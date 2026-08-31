@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- Thème sombre par défaut, comme GEARBOX. `ThemeContext` retire la classe
+     `dark` si l'utilisateur préfère le clair. La valeur est posée ici pour éviter
+     un flash blanc au premier rendu. -->
+<html lang="fr" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Relance Bony</title>
+
+    <!-- Charte Bony : Syncopate pour les titres, Albert Sans pour le texte.
+         Mêmes familles et mêmes graisses que GEARBOX. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Albert+Sans:ital,wght@0,100..900;1,100..900&family=Syncopate:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Alignée sur --bg-main du thème sombre ; ThemeContext la met à jour. -->
+    <meta name="theme-color" content="#121212" />
+  </head>
+  <body>
+    <div id="racine"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

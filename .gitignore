@@ -1,0 +1,36 @@
+# Dependances
+node_modules
+
+# Build
+dist
+dist-ssr
+backend/dist
+*.local
+
+# Secrets — JAMAIS committes
+.env
+.env.*
+!.env.example
+backend/.env
+ACCES-INFRA-SECRET.md
+
+# Base locale (Postgres portable, si utilise)
+.pgdata/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+vite-dev.log
+
+# Editeurs / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

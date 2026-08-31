@@ -1,0 +1,2906 @@
+/* ============================================================================
+   CHARTE BONY — reprise de GEARBOX (`gearbox3backup/index.html`).
+
+   Mêmes valeurs, mêmes noms de tokens (`--bg-main`, `--bg-panel`, `--text-main`,
+   `--glass-*`, `--wash-*`), même couche « liquid glass », mêmes classes
+   `.glass` / `.glass-strong` / `.glass-menu`. Porter un écran d'un projet à
+   l'autre ne demande donc aucune traduction de variables.
+
+   DIFFÉRENCE ASSUMÉE : GEARBOX passe par Tailwind chargé depuis un CDN. Ici tout
+   est en CSS simple. Deux raisons — la grille du module C impose ses propres
+   contraintes de mise en page et ne gagnerait rien à des classes utilitaires, et
+   Tailwind par CDN ajoute une dépendance réseau au démarrage. La charte, elle,
+   est identique : couleurs, polices, dégradé, verre.
+
+   LOGO : le logotype GEARBOX est un logotype PRODUIT, pas la marque du groupe.
+   Il n'est donc pas réutilisé ici. `RELANCE` est composé en Syncopate dans le
+   dégradé Bony. Si un logotype dédié existe, il remplace `.logotype`.
+   ============================================================================ */
+
+:root {
+  /* ---- Marque Bony ---- */
+  --bony-orange: #f75632;
+  --bony-violet: #8f12ab;
+  --bony-blue: #293f74;
+  --bony-gradient: linear-gradient(to right, #f75632, #8f12ab);
+  --bony-gradient-hover: linear-gradient(to right, #ff6b4a, #a62bc4);
+
+  /* ---- Thème clair ---- */
+  --bg-main: #f1f5f9;
+  --bg-panel: #ffffff;
+  --bg-input: #f8fafc;
+  --border-color: #cbd5e1;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+
+  /* ---- Verre ---- */
+  --glass-bg: rgba(255, 255, 255, 0.38);
+  --glass-bg-strong: rgba(255, 255, 255, 0.66);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-blur: 30px;
+
+  --glass-menu-bg: rgba(255, 255, 255, 0.9);
+  --glass-menu-border: rgba(255, 255, 255, 0.9);
+
+  --panel-glass-bg: rgba(255, 255, 255, 0.5);
+  --panel-glass-border: rgba(255, 255, 255, 0.7);
+
+  /* ---- Washes du fond ---- */
+  --wash-1: rgba(247, 86, 50, 0.3);
+  --wash-2: rgba(143, 18, 171, 0.28);
+  --wash-3: rgba(41, 63, 116, 0.22);
+
+  /* ---- Sémantique métier ---- */
+  --succes: #1c7a35;
+  --succes-fond: rgba(28, 122, 53, 0.1);
+  --attention: #a56200;
+  --attention-fond: rgba(165, 98, 0, 0.12);
+  --erreur: #c62828;
+  --erreur-fond: rgba(198, 40, 40, 0.1);
+
+  --rayon: 14px;
+  --rayon-petit: 9px;
+  --ressort: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  font-family: 'Albert Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+html.dark {
+  /* Legerement releve : sur un noir absolu, un wash colore se lit comme une
+     tache et non comme une lumiere. */
+  --bg-main: #14141a;
+  --bg-panel: #1e1e1e;
+  --bg-input: rgba(0, 0, 0, 0.2);
+  --border-color: #333333;
+  --text-main: #ffffff;
+  --text-muted: #94a3b8;
+
+  /* DU VERRE, PAS DE LA PEINTURE. Ces fonds etaient trop opaques (0.58 pour un
+     panneau) : le degrade du fond ne passait pas a travers, et l'interface se
+     lisait comme une suite de rectangles gris sur un fond noir. Abaisses, ils
+     laissent la couleur du groupe monter dans les panneaux — c'est tout l'objet
+     du liquid glass, et c'est ce qui manquait.
+
+     Le flou compense la transparence : le texte reste lisible parce que ce qui
+     est derriere est diffus, pas parce que le fond est epais. */
+  --glass-bg: rgba(26, 26, 34, 0.34);
+  --glass-bg-strong: rgba(30, 30, 38, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.14);
+
+  /* Le menu reste plus dense : il flotte AU-DESSUS du contenu qui defile, et une
+     barre translucide sur du texte en mouvement est illisible. */
+  --glass-menu-bg: rgba(22, 22, 28, 0.8);
+  --glass-menu-border: rgba(255, 255, 255, 0.16);
+
+  --panel-glass-bg: rgba(26, 26, 34, 0.4);
+  --panel-glass-border: rgba(255, 255, 255, 0.12);
+
+  --wash-1: rgba(247, 86, 50, 0.5);
+  --wash-2: rgba(143, 18, 171, 0.46);
+  --wash-3: rgba(41, 63, 116, 0.4);
+
+  --succes: #6ee7a0;
+  --succes-fond: rgba(110, 231, 160, 0.12);
+  --attention: #f0c070;
+  --attention-fond: rgba(240, 192, 112, 0.14);
+  --erreur: #ff8a80;
+  --erreur-fond: rgba(255, 138, 128, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  max-width: 100%;
+  /* La page ne défile JAMAIS horizontalement : c'est le contenu large — grille
+     de marques, planning de saisie — qui défile dans son propre cadre. */
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  color: var(--text-main);
+  background-color: var(--bg-main);
+  min-height: 100vh;
+  /* Le degrade vit dans deux couches animees, `body::before` et `body::after` :
+     voir la section « FOND VIVANT » en fin de fichier. */
+}
+
+/* ---------------------------------------------------------------- verre */
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(200%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 8px 32px -6px rgba(16, 18, 32, 0.18),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.55);
+}
+
+.glass-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(200%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 8px 32px -6px rgba(16, 18, 32, 0.18),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.55);
+}
+
+html.dark .glass,
+html.dark .glass-strong {
+  box-shadow:
+    0 10px 36px -8px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+}
+
+.glass-menu {
+  background: var(--glass-menu-bg);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid var(--glass-menu-border);
+  box-shadow:
+    0 20px 50px -12px rgba(16, 18, 32, 0.35),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+}
+
+html.dark .glass-menu {
+  box-shadow:
+    0 24px 60px -12px rgba(0, 0, 0, 0.72),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Sans backdrop-filter, le verre devient illisible : on le rend quasi opaque. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-strong,
+  .glass-menu,
+  .carte,
+  header {
+    background: var(--bg-panel);
+  }
+}
+
+/* ---------------------------------------------------------------- typographie */
+
+h1,
+h2,
+h3,
+.logotype {
+  font-family: 'Syncopate', 'Albert Sans', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+h2 {
+  margin: 0 0 0.35rem;
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+h3 {
+  margin: 0 0 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.logotype {
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  background: var(--bony-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  white-space: nowrap;
+}
+
+.note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.attente {
+  padding: 3rem;
+  color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------- cartes */
+
+.carte {
+  background: var(--panel-glass-bg);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid var(--panel-glass-border);
+  border-radius: var(--rayon);
+  padding: 1.3rem 1.4rem;
+  box-shadow:
+    0 2px 8px rgba(16, 18, 32, 0.05),
+    0 16px 40px -8px rgba(16, 18, 32, 0.12);
+  overflow-x: auto;
+}
+
+html.dark .carte {
+  box-shadow: 0 16px 44px -14px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------------------------------------------------------------- connexion */
+
+.connexion {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.connexion form {
+  width: 100%;
+  max-width: 23rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 2rem;
+}
+
+.connexion .logotype {
+  font-size: 1.45rem;
+  letter-spacing: 0.2em;
+}
+
+.sous-titre {
+  margin: 0.45rem 0 1.4rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------- champs */
+
+label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-top: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--rayon-petit);
+  background: var(--bg-input);
+  color: var(--text-main);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--bony-orange);
+  box-shadow: 0 0 0 3px rgba(247, 86, 50, 0.18);
+}
+
+input[type='checkbox'] {
+  padding: 0;
+  accent-color: var(--bony-orange);
+}
+
+textarea {
+  width: 100%;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 0.8rem;
+  resize: vertical;
+}
+
+/* ==========================================================================
+   BOUTONS — REGLE INVERSEE.
+
+   Une regle fourre-tout donnait le degrade Bony a TOUT bouton d'un ecran, avec
+   une liste d'exceptions qui s'allongeait :
+   `button:not(.lien):not(.onglet):not(.secondaire):not(.retirer):not(.bascule):not(.vendeur)`.
+
+   Elle a fini par attraper les segments du tableau de bord, les en-tetes de
+   colonne triables et les cartes de vendeur du module B : trois surfaces qui se
+   sont retrouvees en degrade plein, cote a cote, illisibles. Chaque nouveau
+   composant devait PENSER a s'exclure, et celui qui oubliait devenait criard.
+
+   La regle est donc inversee. LE DEFAUT EST NEUTRE, le degrade s'OBTIENT en
+   ajoutant `.principal`. Le mode d'echec change de sens : un bouton oublie est
+   discret au lieu d'etre agressif.
+
+   TOUT BOUTON REAGIT — au survol, a l'appui, au focus clavier. Un bouton qui ne
+   bouge pas sous la souris ne se lit pas comme un bouton.
+   ========================================================================== */
+
+button {
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--rayon-petit);
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  color: var(--text-main);
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease,
+    transform 0.12s var(--ressort),
+    box-shadow 0.16s ease;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--bony-orange);
+  background: var(--glass-bg-strong);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* Le focus clavier doit se voir : c'est le seul repere de celui qui n'utilise
+   pas la souris, et la saisie du module C se fait au clavier. */
+button:focus-visible {
+  outline: 2px solid var(--bony-violet);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- L'ACTION PRINCIPALE, en degrade Bony. Une par ecran, deux au plus. ---- */
+
+.principal {
+  font-weight: 600;
+  padding: 0.55rem 1.05rem;
+  border: 1px solid transparent;
+  background-image: var(--bony-gradient);
+  background-color: transparent;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow:
+    0 3px 12px rgba(247, 86, 50, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+/* Reflet haut : c'est ce qui donne au degrade son aspect verre plutot que
+   peinture plate. */
+.principal::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 45%;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.18), transparent 75%);
+  pointer-events: none;
+}
+
+.principal:hover:not(:disabled) {
+  background-image: var(--bony-gradient-hover);
+  border-color: transparent;
+  box-shadow:
+    0 5px 18px rgba(247, 86, 50, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.principal:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+  box-shadow:
+    0 1px 5px rgba(247, 86, 50, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ---- Secondaire : conserve pour les appels existants, aligne sur la base ---- */
+
+button.secondaire {
+  background: var(--bg-input);
+}
+
+button.secondaire:hover:not(:disabled) {
+  border-color: var(--bony-orange);
+  background: var(--glass-bg-strong);
+}
+
+.lien {
+  font: inherit;
+  font-size: 0.82rem;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.lien:hover {
+  color: var(--bony-orange);
+}
+
+button.retirer {
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.15rem 0.28rem;
+  border-radius: 4px;
+}
+
+button.retirer:hover {
+  color: var(--erreur);
+  background: var(--erreur-fond);
+}
+
+button.bascule {
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--rayon-petit);
+  padding: 0.35rem 0.5rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+button.bascule:hover {
+  border-color: var(--bony-orange);
+  color: var(--bony-orange);
+}
+
+/* ---------------------------------------------------------------- en-tête */
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  row-gap: 0.6rem;
+  padding: 0.8rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(200%);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+nav {
+  display: flex;
+  gap: 0.2rem;
+  margin-left: 0.5rem;
+}
+
+.onglet {
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: var(--rayon-petit);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.onglet:hover {
+  color: var(--text-main);
+  background: var(--bg-input);
+}
+
+.onglet.actif {
+  color: #fff;
+  background-image: var(--bony-gradient);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.identite {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.85rem;
+}
+
+.etiquette {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.16rem 0.42rem;
+  border-radius: 5px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.etiquette.marque {
+  background-image: var(--bony-gradient);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* Second segment d'une etiquette : la precision qui la desambigue — la campagne
+   d'une table, par exemple. Meme etiquette, moins d'insistance. */
+.etiquette-suffixe {
+  margin-left: 0.4rem;
+  padding-left: 0.4rem;
+  border-left: 1px solid var(--border-color);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.72;
+}
+
+main {
+  padding: 1.5rem;
+  /* 120rem et non 76rem : la grille de saisie et le tableau de bord ont besoin de
+     la largeur reelle de l'ecran. Cette valeur etait declaree DEUX FOIS dans ce
+     fichier, la seconde ecrasant la premiere — les deux sont fondues ici. */
+  max-width: 120rem;
+}
+
+/* ---------------------------------------------------------------- écrans */
+
+.ecran {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ecran-entete {
+  display: flex;
+  align-items: flex-start;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.ecran-entete > div:first-child {
+  flex: 1 1 22rem;
+}
+
+.ecran-entete .note {
+  max-width: 46rem;
+}
+
+.actions,
+.ajout {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.85rem;
+}
+
+.ajout label,
+.champs label {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.ajout label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-weight: 500;
+  font-size: 0.82rem;
+  color: var(--text-main);
+}
+
+.champs {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.champs label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.barre-outils {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.interrupteur {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-weight: 500;
+  font-size: 0.82rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- progression */
+
+.progression {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 12rem;
+}
+
+.progression strong {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 1.3rem;
+  line-height: 1.1;
+  background: var(--bony-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.progression span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.jauge {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  margin-top: 0.35rem;
+}
+
+.jauge-remplie {
+  height: 100%;
+  background-image: var(--bony-gradient);
+  transition: width 0.3s var(--ressort);
+}
+
+/* ---------------------------------------------------------------- tableaux */
+
+.tableau {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 34rem;
+}
+
+.tableau th,
+.tableau td {
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tableau th {
+  font-size: 0.67rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.tableau tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tableau tbody tr:hover td {
+  background: var(--bg-input);
+}
+
+.colonne-marque,
+.colonne-type,
+.colonne-etat {
+  text-align: center;
+  width: 5.4rem;
+}
+
+.entete-groupe {
+  border-left: 1px solid var(--border-color);
+  color: var(--bony-orange);
+}
+
+td.debut-groupe,
+th.debut-groupe {
+  border-left: 1px solid var(--border-color);
+}
+
+.grille-marques input[type='checkbox'] {
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
+}
+
+tr.a-confirmer td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--attention);
+}
+
+tr.sorti td {
+  opacity: 0.5;
+}
+
+.alerte {
+  color: var(--attention);
+  font-weight: 600;
+}
+
+.ligne-probleme td {
+  background: var(--attention-fond);
+}
+
+/* ---------------------------------------------------------------- listes */
+
+.puces {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+}
+
+.puces li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--rayon-petit);
+  font-size: 0.82rem;
+  background: var(--bg-input);
+}
+
+.liste-creneaux {
+  margin: 0;
+  padding-left: 1.4rem;
+  font-size: 0.85rem;
+}
+
+.liste-creneaux li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.28rem 0;
+}
+
+.liste-creneaux .code {
+  font-family: ui-monospace, Consolas, monospace;
+  min-width: 7rem;
+}
+
+.liste-creneaux .libelle {
+  color: var(--text-muted);
+  min-width: 5rem;
+}
+
+.actions-ligne {
+  display: flex;
+  gap: 0.2rem;
+  margin-left: auto;
+}
+
+.actions-ligne button {
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.18rem 0.42rem;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.actions-ligne button:hover:not(:disabled) {
+  border-color: var(--bony-orange);
+}
+
+.droits {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.4rem 1.2rem;
+  margin: 1.1rem 0;
+  font-size: 0.85rem;
+}
+
+.droits dt {
+  font-weight: 600;
+}
+
+.droits dd {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------- messages */
+
+.erreur-bloc,
+.succes-bloc,
+.info-bloc {
+  padding: 0.75rem 0.95rem;
+  border-radius: var(--rayon-petit);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.erreur-bloc {
+  background: var(--erreur-fond);
+  border: 1px solid var(--erreur);
+  color: var(--erreur);
+}
+
+.succes-bloc {
+  background: var(--succes-fond);
+  border: 1px solid var(--succes);
+  color: var(--succes);
+}
+
+.info-bloc {
+  background: var(--attention-fond);
+  border: 1px solid var(--attention);
+  color: var(--attention);
+}
+
+.apercu {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.9rem;
+}
+
+.resume {
+  font-size: 0.85rem;
+  margin: 0 0 0.8rem;
+  line-height: 1.55;
+}
+
+.conflit {
+  border-color: var(--attention);
+}
+
+.impacts {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+  line-height: 1.65;
+}
+
+/* ============================================================================
+   ECRAN DE SAISIE — module C.
+
+   La contrainte qui gouverne tout : le chef de table saisit au clavier pendant
+   des heures, souvent sur tablette. La liste de gauche et les en-tetes de jours
+   restent COLLES pendant le defilement des creneaux, sinon on perd le repere de
+   « quel vendeur » et « quel jour » des la moitie de la grille.
+   ============================================================================ */
+
+.saisie-corps {
+  display: grid;
+  grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 60rem) {
+  .saisie-corps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------------- liste */
+
+.liste-vendeurs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--panel-glass-bg);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid var(--panel-glass-border);
+  border-radius: var(--rayon);
+  padding: 0.5rem;
+  position: sticky;
+  top: 4.5rem;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+}
+
+.liste-vendeurs .vendeur {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'nom compteur' 'detail compteur';
+  gap: 0 0.6rem;
+  text-align: left;
+  font: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--rayon-petit);
+  background: none;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.liste-vendeurs .vendeur:hover {
+  background: var(--bg-input);
+}
+
+.liste-vendeurs .vendeur.actif {
+  border-color: var(--bony-orange);
+  background: var(--bg-input);
+}
+
+.liste-vendeurs .nom {
+  grid-area: nom;
+  font-size: 0.84rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.liste-vendeurs .nom .etiquette {
+  font-size: 0.6rem;
+  padding: 0.08rem 0.3rem;
+}
+
+.liste-vendeurs .detail {
+  grid-area: detail;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.liste-vendeurs .compteur {
+  grid-area: compteur;
+  align-self: center;
+  font-family: 'Syncopate', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  min-width: 1.8rem;
+  text-align: right;
+}
+
+.total-perimetre {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 0.4rem;
+  padding: 0.6rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.total-perimetre strong {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 1.2rem;
+  background: var(--bony-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------------------------------------------------------------- grille */
+
+.zone-grille {
+  min-width: 0;
+}
+
+.grille {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  outline: none;
+}
+
+.grille:focus-visible {
+  outline: 2px solid var(--bony-orange);
+  outline-offset: 4px;
+  border-radius: var(--rayon);
+}
+
+.tableau-grille {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.82rem;
+  background: var(--panel-glass-bg);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid var(--panel-glass-border);
+  border-radius: var(--rayon);
+  overflow: hidden;
+}
+
+.tableau-grille thead th {
+  position: sticky;
+  top: 3.6rem;
+  z-index: 2;
+  background: var(--glass-menu-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 700;
+  padding: 0.5rem 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tableau-grille .entete-section {
+  text-align: left;
+  min-width: 7rem;
+}
+
+.tableau-grille .creneau {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: left;
+  padding: 0 0.5rem;
+  white-space: nowrap;
+  border-right: 1px solid var(--border-color);
+}
+
+/* Cases dimensionnees pour le doigt (F-C.9) : 2.4rem de haut, pas 1.2. */
+.tableau-grille .case {
+  height: 2.4rem;
+  padding: 0;
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  cursor: text;
+  position: relative;
+}
+
+.tableau-grille .case:last-child {
+  border-right: 0;
+}
+
+.tableau-grille tbody tr:last-child .case {
+  border-bottom: 0;
+}
+
+.tableau-grille .case.figee {
+  cursor: default;
+}
+
+.tableau-grille .case .client {
+  display: block;
+  padding: 0 0.5rem;
+  line-height: 2.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.8rem;
+}
+
+.tableau-grille .case.remplie {
+  background: var(--succes-fond);
+}
+
+.tableau-grille .case.remplie .client {
+  font-weight: 600;
+}
+
+/* La case active doit se voir SANS ambiguite : le chef ne regarde pas l'ecran en
+   permanence, il y revient. Un liseré fin ne suffit pas. */
+.tableau-grille .case.active {
+  box-shadow: inset 0 0 0 2px var(--bony-orange);
+}
+
+.tableau-grille .case form,
+.tableau-grille .case input {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.tableau-grille .case input {
+  border: 0;
+  border-radius: 0;
+  background: var(--bg-panel);
+  padding: 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 2px var(--bony-orange);
+}
+
+.tableau-grille .case input:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--bony-orange);
+}
+
+.aide-clavier {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+kbd {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.32rem;
+  border: 1px solid var(--border-color);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-input);
+  color: var(--text-main);
+}
+
+.etat-enregistrement {
+  color: var(--bony-orange);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- correctif
+   La regle de bouton principal ci-dessus est un fourre-tout : elle cible tous les
+   boutons d'un `.ecran` sauf une liste d'exceptions, et elle avait deja avale les
+   vendeurs de la liste de saisie — tous affiches en degrade, donc tous apparemment
+   actifs, avec un detail illisible.
+
+   Le degrade est desormais reserve a la selection reelle. A retenir : cette regle
+   negative devra devenir positive (une classe sur les boutons principaux) des
+   qu'un troisieme ecran s'y heurtera. */
+
+.liste-vendeurs .vendeur.actif {
+  background-image: var(--bony-gradient);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(16, 18, 32, 0.16);
+}
+
+.liste-vendeurs .vendeur.actif .detail {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.liste-vendeurs .vendeur.actif .etiquette {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+/* ---------------------------------------------------------------- correctif
+   DEFILEMENT DE LA GRILLE DANS SON PROPRE CADRE.
+
+   Premiere version : `thead` colle a `top: 3.6rem`, une valeur censee egaler la
+   hauteur de l'en-tete de page. Mais cet en-tete se replie sur ecran etroit, sa
+   hauteur varie, et la premiere ligne de creneaux passait sous lui.
+
+   Une constante qui doit egaler la hauteur d'un element variable est un bug qui
+   attend. La grille defile donc dans SON conteneur : le `thead` colle a `top: 0`
+   de ce conteneur, ce qui ne depend plus de rien. Effet de bord souhaitable — la
+   liste des vendeurs reste visible pendant qu'on parcourt les creneaux, ce que
+   F-C.9 demande sur tablette. */
+
+.zone-grille {
+  max-height: calc(100vh - 9rem);
+  overflow: auto;
+  border-radius: var(--rayon);
+}
+
+.tableau-grille thead th {
+  top: 0;
+}
+
+/* La colonne des creneaux colle a gauche : en faisant defiler les jours d'une
+   campagne qui en compte plus de cinq, on doit garder l'heure sous les yeux. */
+.tableau-grille .creneau,
+.tableau-grille .entete-section {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--glass-menu-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.tableau-grille .entete-section {
+  z-index: 3;
+}
+
+.aide-clavier {
+  position: sticky;
+  bottom: 0;
+  padding: 0.5rem 0.2rem;
+  background: var(--glass-menu-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--rayon-petit);
+}
+
+/* ---------------------------------------------------------------- correctif
+   AFFICHAGE UNE COLONNE (tablette, volet etroit).
+
+   La liste des vendeurs est collante avec son propre defilement, ce qui est juste
+   en deux colonnes — elle reste sous les yeux pendant qu'on parcourt les creneaux.
+   En UNE colonne, elle occupe toute la largeur, et son defilement interne capturait
+   la molette : la page ne bougeait plus.
+
+   En une colonne elle reprend donc le flux normal, et c'est la grille qui garde son
+   cadre defilant. */
+
+@media (max-width: 60rem) {
+  .liste-vendeurs {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .zone-grille {
+    max-height: 70vh;
+  }
+}
+
+/* ==========================================================================
+   MODULE B — le plateau de composition des tables.
+
+   Colonnes cote a cote, defilement horizontal quand il y en a beaucoup : c'est
+   la forme des onglets `TABLES(EAA)` et `TABLES(SUD)` du fichier source, et
+   c'est celle qu'un chef de plaque lit sans reflechir.
+
+   Les zones de depot s'ANNONCENT quand une selection est en cours (`.cible`) et
+   se marquent au survol (`.survolee`). Sans ces deux etats, le glisser-deposer
+   est un pari : rien ne dit ou l'on peut lacher.
+   ========================================================================== */
+
+.selecteurs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ligne-formulaire {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.ligne-formulaire input,
+.ligne-formulaire select {
+  margin: 0;
+}
+
+.plateau {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 0.7rem;
+  margin-top: 1rem;
+}
+
+.colonne-table {
+  flex: 0 0 17rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--panel-glass-bg);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid var(--panel-glass-border);
+  border-radius: var(--rayon);
+  padding: 0.8rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+/* La reserve n'est pas un reliquat : elle a la meme importance visuelle qu'une
+   table, parce que ses vendeurs sont saisissables (F-B.8). */
+.colonne-table.reserve {
+  flex: 0 0 15rem;
+  border-left: 3px solid var(--bony-blue);
+}
+
+/* Une selection est en cours : les destinations possibles se signalent. */
+.colonne-table.cible {
+  border-color: var(--bony-orange);
+  cursor: pointer;
+}
+
+.colonne-table.survolee {
+  border-color: var(--bony-violet);
+  box-shadow: 0 0 0 2px rgba(143, 18, 171, 0.25);
+}
+
+.colonne-table > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.colonne-table > header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.colonne-table .champs-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.colonne-table .champs-table label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.colonne-table .champs-table select {
+  margin: 0;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.4rem;
+}
+
+.cartes-vendeurs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 2.5rem;
+}
+
+/* Regle POSITIVE et non un `:not(...)` : la couche de boutons du projet a deja
+   ete corrigee une fois par une negation, et une negation de plus deviendrait
+   illisible. Ici on redefinit tout ce qui compte. */
+.cartes-vendeurs .carte-vendeur {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 0.5rem;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: calc(var(--rayon) - 4px);
+  padding: 0.35rem 0.5rem;
+  color: var(--text-main);
+  font: inherit;
+  cursor: grab;
+}
+
+.cartes-vendeurs .carte-vendeur:hover {
+  background: var(--bg-input);
+  border-color: var(--border-color);
+}
+
+.cartes-vendeurs .carte-vendeur.selectionne {
+  background: var(--bony-gradient);
+  border-color: transparent;
+  color: #fff;
+}
+
+.cartes-vendeurs .carte-vendeur.selectionne .detail,
+.cartes-vendeurs .carte-vendeur.selectionne .etiquette {
+  color: rgba(255, 255, 255, 0.85);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.cartes-vendeurs .carte-vendeur .nom {
+  font-size: 0.82rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.cartes-vendeurs .carte-vendeur .detail {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  align-self: center;
+}
+
+.cartes-vendeurs .carte-vendeur:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* ==========================================================================
+   PANNEAUX LIVE DU MODULE C.
+
+   Le mot LIVE vient du fichier source : ses classements de l'onglet RANK sont
+   titres « CLASSEMENT LIVE ». Ces chiffres sont regardes PENDANT la session.
+
+   REPLIES PAR DEFAUT, et sous la grille. En cas d'arbitrage entre l'elegance
+   d'un tableau de bord et la fluidite de la saisie, la saisie gagne toujours :
+   la grille ne doit jamais se faire pousser hors de l'ecran.
+
+   Lisible PROJETE : le panneau finit sur un ecran collectif pendant une session,
+   d'ou les tailles de police plus genereuses que celles du reste de l'ecran.
+   ========================================================================== */
+
+.panneaux-live {
+  margin-top: 1.2rem;
+}
+
+.bascule-panneaux {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--rayon);
+  padding: 0.55rem 0.8rem;
+  color: var(--text-main);
+  font-family: 'Syncopate', sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.bascule-panneaux:hover {
+  border-color: var(--bony-orange);
+}
+
+.bascule-panneaux .note {
+  font-family: 'Albert Sans', sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+  margin: 0;
+}
+
+.grille-panneaux {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 0.9rem;
+  margin-top: 0.7rem;
+}
+
+.panneau {
+  background: var(--panel-glass-bg);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid var(--panel-glass-border);
+  border-radius: var(--rayon);
+  padding: 0.8rem 0.9rem;
+}
+
+.panneau > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.panneau > header h4 {
+  margin: 0;
+  font-family: 'Syncopate', sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.panneau > header strong {
+  font-size: 1.4rem;
+  background: var(--bony-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.liste-panneau {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.liste-panneau li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 0 0.6rem;
+  padding: 0.3rem 0.35rem;
+  border-radius: calc(var(--rayon) - 6px);
+}
+
+.liste-panneau.classement li {
+  grid-template-columns: 1.6rem 1fr auto;
+}
+
+.liste-panneau li + li {
+  border-top: 1px solid var(--border-color);
+}
+
+/* Ma table, mise en avant : c'est celle que le chef cherche des yeux. */
+.liste-panneau li.mienne {
+  background: var(--wash-1);
+  border-radius: calc(var(--rayon) - 6px);
+}
+
+.liste-panneau .rang {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.liste-panneau .libelle {
+  font-size: 0.92rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.liste-panneau .detail {
+  grid-column: 1;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.liste-panneau.classement .detail {
+  grid-column: 2;
+}
+
+.liste-panneau strong {
+  grid-row: 1 / span 2;
+  grid-column: -1;
+  font-size: 1.05rem;
+  align-self: center;
+}
+
+.liste-panneau.classement strong {
+  grid-row: 1;
+}
+
+.segments {
+  display: inline-flex;
+  border: 1px solid var(--border-color);
+  border-radius: calc(var(--rayon) - 6px);
+  overflow: hidden;
+}
+
+.segments .segment {
+  background: transparent;
+  border: 0;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.segments .segment.actif {
+  background: var(--bony-gradient);
+  color: #fff;
+}
+
+/* ==========================================================================
+   MODULE D — le tableau de bord.
+
+   Il remplace trois onglets du fichier : les totaux, le suivi compare, les
+   classements. Il finit projete sur un ecran collectif pendant une session,
+   d'ou des chiffres lisibles de loin.
+   ========================================================================== */
+
+/* Les tableaux larges defilent DANS leur conteneur. Le corps de page ne doit
+   jamais defiler horizontalement : sur tablette on perdrait la colonne des
+   libelles. */
+.tableau-defilant {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.tableau .nombre {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tableau .nombre .detail {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.bandeau-jours {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.5rem;
+}
+
+.bandeau-jours .jour {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: calc(var(--rayon) - 4px);
+  background: var(--bg-input);
+}
+
+.bandeau-jours .jour .libelle {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+.bandeau-jours .jour strong {
+  font-size: 1.5rem;
+  background: var(--bony-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  line-height: 1.1;
+}
+
+.bandeau-jours .jour .detail {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.classement-complet {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 0 1.2rem;
+}
+
+.classement-complet li {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  align-items: baseline;
+  gap: 0 0.6rem;
+  padding: 0.35rem 0.2rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.classement-complet .rang {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.classement-complet .libelle {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.classement-complet .detail {
+  grid-column: 2;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.classement-complet strong {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: 1.1rem;
+}
+
+.carte h3 .segments {
+  margin-left: 0.6rem;
+  vertical-align: middle;
+}
+
+/* ==========================================================================
+   ENCADREMENT D'UN SITE, TRI, ET ARCHIVAGE.
+
+   Le bloc d'encadrement est en TETE de la carte du site, avant la liste : c'est
+   une propriete du site, pas d'un vendeur en particulier. Le placer dans le
+   tableau l'aurait noye parmi 16 lignes.
+   ========================================================================== */
+
+.encadrement {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.6rem 0.9rem;
+  padding: 0.7rem 0.8rem;
+  margin-bottom: 0.9rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: calc(var(--rayon) - 4px);
+}
+
+.encadrement label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.encadrement select {
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.85rem;
+  color: var(--text-main);
+}
+
+.encadrement .note {
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.68rem;
+}
+
+/* ------------------------------------------------------------------ tri */
+
+.tableau th.triable {
+  padding: 0;
+}
+
+.tableau th.triable button {
+  width: 100%;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  justify-content: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.tableau th.triable button:hover {
+  color: var(--bony-orange);
+}
+
+/* La fleche est DISCRETE tant que la colonne n'est pas celle du tri : afficher
+   trois fleches franches sur chaque colonne transforme l'en-tete en sapin de
+   Noel. */
+.tableau th.triable .fleche {
+  opacity: 0.3;
+  font-size: 0.65rem;
+}
+
+.tableau th.triable.trie .fleche {
+  opacity: 1;
+  color: var(--bony-orange);
+}
+
+.tableau th.triable.trie {
+  color: var(--text-main);
+}
+
+/* --------------------------------------------------------- actions de ligne */
+
+.tableau td.colonne-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.tableau td.colonne-actions button + button {
+  margin-left: 0.4rem;
+}
+
+/* La poubelle ARCHIVE : geste courant, donc discret. Elle ne se teinte de rouge
+   qu'au survol, pour qu'on la remarque au moment de cliquer et pas avant. */
+.poubelle {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: calc(var(--rayon) - 8px);
+  padding: 0.15rem 0.4rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.poubelle:hover {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.poubelle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* La PURGE, elle, est irreversible : elle s'annonce en rouge d'entree de jeu.
+   C'est le seul bouton de tout le produit qui detruit de l'historique. */
+.destructif {
+  background: transparent;
+  border: 1px solid #dc2626;
+  border-radius: calc(var(--rayon) - 8px);
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+  color: #dc2626;
+  cursor: pointer;
+}
+
+.destructif:hover {
+  background: #dc2626;
+  color: #fff;
+}
+
+.destructif:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ==========================================================================
+   FOND VIVANT — le dégradé tamisé aux couleurs du groupe, en mouvement.
+
+   Le fond était peint sur `body` en `background-attachment: fixed` : figé, et
+   trop discret pour qu'on le remarque. Il vit maintenant dans DEUX couches
+   pseudo-éléments, animées à des vitesses différentes.
+
+   POURQUOI DEUX COUCHES ET NON UNE. Une seule couche translatée donne un
+   glissement uniforme, qu'on lit comme un défaut de rendu. Deux couches de
+   périodes différentes (38 s et 61 s, volontairement non multiples) produisent
+   une dérive qui ne se répète jamais à l'œil.
+
+   `transform` ET NON `background-position` : la transformation est composée par
+   le GPU, donc gratuite. Animer `background-position` sur trois dégradés
+   radiaux plein écran repeint le fond à chaque image et fait tomber les
+   images/seconde — visible pendant une saisie au clavier, qui est justement le
+   moment où l'outil ne doit rien coûter.
+
+   `pointer-events: none` et `z-index: -1` : la couche ne doit jamais intercepter
+   un clic ni passer devant le contenu.
+   ========================================================================== */
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  /* Débordement volontaire : la couche se déplace, et ses bords ne doivent
+     jamais entrer dans le champ. */
+  inset: -35%;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* TROIS couches et non deux : avec deux, on finit toujours par percevoir un
+   aller-retour. Trois periodes premieres entre elles (17 s, 23 s, 31 s) donnent
+   un motif qui ne se referme qu'au bout de plus de trois heures.
+
+   L'AMPLITUDE A ETE FRANCHEMENT AUGMENTEE. La premiere version se deplacait de
+   3 a 5 % en 38 secondes : mathematiquement en mouvement, invisible a l'oeil.
+   On passe a 14-22 % sur des periodes deux fois plus courtes, avec une rotation
+   qui fait tourner les taches au lieu de les faire glisser. */
+body::before {
+  background-image:
+    radial-gradient(ellipse 50% 44% at 16% 10%, var(--wash-1), transparent 62%),
+    radial-gradient(ellipse 46% 40% at 84% 86%, var(--wash-2), transparent 62%);
+  animation: derive-un 17s ease-in-out infinite alternate;
+}
+
+body::after {
+  background-image:
+    radial-gradient(ellipse 44% 38% at 74% 20%, var(--wash-3), transparent 64%),
+    radial-gradient(ellipse 40% 36% at 24% 78%, var(--wash-1), transparent 66%);
+  animation: derive-deux 23s ease-in-out infinite alternate;
+  opacity: 0.9;
+}
+
+/* La troisieme couche vit sur `.application` : `body` n'a que deux
+   pseudo-elements, et on ne va pas ajouter un div de decor dans le DOM pour ca. */
+.application::before {
+  content: '';
+  position: fixed;
+  inset: -40%;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform;
+  background-image:
+    radial-gradient(ellipse 38% 34% at 50% 46%, var(--wash-2), transparent 66%),
+    radial-gradient(ellipse 34% 30% at 8% 60%, var(--wash-3), transparent 68%);
+  opacity: 0.8;
+  animation: derive-trois 31s ease-in-out infinite alternate;
+}
+
+@keyframes derive-un {
+  0% {
+    transform: translate3d(-8%, 4%, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(12%, -10%, 0) scale(1.25) rotate(7deg);
+  }
+  100% {
+    transform: translate3d(-4%, 14%, 0) scale(1.08) rotate(-5deg);
+  }
+}
+
+@keyframes derive-deux {
+  0% {
+    transform: translate3d(10%, -6%, 0) scale(1.18) rotate(4deg);
+  }
+  50% {
+    transform: translate3d(-14%, 8%, 0) scale(1) rotate(-8deg);
+  }
+  100% {
+    transform: translate3d(6%, -12%, 0) scale(1.22) rotate(6deg);
+  }
+}
+
+@keyframes derive-trois {
+  0% {
+    transform: translate3d(4%, 10%, 0) scale(1.1) rotate(-6deg);
+  }
+  50% {
+    transform: translate3d(-16%, -8%, 0) scale(1.3) rotate(9deg);
+  }
+  100% {
+    transform: translate3d(14%, 6%, 0) scale(1.02) rotate(-3deg);
+  }
+}
+
+/* Le mouvement est un agrément, jamais une information. Qui demande moins
+   d'animation garde le dégradé, figé. */
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after,
+  .application::before {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   BARRES DE DEFILEMENT — à la charte.
+
+   Il n'y en avait aucune règle : les barres du système traversaient l'interface
+   en gris clair, et sur le thème sombre ça se voyait plus que le contenu.
+
+   Le pouce porte le dégradé Bony, la piste reste transparente. Firefox n'accepte
+   que `scrollbar-color`, d'où les deux syntaxes — et non l'une OU l'autre.
+   ========================================================================== */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bony-violet) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-image: linear-gradient(to bottom, var(--bony-orange), var(--bony-violet));
+  border-radius: 99px;
+  /* La bordure transparente amincit le pouce sans changer la zone cliquable :
+     une barre fine qui reste facile à attraper. */
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-image: linear-gradient(to bottom, #ff6b4a, #a62bc4);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ==========================================================================
+   LIQUID GLASS — renforcé.
+
+   Le verre était présent mais trop timide : un fond translucide et une bordure,
+   sans les deux détails qui font la différence entre « translucide » et
+   « verre » — le REFLET HAUT et l'OMBRE PORTEE.
+
+   Un panneau de verre se lit à trois choses :
+     1. ce qu'on voit à travers (flou + saturation) ;
+     2. un liseré clair sur l'arête supérieure, où la lumière accroche ;
+     3. une ombre douce dessous, qui le décolle du fond.
+
+   Le point 2 est celui qui manquait partout, et c'est lui qui donne l'épaisseur.
+   ========================================================================== */
+
+.carte,
+.panneau,
+.colonne-table,
+.liste-vendeurs,
+.tableau-grille,
+.apercu {
+  box-shadow:
+    0 8px 28px rgba(10, 12, 24, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+html.dark .carte,
+html.dark .panneau,
+html.dark .colonne-table,
+html.dark .liste-vendeurs,
+html.dark .tableau-grille,
+html.dark .apercu {
+  box-shadow:
+    0 10px 34px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.carte,
+.panneau,
+.colonne-table {
+  backdrop-filter: blur(26px) saturate(190%);
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
+}
+
+/* ==========================================================================
+   SEGMENTS — un vrai contrôle segmenté.
+
+   Ils étaient attrapés par la règle fourre-tout : quatre pavés en dégradé plein,
+   collés, sans aucune réaction au survol ni au clic. Rien ne disait lequel était
+   actif, et rien ne disait qu'ils étaient cliquables.
+
+   Un seul segment porte le dégradé — l'actif. Les autres sont neutres, se
+   teintent au survol, et un séparateur fin les distingue.
+   ========================================================================== */
+
+.segments {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--rayon-petit);
+  background: var(--bg-input);
+  overflow: hidden;
+}
+
+.segments .segment,
+.ecran .segments .segment {
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0.34rem 0.8rem;
+  border-radius: calc(var(--rayon-petit) - 3px);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  box-shadow: none;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.segments .segment:hover:not(.actif),
+.ecran .segments .segment:hover:not(.actif) {
+  background: var(--glass-bg-strong);
+  color: var(--text-main);
+  border-color: transparent;
+}
+
+.segments .segment.actif,
+.ecran .segments .segment.actif {
+  background-image: var(--bony-gradient);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.segments .segment:active:not(:disabled) {
+  transform: none;
+}
+
+/* ==========================================================================
+   CARTES DE VENDEUR (module B) — le dégradé plein en faisait un mur de couleur.
+
+   Chaque carte était un pavé orange-violet : douze côte à côte donnaient une
+   colonne illisible où plus rien ne ressortait, et surtout où la SELECTION ne se
+   voyait plus — tout était déjà au maximum.
+
+   Une carte est maintenant neutre, avec un LISERE DE COULEUR PAR METIER à
+   gauche. Le dégradé est réservé à la carte sélectionnée : il redevient un
+   signal au lieu d'être le fond.
+   ========================================================================== */
+
+.cartes-vendeurs .carte-vendeur,
+.ecran .cartes-vendeurs .carte-vendeur {
+  border: 1px solid transparent;
+  border-left: 3px solid var(--bony-blue);
+  border-radius: calc(var(--rayon-petit) - 2px);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  padding: 0.4rem 0.55rem;
+  font-weight: 500;
+}
+
+/* Le métier se lit à la couleur du liseré, sans occuper de place. */
+.cartes-vendeurs .carte-vendeur:has(.etiquette-vn),
+.cartes-vendeurs .carte-vendeur.vn {
+  border-left-color: var(--bony-orange);
+}
+
+.cartes-vendeurs .carte-vendeur.vo {
+  border-left-color: var(--bony-violet);
+}
+
+.cartes-vendeurs .carte-vendeur:hover:not(:disabled),
+.ecran .cartes-vendeurs .carte-vendeur:hover:not(:disabled) {
+  background: var(--glass-bg-strong);
+  border-color: var(--border-color);
+  border-left-color: var(--bony-orange);
+}
+
+.cartes-vendeurs .carte-vendeur.selectionne,
+.ecran .cartes-vendeurs .carte-vendeur.selectionne {
+  background-image: var(--bony-gradient);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(247, 86, 50, 0.28);
+}
+
+/* ==========================================================================
+   EN-TETES TRIABLES — même cause, même correctif.
+
+   Six en-têtes en dégradé plein sur chaque tableau de chaque site : la ligne
+   d'en-tête criait plus fort que les données. Un en-tête est un repère, pas une
+   action principale.
+   ========================================================================== */
+
+.tableau th.triable button,
+.ecran .tableau th.triable button {
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  border-radius: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tableau th.triable button:hover:not(:disabled),
+.ecran .tableau th.triable button:hover:not(:disabled) {
+  background: var(--glass-bg-strong);
+  color: var(--bony-orange);
+  border-color: transparent;
+}
+
+.tableau th.triable button:active:not(:disabled) {
+  transform: none;
+}
+
+.tableau th.triable.trie button {
+  color: var(--text-main);
+}
+
+/* ==========================================================================
+   TABLEAUX DE DONNEES — lisibilité.
+
+   Le tableau du module D est une grille de neuf colonnes numériques sur dix-neuf
+   lignes, dont l'immense majorité à zéro. Tel quel, l'œil n'a aucun point
+   d'accroche : c'est un mur de chiffres tous de la même intensité, et le seul
+   nombre qui compte se noie parmi les zéros.
+
+   Quatre corrections, dans cet ordre d'importance :
+     1. LES ZEROS SONT ESTOMPES. C'est ce qui change tout — les valeurs non nulles
+        ressortent d'elles-mêmes, sans les mettre en gras.
+     2. En-tête COLLANT : sur dix-neuf lignes on perd le nom des colonnes.
+     3. Alternance et survol de ligne, très légers : de quoi suivre une ligne
+        jusqu'au bout sans que le zébrage devienne un motif.
+     4. Un filet net entre les groupes de colonnes.
+   ========================================================================== */
+
+.tableau {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.tableau thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--glass-menu-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.5rem 0.6rem;
+  white-space: nowrap;
+}
+
+.tableau tbody tr:nth-child(even) td {
+  background: rgba(127, 127, 140, 0.045);
+}
+
+.tableau tbody tr:hover td {
+  background: var(--wash-3);
+}
+
+.tableau td {
+  padding: 0.42rem 0.6rem;
+  border-bottom: 1px solid rgba(127, 127, 140, 0.14);
+}
+
+.tableau tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* LE POINT CLE : un zéro reste lisible mais cesse d'attirer l'œil. */
+.tableau .zero {
+  color: var(--text-muted);
+  opacity: 0.35;
+  font-weight: 400;
+}
+
+.tableau .debut-groupe {
+  border-left: 1px solid var(--border-color);
+}
+
+/* ==========================================================================
+   KPI ET GRAPHIQUES — module D.
+
+   Ce qu'ils remplacent : de l'espace vide. La moitié droite de l'écran était
+   inoccupée pendant que le chiffre le plus important — le total de RDV — se
+   cachait dans un coin de l'en-tête.
+   ========================================================================== */
+
+.bandeau-kpi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.9rem 1rem;
+  background: var(--panel-glass-bg);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid var(--panel-glass-border);
+  border-radius: var(--rayon);
+  box-shadow:
+    0 8px 26px rgba(10, 12, 24, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13);
+}
+
+html.dark .kpi {
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.kpi .libelle {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.kpi strong {
+  font-size: 1.9rem;
+  line-height: 1.05;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* UNE SEULE valeur maîtresse par écran. Le dégradé perd tout son sens dès qu'il
+   est partout — c'est exactement ce qui est arrivé aux boutons. */
+.kpi.maitresse {
+  border-color: rgba(247, 86, 50, 0.35);
+}
+
+.kpi.maitresse strong {
+  font-size: 2.3rem;
+  background: var(--bony-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.kpi .detail {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.grille-graphiques {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+  gap: 0.9rem;
+}
+
+/* ---------------------------------------------------------- barres par jour */
+
+.graphique-jours {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  min-height: 12rem;
+  padding-top: 0.4rem;
+}
+
+.graphique-jours .colonne-jour {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.graphique-jours .valeur {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* La piste garde sa hauteur même quand la barre est à zéro : sans elle, les
+   colonnes vides s'effondrent et l'axe se déforme. */
+.graphique-jours .piste {
+  position: relative;
+  width: 100%;
+  height: 8.5rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(127, 127, 140, 0.09);
+  border-radius: var(--rayon-petit) var(--rayon-petit) 0 0;
+  overflow: hidden;
+}
+
+.graphique-jours .barre {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-image: linear-gradient(to top, var(--bony-violet), var(--bony-orange));
+  border-radius: var(--rayon-petit) var(--rayon-petit) 0 0;
+  /* La croissance s'anime : quand un RDV arrive en temps réel pendant une
+     session, la barre monte au lieu de sauter. */
+  transition: height 0.45s var(--ressort);
+  min-height: 2px;
+}
+
+/* La part VN, plus claire et plus étroite, DEVANT le total : les deux hauteurs
+   partent du même bas, donc elles se comparent sans effort. */
+.graphique-jours .barre.part {
+  left: 28%;
+  right: 28%;
+  background-image: none;
+  background-color: rgba(255, 255, 255, 0.34);
+  border-radius: 3px 3px 0 0;
+}
+
+.graphique-jours .libelle {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-align: center;
+  text-transform: capitalize;
+  white-space: pre-line;
+  line-height: 1.15;
+}
+
+.graphique-jours .detail {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+/* -------------------------------------------------- barres de classement */
+
+.graphique-classement {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.graphique-classement .ligne-barre {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(6rem, 9rem) 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.graphique-classement .rang {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.graphique-classement .libelle {
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.graphique-classement .piste {
+  height: 0.7rem;
+  background: rgba(127, 127, 140, 0.09);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.graphique-classement .barre {
+  height: 100%;
+  background-image: var(--bony-gradient);
+  border-radius: 99px;
+  transition: width 0.45s var(--ressort);
+  min-width: 2px;
+}
+
+.graphique-classement strong {
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 2ch;
+  text-align: right;
+}
+
+.graphique-classement .zero {
+  color: var(--text-muted);
+  opacity: 0.35;
+  font-weight: 400;
+}
+
+/* ==========================================================================
+   LARGEUR — les données prennent la place, la prose non.
+
+   `main` était plafonné à 76 rem, soit ~1216 px. Sur un écran de 1890 px, la
+   moitié droite de l'écran de saisie restait vide alors que la grille — cinq
+   jours de colonnes — avait tout à y gagner. Même chose pour le tableau du module
+   D et ses neuf colonnes.
+
+   Le plafond est relevé à 120 rem. Il n'est pas SUPPRIME : sans borne, une ligne
+   de texte traverse un écran 4K et devient illisible.
+
+   Et pour que le relâchement ne dégrade pas la lecture, LES PARAGRAPHES gardent
+   leur propre limite en `ch` — une largeur de colonne de texte confortable
+   n'excède pas 70 caractères, quelle que soit la taille de l'écran.
+   ========================================================================== */
+
+.ecran-entete .note,
+.carte > .note,
+.panneau > .note {
+  max-width: 70ch;
+}
+
+/* La grille de saisie prend toute la largeur disponible : les colonnes de jour
+   s'étirent, les cases deviennent confortables au doigt (F-C.9). */
+.saisie-corps {
+  grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr);
+}
+
+.tableau-grille .case {
+  min-width: 7rem;
+}
+
+/* ==========================================================================
+   RECHERCHE DE VENDEUR — module C.
+
+   Le périmètre d'un administrateur compte 98 vendeurs : trouver « ROUSSET » dans
+   la liste demandait de la faire défiler. Sur une table de six, le champ ne sert
+   à rien et reste discret ; sur 98, il change tout.
+   ========================================================================== */
+
+.recherche-vendeur {
+  position: relative;
+  padding: 0 0.15rem 0.4rem;
+}
+
+.recherche-vendeur input {
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 2rem 0.45rem 0.6rem;
+  font-size: 0.82rem;
+}
+
+.recherche-vendeur .effacer {
+  position: absolute;
+  right: 0.5rem;
+  top: 0.35rem;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  padding: 0.15rem 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.recherche-vendeur .effacer:hover {
+  color: var(--bony-orange);
+  border-color: transparent;
+  background: transparent;
+}
+
+.recherche-vendeur .compte {
+  display: block;
+  padding: 0.25rem 0.6rem 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   COLONNES DU MODULE B — finition.
+
+   Les cartes de vendeur en dégradé plein ont été traitées plus haut. Restait la
+   colonne elle-même : un empilement de blocs sans hiérarchie, où le titre de la
+   table, son effectif, ses deux sélecteurs et ses douze membres avaient tous le
+   même poids visuel.
+
+   Un FILET DE COULEUR en haut de chaque colonne donne le repère qui manquait, et
+   la colonne survolée se détache — c'est ce qui rend un glisser-déposer lisible.
+   ========================================================================== */
+
+.colonne-table {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Le filet ne prend aucune place dans le flux : il est peint par-dessus l'arête
+   supérieure, à l'intérieur du rayon de bordure. */
+.colonne-table::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-image: var(--bony-gradient);
+  opacity: 0.55;
+  transition: opacity 0.18s ease;
+}
+
+.colonne-table:hover::before {
+  opacity: 1;
+}
+
+/* La réserve porte le bleu du groupe et non le dégradé : ce n'est pas une table,
+   et la distinction doit se voir sans lire le titre. */
+.colonne-table.reserve::before {
+  background-image: none;
+  background-color: var(--bony-blue);
+  opacity: 0.9;
+}
+
+.colonne-table > header h3 {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* L'effectif est le chiffre qu'on cherche du regard : il mérite d'être un
+   chiffre, pas une étiquette parmi d'autres. */
+.colonne-table > header .etiquette {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  padding: 0.1rem 0.5rem;
+  background: transparent;
+  border: 0;
+  color: var(--text-main);
+}
+
+.colonne-table .champs-table select {
+  font-size: 0.76rem;
+  padding: 0.28rem 0.4rem;
+}
+
+/* ==========================================================================
+   ENCADREMENT (écran Vendeurs) — les trois sélecteurs.
+
+   Ils étaient corrects mais noyés : même fond que la carte, même poids que le
+   tableau en dessous. Un liseré gauche et un fond légèrement creusé suffisent à
+   dire « ceci concerne le SITE, pas les lignes ».
+   ========================================================================== */
+
+.encadrement {
+  border-left: 3px solid var(--bony-violet);
+  background: rgba(127, 127, 140, 0.07);
+}
+
+.encadrement label {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.07em;
+}
+
+/* ==========================================================================
+   ETIQUETTES — un peu de couleur là où elle porte du sens.
+
+   `VN` et `VO` reviennent partout : liste de saisie, cartes de table, tableaux.
+   Toutes grises, elles obligent à lire ; teintées, elles se reconnaissent du coin
+   de l'œil. C'est la seule information que la couleur porte ici — le reste des
+   étiquettes reste neutre.
+   ========================================================================== */
+
+.etiquette {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* Sélecteur par contenu impossible en CSS : c'est le composant qui pose la
+   classe quand l'étiquette porte un métier. À défaut, la teinte vient du liseré
+   de la carte, déjà en place. */
+/* Les deux teintes sont declinees par theme. Un violet clair (#c46ad8) lisible
+   sur fond sombre passe sous le seuil de contraste sur fond clair, et l'inverse
+   pour le violet de marque. On ne garde pas une seule valeur « qui passe a peu
+   pres » des deux cotes. */
+.etiquette.vn {
+  border-color: rgba(247, 86, 50, 0.5);
+  color: #c9350f;
+}
+
+.etiquette.vo {
+  border-color: rgba(143, 18, 171, 0.55);
+  color: #7d0f96;
+}
+
+html.dark .etiquette.vn {
+  color: #ff8a6b;
+}
+
+html.dark .etiquette.vo {
+  color: #d98ae8;
+}
+
+/* ==========================================================================
+   ONGLETS DE NAVIGATION — l'actif doit se voir, les autres réagir.
+   ========================================================================== */
+
+.onglet:hover:not(.actif) {
+  background: var(--glass-bg-strong);
+  color: var(--text-main);
+  border-color: transparent;
+}
+
+.onglet.actif {
+  background-image: var(--bony-gradient);
+  color: #fff;
+  font-weight: 600;
+  border-color: transparent;
+  box-shadow:
+    0 3px 12px rgba(247, 86, 50, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* ==========================================================================
+   MENUS DEROULANTS — à la charte, état fermé ET liste ouverte.
+
+   Ils portaient `background: var(--bg-input)`, soit `rgba(0,0,0,0.2)` en thème
+   sombre : un fond quasi transparent que le système remplaçait par son propre
+   gris. Et la liste ouverte restait celle de l'OS, gris clair sur fond gris.
+
+   DEUX SURFACES A TRAITER, et c'est ce qui manquait :
+     1. LE CHAMP FERME — `appearance: none` pour reprendre la main, plus un
+        chevron dessiné en fond. Sans `appearance: none`, la flèche du système
+        reste et se superpose à la nôtre.
+     2. LES OPTIONS — `option` accepte `background-color` et `color` sur Chrome et
+        Firefox sous Windows. C'est la seule prise qu'on ait sur la liste ouverte,
+        et elle suffit : sans elle, le menu déroulant est le seul endroit de
+        l'application qui ignore le thème.
+   ========================================================================== */
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.1rem;
+  background-color: var(--glass-bg-strong);
+  /* Chevron en SVG encodé : aucun fichier à charger, et il suit la couleur du
+     texte atténué par la variable CSS. */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%2394a3b8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.7rem;
+  cursor: pointer;
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+}
+
+select:hover:not(:disabled) {
+  border-color: var(--bony-orange);
+}
+
+select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* La liste ouverte. Opaque et non translucide : elle flotte au-dessus du
+   contenu, et du texte translucide sur du texte est illisible. */
+select option {
+  background-color: var(--bg-panel);
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+select option:checked {
+  background-color: var(--bony-violet);
+  color: #fff;
+}
+
+/* En thème sombre le chevron doit s'éclaircir, sinon il disparaît. */
+html.dark select {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23b9c3d1' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+html.dark select option {
+  background-color: #1c1c24;
+}
+
+/* Les champs de saisie suivent la même logique de verre que le reste. */
+input,
+textarea {
+  background-color: var(--glass-bg-strong);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+}
+
+input:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: var(--bony-orange);
+}
+
+/* Les cases à cocher portent la couleur du groupe. `accent-color` est la seule
+   propriété qui les teinte sans les reconstruire — et une case reconstruite
+   perd son comportement clavier. */
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--bony-orange);
+  width: 1.05rem;
+  height: 1.05rem;
+  cursor: pointer;
+}
+
+input[type='date'] {
+  color-scheme: light;
+}
+
+html.dark input[type='date'] {
+  /* Sans ça, le sélecteur de date natif reste blanc sur le thème sombre. */
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   GESTION DES COMPTES.
+
+   Le mot de passe n'apparaît QU'UNE FOIS. Le bloc qui le porte doit donc se
+   remarquer sans ambiguïté, et ne pas disparaître tout seul : le faire s'effacer
+   au bout de quelques secondes garantirait qu'on le perde.
+   ========================================================================== */
+
+.mot-de-passe-unique {
+  border-color: var(--bony-orange);
+  box-shadow:
+    0 10px 34px rgba(247, 86, 50, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.mot-de-passe {
+  display: block;
+  margin: 0.6rem 0;
+  padding: 0.7rem 0.9rem;
+  font-family: 'Courier New', monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: center;
+  background: var(--bg-input);
+  border: 1px dashed var(--bony-orange);
+  border-radius: var(--rayon-petit);
+  /* Sélectionnable d'un coup : on va le copier, pas le lire. */
+  user-select: all;
+}
+
+/* Les rattachements d'un compte : plusieurs étiquettes par cellule, qui doivent
+   pouvoir passer à la ligne sans casser la hauteur du tableau. */
+.puces-role {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.tableau code {
+  font-size: 0.78rem;
+  padding: 0.1rem 0.35rem;
+  background: var(--bg-input);
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+/* Un compte désactivé reste lisible mais se retire du premier plan. */
+.tableau tbody tr.sorti td {
+  opacity: 0.5;
+}

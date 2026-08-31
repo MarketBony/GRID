@@ -1,0 +1,746 @@
+# BUGS-CONNUS
+
+Mise a jour : 31/08/2026, apres le chantier encadrants et comptes.
+
+Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
+verifie, pas seulement corrige de memoire.
+
+---
+
+## Ouvert — donnees a confirmer
+
+### [CORRIGE] Vite rechargeait la page entiere a chaque edition de la grille
+
+`components/GrilleVendeur.tsx` exportait a la fois un composant React et la fonction
+`cleRdv`. Vite refuse alors le rafraichissement a chaud
+(« Could not Fast Refresh — export is incompatible ») et **recharge la page**.
+
+Consequence bien pire que la gene de developpement : les tests manuels devenaient
+trompeurs. On croit observer une perte de saisie alors qu'on observe un rechargement au
+milieu de la sequence — ce qui a coute plusieurs fausses pistes sur le defaut ci-dessus.
+
+`cleRdv` et `libelleJour` vivent desormais dans `utils/grille.ts`. **Regle a retenir : un
+module qui exporte un composant n'exporte QUE des composants.**
+
+### [A CONNAITRE] Un test d'integration qui cree une entite metier laisse une trace
+
+Consequence directe de l'interdit n.1 : `test:api` cree un vendeur et des RDV, et
+l'application ne peut supprimer ni l'un ni les autres — les triggers
+`vendeur_pas_de_delete` et `rdv_pas_de_delete` s'y opposent, ce qui est exactement le
+comportement voulu en production.
+
+Traitement retenu : le script **purge son propre residu au debut du passage suivant**, par
+la porte de purge (`SET LOCAL relance.purge_autorisee`). Le filtrage est etroit et ne peut
+pas deraper — le nom du vendeur commence par `VENDEUR VERIF API` et le client du RDV vaut
+exactement `CLIENT VERIF API`, deux marqueurs qu'aucune donnee reelle ne porte.
+
+La base ne garde donc qu'**un** vendeur de test et **un** RDV de test entre deux passages,
+au lieu d'en accumuler un de plus a chaque fois. Voir le defaut corrige plus bas.
+
+Pour repartir propre : `drop schema relance cascade`, puis `migrate:deploy` et `seed`.
+
+La lecon generale, valable pour la suite : **les tests qui creent des donnees metier ont
+besoin d'une base jetable.** C'est a prevoir si une integration continue est mise en place.
+
+### [DONNEES] Les MARQUES des vendeurs VN sont un placeholder
+
+**Une seule dimension reste a confirmer, et non deux.** Le fichier source a ete relu :
+
+*Types de vehicule (VN / VO)* : **ce n'est plus un placeholder.** L'onglet `RESULTATS`
+donne le TYPE explicitement, vendeur par vendeur, et `scripts/extraire-xlsx.mjs` le reprend
+tel quel — **72 VN et 27 VO**, somme verifiee contre les totaux par site (1107 des deux
+cotes). Le seed echoue fort si l'un des 99 noms ne s'apparie pas. Le metier est donc une
+donnee reelle, portee par la colonne scalaire `vendeur.type_vehicule`.
+
+*Marques* : toujours un placeholder. Tous les blocs vendeur du fichier portent une section
+Renault ET une section Dacia, quelle que soit la realite du terrain. Ce que le fichier donne
+est une **activite** (`REN 0 / DAC 20`), pas une **autorisation** : un vendeur a zero RDV
+Renault peut etre Dacia seul, ou n'avoir simplement rien vendu ce mois-la. On ne le deduit
+donc pas. Le seed pose les marques DU SITE, ce qui est verifiable et non devine — Alpine
+seul pour le site ALPINE, Renault + Dacia ailleurs.
+
+**Consequence exacte : tant que ce n'est pas corrige, R-C.1 ne protege pas les VN.** Le
+trigger `rdv_marque_autorisee` fonctionne — il est teste — mais il autorise tout, puisque
+tout le monde est declare bi-marque. N'importe quel RDV Dacia passera sur un vendeur
+exclusivement Renault.
+
+**Les VO, eux, sont proteges** : `rdv_marque_selon_metier` impose `marque_id IS NULL` pour
+un vendeur VO, et `rdv_type_coherent` impose l'egalite avec le metier du vendeur.
+
+**Etat au 28/08/2026 : l'outil de correction existe** (ecran Vendeurs), avec import par
+collage, grille de cochage, et modification du metier et des marques dans le meme
+enregistrement. `vendeur.capacites_confirmees_le` distingue une donnee validee du
+placeholder.
+
+Verifie : un vendeur passe en Renault seul refuse bien un RDV Dacia
+(`RELANCE: ANTOINE BASTIEN n'est pas autorise a vendre Dacia.`).
+
+**LE SUIVI CHIFFRE DE CETTE DETTE A ETE RETIRE le 31/08/2026**, sur decision de
+l'utilisateur : un vendeur present en base est valide, point. La jauge « x/72 » et sa route
+n'existent plus.
+
+Le sujet de fond reste : restreindre un vendeur VN a une seule marque se fait vendeur par
+vendeur depuis l'ecran Vendeurs, et c'est ce qui donne du mordant a R-C.1. Simplement, ce
+n'est plus presente comme une dette a solder — une progression qui ne bouge jamais devient un
+reproche permanent.
+
+### [DONNEES] Dates de la campagne de septembre 2026 en placeholder
+
+Le seed cree « Septembre 2026 » du jeudi 10 au lundi 14 septembre, par analogie avec juin
+(jeudi a lundi, week-end inclus). Dates inventees, a confirmer. A saisir dans l'ecran
+Campagnes — ce qui est aussi le critere de recette n.2 : changer les jours d'une campagne
+doit prendre moins de 30 secondes et les 99 plannings doivent suivre.
+
+Le seed a longtemps pose le **14 au 18** alors que ce fichier annoncait le 10 au 14 : la
+divergence est levee, code et documentation disent maintenant la meme chose. Voir le defaut
+corrige plus bas.
+
+### [DONNEES] L'onglet `MDP` du fichier source
+
+Coquille vide, site sans vendeur. La ligne est commentee dans `seed_referentiels.sql` et
+n'est donc pas reprise. A confirmer : site a venir, ou residu ? Le modele accepte un site
+sans vendeur (F-A2.4), donc l'ajouter ne coute rien si c'est un vrai site.
+
+### [OUVERT] Les 8 chefs de table ne recoivent aucun RDV en propre
+
+Severine Besson, Thierry Coignac, Lucien Marchetti, JF Larget, Mickael Masson, Franck
+Nogues, Jerome Hebert, Gilles Parrain. Aucun ne figure parmi les 99 vendeurs : ce sont
+des encadrants sans bloc de saisie, ce qui est exactement pourquoi `Utilisateur` est
+distinct de `Vendeur`.
+
+Le modele le permet via `table_phoning.chef_utilisateur_id`, et le seed les cree comme
+utilisateurs sans role global. **A confirmer** qu'aucun ne doit recevoir de RDV a son
+nom. Si l'un d'eux vend aussi, il faut le creer en `Vendeur` et le relier par
+`Vendeur.utilisateurId`.
+
+---
+
+## Resolu — 28/08/2026
+
+### [RESOLU] Saisie enchainee : c'etait le pilote de test, pas l'application
+
+Signale ouvert en priorite 1 en fin de J3 : dans la grille, taper un nom, `Entree`, le nom
+suivant, `Entree`… semblait perdre un mot sur deux. **Verifie au clavier reel par
+l'utilisateur : la saisie enchainee fonctionne.** Le defaut etait un artefact de
+l'automatisation, comme les trois indices le laissaient craindre — la touche `Return` non
+reconnue par le pilote alors qu'`Enter` l'est, les rechargements Vite en pleine sequence, et
+l'envoi des caracteres par rafales.
+
+Quatre defauts reels avaient tout de meme ete trouves et corriges en chemin, et ils
+restent corriges : soumission implicite de `<form>` remplacee par un gestionnaire explicite ;
+`edition`, `active` et `brouillon` doubles par des refs parce que les gestionnaires lisaient
+l'etat FIGE dans la fermeture de leur rendu ; `Entree` et `Tab` traites aussi sur le
+conteneur ; double ecriture par `onBlur` apres validation, qui creait un doublon invisible.
+
+**Lecon a retenir, et elle a coute cher : un pilote de navigateur n'est pas un utilisateur.**
+Avant de poursuivre un defaut d'ergonomie clavier trouve par automatisation, le faire
+confirmer a la main. L'inverse — croire l'automatisation — a produit plusieurs fausses
+pistes.
+
+
+### [RESOLU] Les jours de juin 2026 comportent un dimanche
+
+`seed_referentiels.sql` donne juin 2026 du **11 au 15 juin**, soit jeudi, vendredi,
+samedi, **dimanche**, lundi. Signale comme anomalie probable, puisque le cahier des
+charges parlait de « jours ouvres ».
+
+**Confirme : la campagne couvrait bien un week-end.** Les dates du seed sont justes.
+
+Consequence pour le code, plus large que ce seul cas : **les jours d'une campagne sont
+libres**. Ni consecutifs, ni au nombre de cinq, ni limites aux jours ouvres. Toute
+logique qui supposerait le contraire — un intervalle de dates plutot qu'une liste, un
+filtre excluant les week-ends, un decompte fige a cinq — casserait sur des donnees
+reelles. La mention « ouvres » a ete retiree de `CAHIER-DES-CHARGES.md` section 2 pour
+que le sujet ne resurgisse pas.
+
+---
+
+## Corrige — 31/08/2026 (un garde-fou disparu en silence)
+
+### [CORRIGE] Trois garde-fous ne tournaient que si le jeu de donnees s'y pretait
+
+Trouve en comparant deux passages : la suite est passee de **33/33 a 32/32 sans afficher
+quoi que ce soit**. Un compteur qui baisse tout seul est le pire des symptomes — il se lit
+comme « rien a signaler ».
+
+Cause : les trois verifications de R-B.5 (table specialisee) cherchaient un vendeur reel
+**libre** de la plaque, et deux d'entre elles n'avaient **aucune branche `else`** quand elles
+n'en trouvaient pas. La purge de `MARC TESTEUR`, seul VO libre de CENTRE, a donc supprime en
+silence le garde-fou « un vendeur VO ne rentre pas dans une table specialisee ».
+
+Le defaut de fond n'est pas la donnee, c'est la dependance : **ce que verifie ce garde-fou
+n'a aucun rapport avec la composition des tables du moment.**
+
+Correction :
+
+- quand aucun vendeur reel ne convient, la verification **en fabrique un dans sa propre
+  transaction**. `doitRefuser` et `doitAccepter` forcent un `ROLLBACK`, donc rien ne
+  survit — verifie apres coup : zero ligne `GARDE-FOU %` en base ;
+- les trois cas ont desormais une branche `else` qui **echoue bruyamment** si le prealable
+  manque vraiment (marque ALPINE ou site de la plaque introuvables).
+
+De retour a **33/33**, et le compte ne peut plus baisser sans le dire.
+
+**La regle : un garde-fou qui peut ne pas tourner doit dire qu'il n'a pas tourne.** C'est le
+meme principe que « une contrainte qu'on n'a jamais vue refuser quelque chose n'est pas une
+contrainte » — appliquee au harnais lui-meme.
+
+---
+
+## Corrige — 31/08/2026 (chaine encadrant -> chef de table)
+
+### [CORRIGE] Un compte neuf n'etait pas proposable comme chef de table
+
+Le meme vivier de personnes est demande a deux endroits — le selecteur d'encadrant d'un
+site (ecran Vendeurs) et le selecteur de chef de table (ecran Tables) — et les deux routes
+l'exprimaient **differemment** :
+
+| Route | Filtre |
+|---|---|
+| `GET /api/referentiels` | tous les comptes actifs, hors `lecteur` |
+| `GET /api/tables/session/:id` | comptes actifs ayant **deja** un site encadre, ou un role `admin`/`direction` |
+
+Consequence, en suivant la sequence decrite pour l'ecran Comptes : je cree un compte, je vais
+dans Tables pour l'attribuer, **il n'y est pas**. Il fallait d'abord lui donner un site dans
+l'ecran Vendeurs — un ordre impose par rien, sinon par cette requete.
+
+Et l'exclusion frappait aussi les **huit chefs de table de juin**, qui n'encadrent aucun
+site : impossible de les redesigner, alors qu'ils animent deja une table.
+
+Correction : la route des tables applique le meme filtre que les referentiels — tous les
+comptes actifs sauf les `lecteur`, pour qui animer une table contredirait le palier. L'ecran
+les repartit en trois groupes de lecture : encadrants de la plaque, encadrants d'ailleurs,
+autres comptes. **Un groupe de lecture, jamais un filtre** : prendre un coach d'une autre
+concession est le but de l'exercice.
+
+Verifie dans le navigateur : `THIERRY COIGNAC`, rattache comme chef de site d'ALPINE depuis
+l'ecran Vendeurs, apparait aussitot dans « Encadrants de CENTRE » du selecteur de chef de
+table ; les quatorze comptes actifs sont proposables. Rattachement annule apres l'essai —
+archive, pas supprime.
+
+**La lecon, qui est celle de l'interdit n.6 : deux requetes qui doivent rendre le meme
+vivier sont une liste de valeurs dupliquee.** Elles ont divergees sans que rien ne le
+signale.
+
+### [A CONNAITRE] La colonne « tables animees » de l'ecran Comptes nommait mal ses lignes
+
+Un chef qui anime la Table 1 de SUD sur juin **et** sur septembre affichait deux etiquettes
+`TABLE 1 · SUD` identiques, la campagne n'etant que dans l'infobulle. Ca se lit comme un
+doublon de donnees. La campagne est desormais dans l'etiquette : le libelle d'une table
+n'identifie rien sans elle.
+
+---
+
+## Corrige — 31/08/2026 (seed et residu de test)
+
+### [CORRIGE] Le seed RE-AJOUTAIT ses jours par-dessus ceux qu'on avait edites
+
+Trouve par la suite API, qui exigeait 4 jours apres un retrait et en trouvait 8.
+
+`creerCampagne` faisait un `upsert` de la campagne **puis un `upsert` de chacun de ses
+jours**. Sur une campagne existante dont les jours avaient ete corriges dans l'ecran
+Campagnes, le seed reposait donc ses cinq jours de placeholder *en plus* des cinq
+existants : la campagne de septembre s'est retrouvee avec **neuf jours** apres un simple
+`npm run seed`, et ses dates ramenees a l'ancien placeholder.
+
+Aggravant : le seed posait le **14 au 18 septembre** alors que la documentation annoncait le
+**10 au 14**. J'avais corrige la documentation sans corriger le code — une divergence que
+rien ne surveillait, et qui a fabrique les quatre jours en trop.
+
+Correction — `creerCampagne` **ne touche plus a une campagne existante** :
+
+- si la campagne existe, il complete seulement ce qui est structurel (les sessions par
+  plaque, en `upsert` avec `update: {}`) et rend la main. Ni dates, ni jours, ni creneaux ;
+- si elle n'existe pas, il la cree entierement, en `create` et non en `upsert` — l'intention
+  devient lisible, et une collision inattendue echoue bruyamment au lieu d'ecraser ;
+- les dates du placeholder sont alignees sur le 10 au 14.
+
+**La regle qui manquait : un seed etablit un ETAT INITIAL, il ne se bat pas avec les
+modifications de l'utilisateur.** L'idempotence ne suffit pas — rejouer le seed doit etre
+*sans effet*, pas seulement *sans doublon*.
+
+Verifie : septembre reste a 5 jours et du 10 au 14 apres deux `npm run seed` consecutifs, et
+`test:api` repasse a 43/43.
+
+### [CORRIGE] Le vendeur de test sortait APRES juin, et gonflait l'effectif de juin
+
+`test:api` posait la date de sortie de son vendeur de test au **31/08/2026** — c'etait la
+verification « sortir un vendeur sans le supprimer ». Mais ce vendeur survit au script
+(interdit n.1), et une sortie posterieure a juin le laisse **present pendant juin** :
+l'effectif de juin affichait 101 la ou septembre affichait 100.
+
+Meme classe que le defaut deja corrige a la racine (« le residu des tests gonflait
+l'effectif de juin »), a un endroit qui avait ete oublie : le prealable appliquait bien le
+01/01/2026, la verification elle-meme non. Corrige — les deux posent desormais le
+01/01/2026, avant la premiere campagne. Les deux campagnes affichent 100.
+
+### [CORRIGE] Le residu de test s'accumulait, un peu plus a chaque passage
+
+`test:api` sortait ses vendeurs de test au 01/01/2026 sous un nom unique, et archivait ses
+RDV de test. Les chiffres metier etaient bien proteges — un vendeur sorti n'entre dans aucun
+effectif, un RDV archive dans aucun total — mais **chaque passage en laissait un de plus** :
+seize lignes `VENDEUR VERIF API #NNN` a Mozac, et douze RDV `CLIENT VERIF API` archives sur
+un vendeur de Clermont.
+
+Du residu qui grossit n'est pas un residu inoffensif : c'est un residu qu'on finit par
+prendre pour une donnee. C'est exactement ce qui s'est passe avec les « 7 RDV » de
+`JEAN-FRANCOIS LARGET`, cites plus haut comme preuve qu'il etait un vendeur reel.
+
+Correction : le prealable de la suite **purge le residu du passage precedent** par la porte
+de purge, sur les deux marqueurs. Verifie sur deux passages consecutifs : la base reste a
+1 vendeur de test et 1 RDV de test, sans croissance.
+
+---
+
+## Corrige — 31/08/2026 (encadrants et comptes)
+
+### [CORRIGE] ERREUR DE MODELE : les encadrants n'etaient pas des comptes
+
+**Le defaut le plus grave de toute la journee, et il etait de moi.** J'avais fait du
+chef de site et du chef de vente deux DRAPEAUX sur `vendeur` (`chef_de_site`,
+`chef_de_vente`), en croyant que l'encadrant se choisissait parmi les vendeurs du
+site.
+
+Consequence directe, rapportee par l'utilisateur : « quand je selectionne ce menu
+deroulant sur un site, il me propose uniquement les vendeurs du site en question.
+Sauf que c'est la ou ca peche. »
+
+**Ce que le metier demande vraiment :**
+
+> « Par le biais des tables on fait des groupes le plus heterogene possible. Je mets
+> 5 vendeurs de 5 concessions differentes, et un chef de vente en chef de table d'une
+> AUTRE concession pour les coacher. Ca fait de la mixite et c'est tout l'interet du
+> truc. »
+
+Avec un drapeau sur `vendeur`, cette mixite etait **litteralement inexprimable** : le
+selecteur ne pouvait proposer que les vendeurs du site courant.
+
+**Correction** — migration `20260831180000_encadrants_comptes` :
+
+- table `encadrement_site` : le rattachement (site, role) -> UTILISATEUR, durable et
+  hors campagne. Un site a ses encadrants, une table se compose a chaque campagne ;
+- role global `direction` ;
+- suppression de `vendeur.chef_de_site` et `vendeur.chef_de_vente`, et de leurs deux
+  triggers. Les laisser en place aurait garanti qu'on s'y trompe a nouveau.
+
+Verifie de bout en bout : un compte rattache a Clermont et Mozac apparait dans le
+selecteur de chef de table de **SUD-OUEST**, une plaque ou il n'encadre rien.
+
+**Lecon : quand un selecteur ne peut proposer que ce qui est deja au bon endroit,
+c'est le modele qui est faux, pas le selecteur.**
+
+### [CORRIGE] `direction` n'avait aucun perimetre de saisie
+
+La specification dit « acces total mais pas a l'interface de gestion des
+utilisateurs ». `vendeursSaisissables` ne traitait que `admin` : un compte Direction
+ressortait avec **zero vendeur saisissable**.
+
+Trouve par le script des comptes de test, qui REFUSE de livrer un compte sans
+perimetre — un garde-fou ecrit pour une autre raison, et qui a servi.
+
+### [A CONNAITRE] La question posee la veille est tranchee
+
+`BUGS-CONNUS.md` portait : « la chaine encadrant -> chef de table est incomplete,
+decision en attente ». **Tranchee** : l'encadrant est un compte, cree depuis l'ecran
+Comptes, rattache a un site depuis l'ecran Vendeurs et a une table depuis l'ecran
+Tables. Les 8 chefs de table du fichier source restent des comptes sans vendeur
+rattache — ils n'ont pas de bloc de saisie, et l'effectif reste a 99.
+
+---
+
+## Corrige — 31/08/2026 (passe UX)
+
+### [CORRIGE] L'encadrement d'un site ne s'enregistrait pas — course entre deux requetes
+
+**Symptome rapporte : « je ne peux toujours pas saisir les chefs de site/vente ».**
+
+Changer de titulaire lancait DEUX appels cote a cote, sans les attendre : retirer le
+role a l'ancien, le donner au nouveau. Les deux requetes partaient en parallele, et
+quand la seconde arrivait avant la premiere, le trigger voyait encore l'ancien
+titulaire et refusait avec un 409.
+
+Ca passait ou ca echouait selon le hasard du reseau — donc ca ne marchait pas. Mon
+propre essai avait passe par chance de timing, ce qui est la pire facon de valider
+quelque chose.
+
+Corrige en UNE action sequentielle : on retire, on ATTEND, on donne. L'ordre inverse
+est refuse par construction. Verifie sur les trois roles d'un meme site, transfert
+compris.
+
+**Lecon : deux ecritures qui dependent l'une de l'autre ne se lancent pas cote a
+cote, meme quand le test passe.**
+
+### [CORRIGE] Une regle CSS fourre-tout peignait tous les boutons en degrade
+
+Detail complet dans la section Charte de `CLAUDE.md`. La regle
+`button:not(.lien):not(.onglet):not(.secondaire)…` avait fini par attraper les
+segments du tableau de bord, les en-tetes de colonne triables et les cartes de
+vendeur du module B. Regle INVERSEE : le defaut est neutre, `.principal` porte le
+degrade. Un bouton oublie est desormais discret au lieu d'etre criard.
+
+J'avais note apres la premiere collision qu'il faudrait inverser a la troisieme.
+C'etait la troisieme.
+
+### [CORRIGE] Les menus deroulants ignoraient le theme
+
+`background: var(--bg-input)` valant `rgba(0,0,0,0.2)` en theme sombre, le systeme
+remplacait ce fond quasi transparent par son propre gris. Et la liste OUVERTE
+restait celle de l'OS. Deux surfaces a traiter, et une seule l'etait :
+`appearance: none` + chevron dessine pour le champ ferme, `option { background-color }`
+pour la liste — la seule prise disponible, et elle suffit.
+
+### [RESOLU] La chaine « encadrant -> chef de table » etait incomplete
+
+Constat de l'epoque : un role d'encadrement etait porte par un `Vendeur`, le chef d'une
+table est un `Utilisateur`, et le lien `vendeur.utilisateur_id` n'etait renseigne pour aucun
+vendeur. La chaine ne pouvait donc pas fonctionner.
+
+**Voie retenue : les encadrants sont des COMPTES**, pas des vendeurs porteurs d'un drapeau.
+`encadrement_site (site_id, role, utilisateur_id)` remplace les colonnes
+`vendeur.chef_de_site` / `chef_de_vente`, supprimees. Les 8 chefs de table de juin restent
+des comptes sans bloc de saisie, l'effectif reste a 99, et le meme compte peut encadrer un
+site et animer la table d'une autre concession.
+
+`vendeur.utilisateur_id` reste utile et facultatif : il relie un chef de vente qui vend
+lui-meme a son bloc de saisie. Ce n'est plus un prerequis de la chaine.
+
+### [A CONNAITRE] Le selecteur << Specialisee >> a ete retire de l'ecran Tables
+
+Sur demande. La colonne `table_phoning.marque_id`, son trigger et ses trois garde-fous
+RESTENT : ils ne coutent rien et continuent de proteger si une valeur y est posee un
+jour. A dire si tu veux les retirer aussi — c'est une migration.
+
+---
+
+## Corrige — 31/08/2026 (ajustements vendeurs)
+
+### [CORRIGE] La suite API a ABIME la campagne de septembre
+
+**Le defaut le plus grave de ce lot.** `test:api` modifie des donnees metier — les
+jours de la campagne de septembre — et sa remise en etat vivait en fin de `main()`,
+donc ne tournait JAMAIS en cas d'exception.
+
+Ce n'est pas theorique : une simple erreur de serialisation `BigInt` a fait planter
+le script en plein milieu, deux fois de suite. Resultat constate — la campagne de
+septembre avec **9 jours au lieu de 5**, ses dates ramenees a l'ancien placeholder
+du seed (14 au 18 septembre), et les `ordre` melanges.
+
+Reparee par l'API, donc en respectant R-A.2 : les 4 jours surnumeraires ne portaient
+aucun RDV, rien n'a bouge. Puis le defaut de fond corrige — la restauration passe par
+un **carnet** rempli au fur et a mesure et consomme dans un `finally`, chaque etape
+protegee individuellement, et un echec de restauration CRIE au lieu de se taire.
+
+**Lecon : un test qui touche a la donnee metier doit rendre l'etat MEME quand il
+echoue.** Verifie : la campagne survit intacte a un passage complet.
+
+### [CORRIGE] Le volet Archivage restait perime
+
+Archiver un vendeur pendant que le volet Archivage etait ouvert le faisait
+disparaitre de la liste **sans apparaitre dans les archives** : le volet ne se
+rechargeait pas. Un compteur de version, incremente a chaque archivage et passe en
+dependance de l'effet, sert desormais de signal de relecture.
+
+### [A CONNAITRE] `JEAN-FRANCOIS LARGET` n'est pas un residu — mais son decompte de RDV l'etait
+
+Signale trois fois comme « cree par l'interface, absent du fichier source ».
+Verifie a l'occasion d'un essai d'archivage : il porte **1 affectation et le role de chef de
+site a Clermont**. C'est un vendeur reel, cree volontairement le 28/08.
+
+**Correction du raisonnement.** J'avais conclu au vendeur reel en partie sur ses « 7 RDV ».
+Verification faite un cran plus loin : ces RDV etaient **les RDV de test de la suite API**,
+tous archives, tous nommes `CLIENT VERIF API`, empiles a raison d'un par passage — ils
+etaient douze. La conclusion tient (il est bien reel, il porte une affectation et un role),
+mais l'argument etait faux. Un decompte n'est un argument que si on a regarde les lignes.
+
+C'est la suite API qui posait ses RDV de test sur lui ; elle purge desormais les siens.
+
+L'archivage teste sur lui a ete annule : etat restaure a l'identique, role compris.
+C'est precisement l'interet de l'archivage sur la suppression — un geste de trop ne
+coute rien.
+
+Reste `MARC TESTEUR` (site ALPINE, 0 RDV), archive, et disponible a la purge dans le
+volet Archivage si l'utilisateur le confirme.
+
+---
+
+## Corrige — 31/08/2026 (modules B et D)
+
+### [CORRIGE] La specialisation d'une table etait decidee par le TIRAGE AU SORT
+
+**Le defaut le plus grave de ce lot, et le desequilibre n'en etait que le symptome.**
+
+F-B.5 demande de « respecter les marques quand la table est specialisee ». Le modele ne
+portait aucun lien table -> marque, donc la premiere implementation DEDUISAIT la
+specialisation des membres deja presents : les marques que la table couvrait.
+
+Constate sur la vraie session CENTRE de septembre, 29 vendeurs et 3 tables : la repartition
+a rendu **11/8/10 au lieu de 10/10/9**. Cause exacte — le premier vendeur tire au sort dans
+une table vide fixait ses marques pour toujours. Un vendeur ALPINE (Alpine seule) est tombe
+dans la table 2, qui a des lors refuse tout Renault/Dacia et n'a plus accueilli que des
+Alpine et des VO. Elle est devenue le **deversoir** des vendeurs sans contrainte.
+
+Le fond : une specialisation decidee par le hasard est l'inverse exact de ce que la regle
+demande. **Une table specialisee est une decision humaine, donc une colonne** —
+`table_phoning.marque_id`, migration `20260831090000_table_specialisation`, avec son trigger
+`affectation_marque_table` et trois garde-fous (R-B.5).
+
+Effet de bord heureux : `utils/repartition.ts` est PLUS SIMPLE qu'avant. L'etat mutable par
+table a disparu — c'etait lui qui rendait le resultat dependant de l'ordre de tirage.
+
+**Une premiere tentative de correction etait fausse aussi**, et c'est le test qui l'a dit :
+j'avais remplace l'intersection des marques des membres par leur union. L'assertion
+« un bi-marque rouvre une table specialisee » a echoue, parce qu'une intersection ne peut que
+se reduire. En creusant : une table contenant un Renault-seul ET un Dacia-seul avait une
+intersection VIDE, donc plus aucune contrainte — elle acceptait un vendeur Alpine. Une table
+plus diverse devenait moins contrainte. Absurde, et invisible a la relecture.
+
+### [CORRIGE] Le temps reel ne se connectait pas, en silence
+
+`hooks/useTempsReel.ts` demandait `transports: ['websocket', 'polling']` — le WebSocket
+d'abord, pour economiser le tour de polling. Constate dans un navigateur qui bloque `ws://` :
+trois echecs dans la console, **aucun repli**, zero requete socket.io, et le temps reel muet.
+Le critere de recette n°5 tombait sans qu'aucune erreur n'apparaisse a l'ecran.
+
+Le probleme n'est pas propre au bac a sable : **un proxy d'entreprise refuse souvent l'upgrade
+WebSocket**, et l'outil tournera derriere Caddy sur le reseau du groupe. Retour a l'ordre par
+defaut de socket.io — polling, puis montee en WebSocket quand c'est possible — plus un
+`connect_error` journalise. Verifie : 5 requetes en polling, et un RDV cree depuis un autre
+client fait monter le tableau de bord tout seul (3 -> 4, samedi 12/09 de 0 a 1).
+
+**Lecon : une optimisation qui echoue en silence coute plus qu'elle ne rapporte.**
+
+### [CORRIGE] Un test cassait parce que le travail metier AVANCAIT
+
+`test:api` exigeait deux vendeurs VN de Clermont **non encore confirmes**, pour voir le
+compteur de progression franchir une transition. Le script a cesse de demarrer le jour ou les
+12 VN de Clermont ont ete confirmes — c'est-a-dire le jour ou l'outil a servi a ce qu'il sert.
+
+Il note desormais l'etat EXACT des deux vendeurs qu'il choisit, le neutralise le temps du
+test, et le restaure a l'identique. La restauration remettait par ailleurs
+`capacites_confirmees_le` a `null` d'office : sur un vendeur deja confirme par un
+administrateur, elle aurait **efface une vraie confirmation**.
+
+### [CORRIGE] Un decompte de structure ecrit en dur dans un test
+
+La meme suite exigeait exactement **99 vendeurs actifs**. Elle a echoue a 98 : un vendeur
+ajoute et deux sortis par l'interface. Un decompte de structure ecrit en dur est un bug meme
+quand il est juste le jour ou on l'ecrit (interdit n°3). L'effectif attendu est maintenant lu
+en base — le test verifie que la route rend CE QUE LA BASE CONTIENT.
+
+### [CORRIGE] Le message d'un trigger fuyait les internes du pilote, a nouveau
+
+`routes/tables.ts` avait sa propre extraction du message d'un trigger, qui coupait au premier
+saut de ligne. Or tout tient sur une seule ligne : l'utilisateur lisait
+`... severity: "ERREUR", detail: None`. **Exactement la classe de defaut deja corrigee dans le
+gestionnaire d'erreurs global, reintroduite en la recopiant** — interdit n°6.
+
+Source unique : `utils/messageTrigger.ts`, consommee par les deux. Elle de-echappe aussi les
+guillemets, ce qui reglait d'un coup les `la table \"Table 1\"` de tous les messages.
+
+### [CORRIGE] Derive Prisma : un index cree en SQL sans etre declare
+
+La migration `20260831090000` cree `table_phoning_marque_id_idx`. Prisma GERE les index :
+faute d'etre declare dans `schema.prisma`, il proposait un `DROP INDEX` a chaque
+`migrate diff`. Classe de derive deja rencontree sur les index partiels. `@@index([marqueId])`
+ajoute.
+
+---
+
+## A connaitre — defauts du FICHIER SOURCE
+
+### [FICHIER] Dix totaux du jour sont faux dans le classeur
+
+Releve a l'extraction des 1107 RDV. La ligne 2 de chaque onglet site porte un `COUNTA` des
+blocs vendeur. Sur **GAILL et CARM**, cette formule contient des `#REF!` et vise des lignes
+qui n'existent plus — CARM fait 27 lignes et sa formule additionne jusqu'a la 138 — tout en
+AFFICHANT un nombre plausible. Ce sont des valeurs figees, jamais recalculees depuis que des
+blocs ont ete supprimes.
+
+L'ecart : GAILL sur-compte de 2 par jour (10 au total), CARM de 5 par jour (25 au total).
+
+**RESULTATS, lui, est juste** : notre lecture des cellules retombe a l'unite sur ses totaux
+par vendeur et par site. Les totaux de site, de plaque et de groupe du fichier ne sont donc
+pas affectes — seules ces deux lignes d'en-tete mentent.
+
+`scripts/extraire-xlsx.mjs` le signale a chaque passage et marque ces entrees `fiable: false` ;
+`test:agregats` les exclut de la comparaison et compte celles qu'il ignore. C'est exactement
+la fragilite que cet outil remplace : une formule cassee qui continue d'afficher un chiffre.
+
+---
+
+## Corrige — 28/08/2026
+
+### [CORRIGE] Onglet Vendeurs : page blanche muette
+
+**Symptome.** L'onglet Vendeurs n'affichait plus rien. Pas un message, pas une trace a
+l'ecran : l'application entiere disparaissait, barre de navigation comprise.
+
+**Cause.** `services/referentiels.ts` declarait encore
+`VendeurReferentiel.typesVehicule: TypeVehicule[]` alors que la migration
+`vendeur_type_scalaire` avait remplace ce tableau par un scalaire `typeVehicule`. L'ecran
+appelait `v.typesVehicule.includes(...)` sur `undefined`.
+
+**Pourquoi `tsc` n'a rien vu, et c'est le vrai enseignement.** Les deux typechecks passaient
+au vert. **L'interface mentait sur la reponse de l'API**, et TypeScript ne verifie que la
+coherence du front avec sa propre declaration, jamais avec ce que le serveur renvoie
+vraiment. Une interface de reponse HTTP non tenue a jour est un mensonge que le compilateur
+valide.
+
+**Corrections.** Contrat aligne sur le scalaire. Metier et marques se modifient desormais
+**dans le meme enregistrement** : le serveur exige au moins une marque pour un VN et un VO
+n'en a aucune, donc deux gestes separes rendaient le passage VO vers VN impossible. Les
+colonnes de marque d'un vendeur VO affichent `—`, comme dans le fichier source.
+
+### [CORRIGE] Une erreur dans un ecran vidait toute l'application
+
+Consequence du defaut precedent, et bien plus grave que lui : il n'y avait **aucune
+frontiere d'erreur**. Il a fallu ouvrir la console du navigateur pour savoir quel champ
+manquait. Inacceptable en session — un chef de table qui perd son ecran a 19h un samedi
+n'ouvrira pas les outils de developpement.
+
+`components/Rempart.tsx`, une frontiere **par onglet** : l'ecran fautif nomme sa panne,
+propose de reessayer, et les autres onglets restent utilisables.
+
+### [CORRIGE] Vite se rabattait silencieusement sur le port de l'API
+
+`vite.config.ts` demande le port 3000. Sans `strictPort`, Vite passe **sans rien dire** au
+port suivant quand 3000 est pris — donc sur **3001, celui de l'API**. Le front se sert alors
+depuis le port qu'il proxifie, et le proxy `/api` boucle sur lui-meme. Constate en vrai.
+`strictPort: true` : un refus net vaut mieux qu'un demarrage qui mentira.
+
+### [CORRIGE] `npm run dev` du backend ne demarrait pas
+
+`nodemon src/index.ts` appelle `ts-node` par defaut, qui n'est pas une dependance du projet
+— celui-ci utilise `tsx`. Le script echouait donc systematiquement
+(`'ts-node' n'est pas reconnu`), et l'API avait ete lancee a la main par
+`npx tsx src/index.ts`, **sans rechargement automatique**. Consequence : une modification du
+backend n'etait pas prise en compte, et il fallait s'en apercevoir.
+`nodemon --exec tsx --watch src --ext ts,json src/index.ts`.
+
+### [CORRIGE] Le residu des tests gonflait l'effectif de juin
+
+`test:api` sortait ses vendeurs de test au **31/08/2026**, soit APRES la campagne de juin.
+`presenceVendeur` les comptait donc comme presents en juin : l'effectif affichait **106 au
+lieu de 99**. Du residu de test qui contamine un chiffre metier, alors que le critere de
+recette n.4 exige de retrouver les totaux a l'unite. Sortie repoussee au 01/01/2026, avant
+la premiere campagne, et les 7 vendeurs deja en base ont ete remis en conformite — par mise
+a jour de leur date de sortie, sans aucune suppression (interdit n.1).
+
+### [CORRIGE] Deux denominateurs differents pour la meme progression
+
+*Entree historique : cette route n'existe plus depuis le 31/08/2026, la notion de
+confirmation ayant ete retiree. La lecon sur les implementations concurrentes, elle, reste.*
+
+`GET /api/vendeurs/capacites/progression` comptait les 99 vendeurs, l'ecran n'en comptait
+que les 72 VN. Le front n'appelait pas encore la route, donc rien ne divergeait a l'ecran —
+c'est exactement le piege de l'interdit n.6 : une implementation concurrente non branchee,
+que quelqu'un finira par brancher. L'API compte desormais les VN seuls.
+
+### [CORRIGE] Un chef sans perimetre atterrissait sur un ecran vide
+
+L'ecran de saisie ouvrait sur la campagne la plus recente. Un chef de table de juin
+atterrissait donc sur septembre, ou il n'a aucun droit, et lisait « aucun vendeur ne vous est
+rattache » comme une panne. `GET /api/campagnes` porte desormais `vendeursSaisissables`, le
+nombre de vendeurs que L'APPELANT peut saisir sur chaque campagne : l'ecran ouvre sur une
+campagne ou il y a quelque chose a faire, et le selecteur annote les autres.
+
+
+### [CORRIGE] Le parseur d'import avalait la premiere ligne de donnees
+
+Trois defauts du meme ordre dans `utils/importMarques.ts`, tous trouves par
+`npm --prefix backend run test:import` et non par relecture.
+
+1. **En-tete detecte a tort.** Le critere etait « cette ligne contient-elle un nom de
+   marque ». Or au format « marques groupees » sans en-tete, la premiere ligne de donnees
+   en contient forcement une (`CLF | PARPINELLI VALENTIN | DACIA`) : le premier vendeur du
+   fichier disparaissait en silence. Le critere fiable est l'inverse — une ligne d'en-tete
+   ne porte **jamais** de nom de vendeur connu.
+2. **Collage d'une seule ligne rejete.** Meme cause : une correction ponctuelle sur un
+   vendeur inconnu etait refusee comme « contenu reduit a un en-tete ». Ajout d'un second
+   garde-fou : un en-tete qui ne laisse aucune ligne de donnees n'est pas un en-tete.
+3. **Colonne de marques indetectable des qu'une valeur etait fautive.** La deduction
+   exigeait que **tous** les termes d'une colonne soient des marques connues. Une seule
+   faute de frappe faisait chuter le score sous le seuil, et l'utilisateur recevait
+   « aucune colonne de marques reconnue » — un message qui accuse le tableau entier au
+   lieu de designer la ligne. Passe a « au moins un terme connu », plus un dernier recours :
+   si les colonnes nom et site sont identifiees et qu'il n'en reste qu'une non vide, c'est
+   celle des marques.
+
+**Lecon.** Un parseur tolerant doit degrader ligne par ligne, jamais en bloc. Le bon
+comportement face a une anomalie est de l'isoler et de continuer, parce que l'utilisateur
+corrige une ligne, pas un fichier de 99.
+
+### [CORRIGE] `verifier_affectation_unique` refusait une reaffectation a la MEME table
+
+**Symptome.** Le seed rejoue une seconde fois echouait sur
+`RELANCE: ce vendeur est deja affecte a la table "Table 1" pour cette campagne`, alors
+que la table en question etait justement celle qu'on reaffectait. L'idempotence du seed
+etait donc cassee — et c'est le test d'idempotence qui a trouve le defaut, pas une
+relecture.
+
+**Cause.** La premiere version du trigger s'auto-excluait par
+`a.id <> COALESCE(NEW.id, -1)`. Or `upsert` cote Prisma se traduit par
+`INSERT ... ON CONFLICT DO UPDATE` : le trigger `BEFORE INSERT` se declenche **avant** que
+le conflit ne soit detecte, donc avec un `NEW.id` tout neuf issu de la sequence.
+L'auto-exclusion ne reconnaissait jamais la ligne existante, et le trigger voyait son
+propre couple (table, vendeur) comme un doublon.
+
+**Correction.** Migration `20260828091000_fix_affectation_unique` : retour a la
+formulation de `schema.sql`, `a.table_id <> NEW.table_id`. C'est la regle R-B.4 telle
+qu'elle est ecrite — un vendeur ne peut appartenir qu'a une seule table par campagne — et
+une reaffectation a la meme table n'a jamais ete une violation.
+
+**Lecon a retenir.** Un trigger `BEFORE INSERT` ne peut pas raisonner sur l'identite
+technique de la ligne en cours d'insertion des lors que l'appelant passe par
+`ON CONFLICT`. Il doit raisonner sur les **cles metier**.
+
+Test de non-regression en place : `R-B.4 reaffectation a la MEME table` dans
+`npm --prefix backend run test:garde-fous`.
+
+### [CORRIGE] `Marque.code` sans contrainte unique
+
+Oubli lors du passage des trois booleens `renault`/`dacia`/`alpine` a une table `marque`.
+Le seed echouait sur `marque.upsert` faute de cle unique. Migration
+`20260828084642_marque_code_unique`.
+
+---
+
+## Defauts de `schema.sql` corriges par conception dans `schema.prisma`
+
+Consignes ici pour qu'on ne les reintroduise pas. `schema.sql` est conserve a la racine
+en reference historique.
+
+| Defaut | Ligne d'origine | Traitement |
+|---|---|---|
+| Effectif calcule a la mauvaise date : moyenne RDV/vendeur d'une campagne passee qui change des qu'un vendeur part | `schema.sql:212-225` | `utils/presenceVendeur.ts`, source unique, bornee par les dates de la campagne |
+| `vendeur.date_entree` absente : un vendeur cree en novembre entre retroactivement dans l'effectif de septembre | — | Colonne ajoutee |
+| Classements bases sur les RDV : un vendeur a 0 RDV disparait du classement | `schema.sql:200-209` | Les classements partiront de `vendeur`, pas des RDV |
+| 3 marques en dur, en colonnes et en `check` | `schema.sql:35-37`, `:116` | Tables `marque` + `vendeur_marque` |
+| `table_phoning.chef_id` doublant `chef_user_id` sans contrainte de coherence | `schema.sql:94-95` | `chef_id` supprime |
+| Nom du chef dans le libelle de la table (`SEVERINE BESSON — TABLE 1`) : faux des que le chef change | seed | Libelle `Table N`, chef par cle etrangere |
+| `ordre = 0` sur les 8 tables, rendant non deterministe le departage de la repartition a graine fixe | seed | `ordre` 1..n |
+| Seed non idempotent : une seconde execution dupliquait 19 sites et 99 vendeurs | seed | `upsert` / `findFirst`, verifie par rejeu |
+| RLS activee sans aucune politique — renvoie zero ligne, sans erreur | `schema.sql:231-240` | Sans objet : plus de RLS, l'API fait autorite |
+| Triggers non `security definer` lisant des tables sous RLS : controle contournable en silence | `schema.sql:137`, `:160`, `:177` | Sans objet pour la meme raison ; les triggers sont conserves comme filet |
+| Vues sans `security_invoker`, executees avec les droits du proprietaire | `schema.sql:192-225` | Sans objet : les agregats seront des requetes Prisma (interdit n.2 dit « par vue **ou requete** ») |
+| `on delete cascade` decoratif sur `campagne_jour`/`campagne_creneau` : echoue des qu'un RDV existe | `schema.sql:62`, `:70` | Conserve et documente — c'est le garde-fou voulu de R-A.2 |
+
+---
+
+## Pieges d'environnement
+
+### `prisma migrate dev` ne fonctionne pas ici
+
+Le PowerShell embarque est non interactif ; `migrate dev` le refuse, y compris avec
+`--create-only` des lors que la base porte deja des migrations. D'ou
+`scripts/nouvelle-migration.mjs`, qui fait le `migrate diff` et ecrit le dossier, puis
+`migrate:deploy` pour appliquer.
+
+### Le telechargement de PostgreSQL par winget echoue en 403
+
+`winget install PostgreSQL.PostgreSQL.17` echoue :
+`Download request status is not success. 0x80190193 : Forbidden (403)`.
+EnterpriseDB refuse le telechargement selon le `User-Agent` — ce n'est pas le reseau du
+bureau (aucun proxy configure, et la meme URL repond 200 avec un `User-Agent` de
+navigateur). Contournement : telecharger avec `curl.exe -A "<UA navigateur>"` puis lancer
+l'installateur avec `--mode unattended`.

@@ -1,0 +1,651 @@
+// ============================================================================
+// TEST DES GARDE-FOUS DE LA BASE
+//
+// Verifie que les invariants se DECLENCHENT vraiment. Une contrainte qu'on n'a
+// jamais vue refuser quelque chose n'est pas une contrainte, c'est une intention.
+//
+// Chaque test tourne dans SA transaction, toujours annulee : rien ne subsiste en
+// base. C'est aussi la seule facon de tester proprement, puisqu'une instruction
+// en echec avorte la transaction en cours — un test par transaction evite qu'un
+// echec attendu ne contamine le suivant. Et cela evite d'avoir besoin de
+// supprimer quoi que ce soit, ce que les triggers interdisent par ailleurs.
+//
+// Usage : npm --prefix backend run test:garde-fous
+// ============================================================================
+
+import { PrismaClient, Prisma } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+const ROLLBACK = 'ROLLBACK_VOULU';
+type Tx = Prisma.TransactionClient;
+
+const resultats: { nom: string; ok: boolean; detail: string }[] = [];
+
+/// Attend que l'operation ECHOUE avec un message contenant `motif`.
+async function doitRefuser(nom: string, motif: string, operation: (tx: Tx) => Promise<unknown>) {
+  try {
+    await prisma.$transaction(async (tx) => {
+      await operation(tx);
+      throw new Error(ROLLBACK); // l'operation a passe : c'est l'echec du test
+    });
+    resultats.push({ nom, ok: false, detail: 'accepte alors que ce devait etre refuse' });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes(ROLLBACK)) {
+      resultats.push({ nom, ok: false, detail: 'accepte alors que ce devait etre refuse' });
+    } else if (message.includes(motif)) {
+      resultats.push({ nom, ok: true, detail: `refuse : ${motif}` });
+    } else {
+      resultats.push({
+        nom,
+        ok: false,
+        detail: `refuse pour une AUTRE raison que "${motif}" : ${message.slice(0, 160).replace(/\s+/g, ' ')}`,
+      });
+    }
+  }
+}
+
+/// Attend que l'operation REUSSISSE. La transaction est annulee ensuite.
+async function doitAccepter(nom: string, operation: (tx: Tx) => Promise<unknown>) {
+  try {
+    await prisma.$transaction(async (tx) => {
+      await operation(tx);
+      throw new Error(ROLLBACK);
+    });
+    resultats.push({ nom, ok: false, detail: 'transaction non annulee (anormal)' });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes(ROLLBACK)) {
+      resultats.push({ nom, ok: true, detail: 'accepte' });
+    } else {
+      resultats.push({
+        nom,
+        ok: false,
+        detail: `refuse alors que ce devait passer : ${message.slice(0, 200).replace(/\s+/g, ' ')}`,
+      });
+    }
+  }
+}
+
+const jour = (iso: string) => new Date(`${iso}T00:00:00Z`);
+
+async function main() {
+  const rdvAvant = await prisma.rdv.count();
+  const juin = await prisma.campagne.findUniqueOrThrow({ where: { libelle: 'Juin 2026' } });
+  const renault = await prisma.marque.findUniqueOrThrow({ where: { code: 'RENAULT' } });
+  const alpine = await prisma.marque.findUniqueOrThrow({ where: { code: 'ALPINE' } });
+
+  // Un vendeur autorise Renault + Dacia, mais PAS Alpine (cas des 97 sur 99).
+  // Un vendeur VN autorise Renault : c'est le cas majoritaire (70 des 99), et le
+  // seul sur lequel les tests de marque ont un sens. Un vendeur VO n'a pas de
+  // marque du tout.
+  const vendeurRenault = await prisma.vendeur.findFirstOrThrow({
+    where: { typeVehicule: 'VN', marques: { some: { marqueId: renault.id } } },
+    orderBy: { id: 'asc' },
+  });
+
+  const premierJour = await prisma.campagneJour.findFirstOrThrow({
+    where: { campagneId: juin.id },
+    orderBy: { ordre: 'asc' },
+  });
+  const premierCreneau = await prisma.campagneCreneau.findFirstOrThrow({
+    where: { campagneId: juin.id },
+    orderBy: { ordre: 'asc' },
+  });
+
+  const rdvValide = {
+    campagneId: juin.id,
+    vendeurId: vendeurRenault.id,
+    jour: premierJour.jour,
+    creneauCode: premierCreneau.code,
+    marqueId: renault.id,
+    typeVehicule: 'VN',
+    client: 'CLIENT TEST',
+  };
+
+  // ---------------------------------------------------------------- R-C.1
+  await doitAccepter('R-C.1  RDV sur une marque autorisee', (tx) =>
+    tx.rdv.create({ data: rdvValide })
+  );
+
+  await doitRefuser(
+    "R-C.1  RDV sur une marque NON autorisee",
+    "n'est pas autorise a vendre",
+    (tx) => tx.rdv.create({ data: { ...rdvValide, marqueId: alpine.id } })
+  );
+
+  // ---------------------------------------------------------------- VN/VO
+  // Le metier du vendeur est un SCALAIRE (VN ou VO), lu dans l'onglet RESULTATS du
+  // fichier source. Trois invariants en decoulent, tous verifies ici.
+
+  // 1. Le type du RDV doit etre celui de son vendeur. Sans ce controle, les totaux
+  //    VN/VO de l'onglet SUIVI melangeraient deux metiers.
+  await doitRefuser(
+    'VN/VO  RDV dont le type contredit le metier du vendeur',
+    'il ne peut pas recevoir un RDV',
+    (tx) => tx.rdv.create({ data: { ...rdvValide, typeVehicule: 'VO' } })
+  );
+
+  // 2. Un vendeur VN DOIT porter une marque : c'est elle qui donne les sections de
+  //    sa grille (« NB RDV RENAULT », « NB RDV DACIA »).
+  await doitRefuser(
+    'VN/VO  RDV d un vendeur VN sans marque',
+    'la marque du RDV est obligatoire',
+    (tx) => tx.rdv.create({ data: { ...rdvValide, marqueId: null } })
+  );
+
+  // 3. Un vendeur VO ne DOIT PAS porter de marque : le fichier ne lui donne aucune
+  //    ventilation, seulement un total.
+  const vendeurVo = await prisma.vendeur.findFirstOrThrow({
+    where: { typeVehicule: 'VO' },
+    orderBy: { id: 'asc' },
+  });
+
+  await doitAccepter('VN/VO  RDV d un vendeur VO sans marque', (tx) =>
+    tx.rdv.create({
+      data: { ...rdvValide, vendeurId: vendeurVo.id, typeVehicule: 'VO', marqueId: null },
+    })
+  );
+
+  await doitRefuser(
+    'VN/VO  RDV d un vendeur VO AVEC une marque',
+    'ses RDV ne portent pas de marque',
+    (tx) =>
+      tx.rdv.create({
+        data: { ...rdvValide, vendeurId: vendeurVo.id, typeVehicule: 'VO', marqueId: renault.id },
+      })
+  );
+
+  await doitRefuser('CHECK  metier de vendeur invalide', 'vendeur_type_check', (tx) =>
+    tx.vendeur.update({ where: { id: vendeurRenault.id }, data: { typeVehicule: 'VD' } })
+  );
+
+  // ---------------------------------------------------------------- R-A.2
+  // Cle etrangere composite : un jour hors campagne doit echouer EN BASE, pour
+  // que l'interface soit obligee de traiter le cas au lieu de creer un orphelin.
+  await doitRefuser(
+    'R-A.2  RDV sur un jour absent de la campagne',
+    'foreign key constraint',
+    (tx) => tx.rdv.create({ data: { ...rdvValide, jour: jour('2026-07-01') } })
+  );
+
+  await doitRefuser(
+    'R-A.2  RDV sur un creneau absent de la campagne',
+    'foreign key constraint',
+    (tx) => tx.rdv.create({ data: { ...rdvValide, creneauCode: '23:00-00:00' } })
+  );
+
+  // ---------------------------------------------------------------- CHECK
+  await doitRefuser('CHECK  type de vehicule invalide', 'rdv_type_vehicule_check', (tx) =>
+    tx.rdv.create({ data: { ...rdvValide, typeVehicule: 'VD' } })
+  );
+
+  await doitRefuser('CHECK  nom de client vide', 'rdv_client_non_vide_check', (tx) =>
+    tx.rdv.create({ data: { ...rdvValide, client: '   ' } })
+  );
+
+  await doitRefuser('CHECK  role global inconnu', 'role_global_role_check', (tx) =>
+    tx.roleGlobal.create({ data: { utilisateurId: 1n, role: 'superadmin' } })
+  );
+
+  // Un `chef_plaque` sans plaque ne donne aucun droit tout en ressemblant a un
+  // droit accorde : le pire cas d'un modele d'autorisation.
+  await doitRefuser('CHECK  chef_plaque sans plaque', 'role_campagne_portee_check', (tx) =>
+    tx.roleCampagne.create({
+      data: { campagneId: juin.id, utilisateurId: 1n, role: 'chef_plaque' },
+    })
+  );
+
+  // ---------------------------------------------------------------- R-B.4
+  const tables = await prisma.tablePhoning.findMany({
+    where: { sessionPlaque: { campagneId: juin.id } },
+    include: { sessionPlaque: true, affectations: { take: 1, where: { archiveLe: null } } },
+    orderBy: { id: 'asc' },
+  });
+  const table1 = tables.find((t) => t.affectations.length > 0);
+  const table2 = tables.find(
+    (t) => table1 && t.id !== table1.id && t.sessionPlaque.plaqueId === table1.sessionPlaque.plaqueId
+  );
+  const vendeurDejaAffecte = table1?.affectations[0]?.vendeurId;
+
+  if (table1 && table2 && vendeurDejaAffecte) {
+    await doitRefuser(
+      'R-B.4  vendeur affecte a une SECONDE table de la campagne',
+      'deja affecte a la table',
+      (tx) => tx.affectation.create({ data: { tableId: table2.id, vendeurId: vendeurDejaAffecte } })
+    );
+
+    // Regression du bug trouve par le test d'idempotence du seed : reaffecter a
+    // la MEME table n'a jamais ete une violation de R-B.4.
+    await doitAccepter('R-B.4  reaffectation a la MEME table (non-regression)', (tx) =>
+      tx.affectation.upsert({
+        where: { tableId_vendeurId: { tableId: table1.id, vendeurId: vendeurDejaAffecte } },
+        update: { archiveLe: null },
+        create: { tableId: table1.id, vendeurId: vendeurDejaAffecte },
+      })
+    );
+  } else {
+    resultats.push({
+      nom: 'R-B.4  tests d\'affectation',
+      ok: false,
+      detail: 'jeu de donnees insuffisant (deux tables de la meme plaque requises)',
+    });
+  }
+
+  // ---------------------------------------------------------------- R-B.1
+  // << Une table ne peut contenir que des vendeurs de sa propre plaque. >>
+  //
+  // Regle inscrite au cahier des charges depuis le debut, et que RIEN ne tenait
+  // avant la migration `20260828160000_affectation_meme_plaque`. Elle n'avait pose
+  // aucun probleme parce que seul le seed ecrivait des affectations. Le module B
+  // change cela : c'est l'ecran qui peut la violer.
+  if (table1) {
+    const plaqueDeLaTable = table1.sessionPlaque.plaqueId;
+    // Un vendeur d'une AUTRE plaque, trouve par jointure sur `site.plaque_id` —
+    // jamais par une plaque derivee autrement.
+    const etranger = await prisma.vendeur.findFirst({
+      where: { site: { plaqueId: { not: plaqueDeLaTable } } },
+      select: { id: true, nom: true, site: { select: { plaque: { select: { libelle: true } } } } },
+    });
+
+    if (etranger) {
+      await doitRefuser(
+        'R-B.1  vendeur d\'une AUTRE plaque affecte a la table',
+        'autre plaque',
+        (tx) => tx.affectation.create({ data: { tableId: table1.id, vendeurId: etranger.id } })
+      );
+    } else {
+      resultats.push({
+        nom: 'R-B.1  affectation hors plaque',
+        ok: false,
+        detail: 'jeu de donnees insuffisant (aucun vendeur d\'une autre plaque)',
+      });
+    }
+
+    // Non-regression : le garde-fou ne doit pas gener une affectation LEGITIME.
+    // Un invariant qui refuse tout est aussi inutile qu'un invariant qui n'a
+    // jamais rien refuse.
+    // Le vendeur doit etre de la MEME plaque ET libre de toute affectation sur
+    // cette campagne : un vendeur deja place ailleurs serait refuse par R-B.4, et
+    // le test accuserait le mauvais invariant. C'est exactement ce qui est arrive
+    // a la premiere ecriture de ce test.
+    const local = await prisma.vendeur.findFirst({
+      where: {
+        site: { plaqueId: plaqueDeLaTable },
+        affectations: {
+          none: { archiveLe: null, table: { sessionPlaque: { campagneId: juin.id } } },
+        },
+      },
+      select: { id: true },
+    });
+    if (local) {
+      await doitAccepter('R-B.1  vendeur de LA MEME plaque accepte (non-regression)', (tx) =>
+        tx.affectation.upsert({
+          where: { tableId_vendeurId: { tableId: table1.id, vendeurId: local.id } },
+          update: { archiveLe: null },
+          create: { tableId: table1.id, vendeurId: local.id },
+        })
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------- R-B.5
+  // Une table SPECIALISEE n'accueille que des vendeurs autorises sur sa marque.
+  //
+  // La specialisation est DECLAREE (`table_phoning.marque_id`) et non deduite des
+  // membres presents : une version deduite faisait dependre la composition du
+  // tirage au sort, et la repartition rendait 11/8/10 au lieu de 10/10/9.
+  if (table1) {
+    const plaqueDeLaTable = table1.sessionPlaque.plaqueId;
+    const alpine = await prisma.marque.findFirst({
+      where: { code: 'ALPINE' },
+      select: { id: true },
+    });
+
+    /// UN SITE DE LA PLAQUE DE LA TABLE, pour fabriquer un vendeur de secours quand
+    /// aucun vendeur reel ne convient. Jointure sur `site.plaque_id` : ne jamais
+    /// deriver la plaque autrement.
+    ///
+    /// Ces trois garde-fous cherchaient un vendeur reel LIBRE et se taisaient quand
+    /// il n'y en avait pas. Ils dependaient donc de la composition des tables du
+    /// moment, ce qui n'a aucun rapport avec ce qu'ils verifient.
+    const siteDeLaPlaque = (
+      await prisma.site.findFirst({
+        where: { plaqueId: plaqueDeLaTable, archiveLe: null },
+        select: { id: true },
+      })
+    )?.id;
+    // Un vendeur de la BONNE plaque, NON autorise sur Alpine, et libre.
+    const nonAutorise = alpine
+      ? await prisma.vendeur.findFirst({
+          where: {
+            site: { plaqueId: plaqueDeLaTable },
+            typeVehicule: 'VN',
+            marques: { none: { marqueId: alpine.id } },
+            affectations: {
+              none: { archiveLe: null, table: { sessionPlaque: { campagneId: juin.id } } },
+            },
+          },
+          select: { id: true },
+        })
+      : null;
+
+    // SI AUCUN VENDEUR REEL NE CONVIENT, ON EN FABRIQUE UN DANS LA TRANSACTION.
+    //
+    // `doitRefuser` et `doitAccepter` forcent un ROLLBACK : rien de ce qui est cree
+    // ici ne survit. C'est ce qui rend ces trois garde-fous independants de la
+    // composition du moment — voir le commentaire de `siteDeLaPlaque`.
+    if (alpine && siteDeLaPlaque) {
+      await doitRefuser(
+        'R-B.5  vendeur non autorise sur la marque de la table specialisee',
+        'pas autorise a vendre',
+        async (tx) => {
+          await tx.tablePhoning.update({
+            where: { id: table1.id },
+            data: { marqueId: alpine.id },
+          });
+          const vendeurId =
+            nonAutorise?.id ??
+            (
+              await tx.vendeur.create({
+                data: { nom: 'GARDE-FOU VN SANS ALPINE', siteId: siteDeLaPlaque, typeVehicule: 'VN' },
+                select: { id: true },
+              })
+            ).id;
+          return tx.affectation.create({ data: { tableId: table1.id, vendeurId } });
+        }
+      );
+    } else {
+      resultats.push({
+        nom: 'R-B.5  affectation hors marque',
+        ok: false,
+        detail: 'jeu de donnees insuffisant (marque ALPINE ou site de la plaque introuvable)',
+      });
+    }
+
+    // Un vendeur VO n'a AUCUNE ventilation par marque : une table specialisee
+    // n'a pas de sens pour lui.
+    const vo = alpine
+      ? await prisma.vendeur.findFirst({
+          where: {
+            site: { plaqueId: plaqueDeLaTable },
+            typeVehicule: 'VO',
+            affectations: {
+              none: { archiveLe: null, table: { sessionPlaque: { campagneId: juin.id } } },
+            },
+          },
+          select: { id: true },
+        })
+      : null;
+
+    // CE GARDE-FOU AVAIT DISPARU EN SILENCE.
+    //
+    // Il ne tournait que `if (alpine && vo)`, sans branche `else`. Le seul VO libre
+    // de CENTRE etait `MARC TESTEUR` ; sa purge, decidee le 31/08/2026, a fait
+    // passer la suite de 33 a 32 verifications SANS AUCUN MESSAGE. Un garde-fou
+    // qu'on croit couvert et qui ne tourne pas est pire qu'un garde-fou absent :
+    // le compteur ment.
+    if (alpine && siteDeLaPlaque) {
+      await doitRefuser(
+        'R-B.5  vendeur VO dans une table specialisee',
+        'aucune ventilation par marque',
+        async (tx) => {
+          await tx.tablePhoning.update({
+            where: { id: table1.id },
+            data: { marqueId: alpine.id },
+          });
+          const vendeurId =
+            vo?.id ??
+            (
+              await tx.vendeur.create({
+                data: { nom: 'GARDE-FOU VO', siteId: siteDeLaPlaque, typeVehicule: 'VO' },
+                select: { id: true },
+              })
+            ).id;
+          return tx.affectation.create({ data: { tableId: table1.id, vendeurId } });
+        }
+      );
+    } else {
+      resultats.push({
+        nom: 'R-B.5  vendeur VO dans une table specialisee',
+        ok: false,
+        detail: 'jeu de donnees insuffisant (marque ALPINE ou site de la plaque introuvable)',
+      });
+    }
+
+    // Non-regression : une table MIXTE (`marque_id` a null) n'impose rien. C'est
+    // le cas normal, et le seul observe en juin 2026.
+    const libre = await prisma.vendeur.findFirst({
+      where: {
+        site: { plaqueId: plaqueDeLaTable },
+        affectations: {
+          none: { archiveLe: null, table: { sessionPlaque: { campagneId: juin.id } } },
+        },
+      },
+      select: { id: true },
+    });
+    if (libre || siteDeLaPlaque) {
+      await doitAccepter('R-B.5  table MIXTE : aucune contrainte (non-regression)', async (tx) => {
+        await tx.tablePhoning.update({ where: { id: table1.id }, data: { marqueId: null } });
+        const vendeurId =
+          libre?.id ??
+          (
+            await tx.vendeur.create({
+              data: { nom: 'GARDE-FOU MIXTE', siteId: siteDeLaPlaque!, typeVehicule: 'VN' },
+              select: { id: true },
+            })
+          ).id;
+        return tx.affectation.upsert({
+          where: { tableId_vendeurId: { tableId: table1.id, vendeurId } },
+          update: { archiveLe: null },
+          create: { tableId: table1.id, vendeurId },
+        });
+      });
+    } else {
+      resultats.push({
+        nom: 'R-B.5  table MIXTE : aucune contrainte (non-regression)',
+        ok: false,
+        detail: 'jeu de donnees insuffisant (aucun site sur la plaque de la table)',
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------- R-A3.7
+  // UN SEUL ENCADRANT PAR (SITE, ROLE).
+  //
+  // Ces tests portaient sur deux drapeaux de `vendeur` — `chef_de_site` et
+  // `chef_de_vente`. C'ETAIT UNE ERREUR DE MODELE, corrigee par la migration
+  // `20260831180000` : un encadrant est un COMPTE rattache a un site, pas un
+  // drapeau sur une ligne de vendeur.
+  //
+  // Le pourquoi, dans les mots de l'utilisateur : « je mets 5 vendeurs de 5
+  // concessions differentes, et un chef de vente en chef de table d'une AUTRE
+  // concession pour les coacher ». Avec un drapeau sur `vendeur`, le selecteur ne
+  // pouvait proposer que les vendeurs du site : la mixite etait inexprimable.
+  const siteA = await prisma.site.findFirstOrThrow({
+    where: { archiveLe: null },
+    orderBy: { id: 'asc' },
+    select: { id: true },
+  });
+  const deuxComptes = await prisma.utilisateur.findMany({
+    where: { actif: true, archiveLe: null },
+    orderBy: { id: 'asc' },
+    take: 2,
+    select: { id: true, nom: true },
+  });
+
+  if (deuxComptes.length >= 2) {
+    const [a, b] = deuxComptes;
+
+    await doitAccepter('R-A3.7  un premier encadrant sur (site, role)', (tx) =>
+      tx.encadrementSite.create({
+        data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: a!.id },
+      })
+    );
+
+    await doitRefuser(
+      'R-A3.7  un SECOND encadrant sur le MEME (site, role)',
+      'Unique constraint',
+      async (tx) => {
+        await tx.encadrementSite.create({
+          data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: a!.id },
+        });
+        return tx.encadrementSite.create({
+          data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: b!.id },
+        });
+      }
+    );
+
+    // Les trois roles COEXISTENT sur un meme site : un chef de site, un chef de
+    // vente VN, un chef de vente VO. C'est le cas des gros sites.
+    await doitAccepter('R-A3.7  les trois roles coexistent sur un site', async (tx) => {
+      await tx.encadrementSite.create({
+        data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: a!.id },
+      });
+      await tx.encadrementSite.create({
+        data: { siteId: siteA.id, role: 'chef_de_vente_vn', utilisateurId: b!.id },
+      });
+      return tx.encadrementSite.create({
+        data: { siteId: siteA.id, role: 'chef_de_vente_vo', utilisateurId: a!.id },
+      });
+    });
+
+    // UN MEME COMPTE ENCADRE PLUSIEURS SITES. Ce n'est pas une tolerance : c'est
+    // le cas normal d'un chef de vente qui couvre deux concessions.
+    const siteB = await prisma.site.findFirst({
+      where: { archiveLe: null, id: { not: siteA.id } },
+      select: { id: true },
+    });
+    if (siteB) {
+      await doitAccepter('R-A3.7  un meme compte encadre DEUX sites', async (tx) => {
+        await tx.encadrementSite.create({
+          data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: a!.id },
+        });
+        return tx.encadrementSite.create({
+          data: { siteId: siteB.id, role: 'chef_de_site', utilisateurId: a!.id },
+        });
+      });
+    }
+
+    await doitRefuser('CHECK  role d encadrement inconnu', 'encadrement_site_role_check', (tx) =>
+      tx.encadrementSite.create({
+        data: { siteId: siteA.id, role: 'chef_de_tout', utilisateurId: a!.id },
+      })
+    );
+
+    // Un compte DESACTIVE ne doit pas rester rattache : il donnerait un encadrant
+    // fantome dans le selecteur d'une table.
+    await doitRefuser(
+      'R-A3.7  un compte desactive ne peut pas encadrer',
+      'est desactive',
+      async (tx) => {
+        await tx.utilisateur.update({ where: { id: b!.id }, data: { actif: false } });
+        return tx.encadrementSite.create({
+          data: { siteId: siteA.id, role: 'chef_de_vente_vn', utilisateurId: b!.id },
+        });
+      }
+    );
+
+    await doitRefuser(
+      'Interdit n.1  DELETE sur encadrement_site',
+      'suppression interdite',
+      async (tx) => {
+        const e = await tx.encadrementSite.create({
+          data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: a!.id },
+        });
+        return tx.$executeRawUnsafe('DELETE FROM relance.encadrement_site WHERE id = $1', e.id);
+      }
+    );
+  } else {
+    resultats.push({
+      nom: 'R-A3.7  encadrement',
+      ok: false,
+      detail: 'jeu de donnees insuffisant (deux comptes actifs requis)',
+    });
+  }
+
+  // ------------------------------------------------- interdit n.1 : la PORTE
+  //
+  // C'EST LE TEST LE PLUS IMPORTANT DE CE FICHIER depuis l'ouverture de la purge.
+  //
+  // L'interdit n.1 n'a pas ete leve : par defaut aucun `DELETE` ne passe. Ce qui
+  // existe, c'est UNE porte, ouverte explicitement pour la duree d'UNE
+  // transaction. Les deux moities doivent etre verifiees — qu'elle refuse par
+  // defaut, ET qu'elle s'ouvre quand on le demande. Verifier une seule des deux
+  // laisserait passer soit un garde-fou desarme, soit une purge impossible.
+  await doitRefuser(
+    'Interdit n.1  DELETE refuse PAR DEFAUT, porte fermee',
+    'suppression interdite',
+    (tx) => tx.$executeRawUnsafe('DELETE FROM relance.vendeur WHERE id = $1', vendeurRenault.id)
+  );
+
+  await doitAccepter(
+    'Interdit n.1  la porte de purge s ouvre quand on la nomme',
+    async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL relance.purge_autorisee = 'oui'`);
+      // Un vendeur jetable, cree puis detruit dans la meme transaction annulee.
+      const jetable = await tx.vendeur.create({
+        data: {
+          nom: 'VENDEUR JETABLE PURGE',
+          siteId: vendeurRenault.siteId,
+          typeVehicule: 'VN',
+        },
+      });
+      return tx.$executeRawUnsafe('DELETE FROM relance.vendeur WHERE id = $1', jetable.id);
+    }
+  );
+
+  // Et elle se REFERME : la meme transaction, sans le `SET LOCAL`, doit refuser.
+  await doitRefuser(
+    'Interdit n.1  la porte ne reste pas ouverte d une transaction a l autre',
+    'suppression interdite',
+    (tx) => tx.$executeRawUnsafe('DELETE FROM relance.rdv WHERE id = $1', -1)
+  );
+
+  // ---------------------------------------------------------------- R-C.3
+  await doitRefuser('R-C.3  saisie sur une campagne cloturee', 'est cloturee', async (tx) => {
+    await tx.campagne.update({ where: { id: juin.id }, data: { cloturee: true } });
+    return tx.rdv.create({ data: rdvValide });
+  });
+
+  // ---------------------------------------------------------------- interdit n.1
+  await doitRefuser('Interdit n.1  DELETE sur vendeur', 'suppression interdite', (tx) =>
+    tx.vendeur.delete({ where: { id: vendeurRenault.id } })
+  );
+
+  await doitRefuser('Interdit n.1  DELETE sur campagne', 'suppression interdite', (tx) =>
+    tx.campagne.delete({ where: { id: juin.id } })
+  );
+
+  // ---------------------------------------------------------------- restitution
+  const largeur = Math.max(...resultats.map((r) => r.nom.length));
+  console.log('');
+  for (const r of resultats) {
+    console.log(`${r.ok ? 'OK  ' : 'ECHEC'} ${r.nom.padEnd(largeur)}  ${r.detail}`);
+  }
+
+  const echecs = resultats.filter((r) => !r.ok).length;
+  console.log(`\n${resultats.length - echecs}/${resultats.length} garde-fous verifies.`);
+
+  // Aucune donnee ne doit subsister : toutes les transactions ont ete annulees.
+  //
+  // On compare AU DEPART ET A L'ARRIVEE, et non a zero : la base de developpement
+  // porte des RDV laisses par d'autres verifications, et un seuil fixe rendait ce
+  // controle faussement rouge des le second passage. Ce qui importe est que CE
+  // script n'ajoute rien.
+  const rdvApres = await prisma.rdv.count();
+  const residu = rdvApres - rdvAvant;
+  console.log(
+    `RDV en base : ${rdvAvant} avant, ${rdvApres} apres — residu ${residu} (doit etre 0)`
+  );
+
+  if (echecs > 0 || residu !== 0) process.exit(1);
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

@@ -1,0 +1,574 @@
+// ============================================================================
+// RELANCE BONY — source de verite du modele de donnees.
+//
+// Remplace `schema.sql` (conserve a la racine en reference, marque obsolete).
+// Lire `MODELE-DONNEES.md` avant de toucher a ce fichier.
+//
+// PRINCIPES, dans l'ordre ou le fichier Excel les a violes :
+//   1. Un RDV est une LIGNE qui porte son sens, pas une position dans une grille.
+//   2. Aucun agregat stocke. Aucune colonne de comptage, aucune table de synthese.
+//   3. Aucune structure en dur : plaques, sites, jours, creneaux et MARQUES sont
+//      des lignes, pas du code.
+//   4. Aucune suppression : archivage par `archive_le` ou `date_sortie`.
+//
+// CONVENTIONS
+//   - Champs Prisma en camelCase francais, colonnes en snake_case francais via
+//     @map (convention CLAUDE.md). Les migrations SQL referencent les colonnes :
+//     elles doivent rester lisibles.
+//   - Cles primaires : `BIGSERIAL`, c'est-a-dire bigint + sequence. CLAUDE.md dit
+//     `generated always as identity` ; Prisma ne sait pas l'exprimer et emettrait
+//     une derive a chaque migration si on le forcait a la main. L'intention de la
+//     convention — cle primaire bigint auto-generee — est tenue ; seule la syntaxe
+//     differe. ECART ASSUME, consigne dans ETAT-BACKEND.md.
+//
+// REACTIVATION PLUTOT QUE RECREATION — pourquoi aucun index unique partiel.
+// Une premiere version prevoyait des uniques partiels (`where archive_le is
+// null`) pour pouvoir recreer un site portant le code d'un site archive. Mais
+// Prisma GERE les index : il proposerait de supprimer ces index a chaque
+// `migrate dev`, ce qui est un piege permanent pour la personne suivante. Et le
+// besoin se traite mieux autrement : on DESARCHIVE l'enregistrement existant au
+// lieu d'en creer un second. L'historique reste sur une seule ligne au lieu
+// d'etre scinde entre deux. Les uniques sont donc simples, et desarchiver est un
+// `update`.
+//
+// CE QUE PRISMA NE SAIT PAS EXPRIMER, et qui vit dans la migration `invariants` :
+//   - les contraintes CHECK (roles, modes, type de vehicule, origine),
+//   - les triggers d'invariant (R-B.4, R-C.1, R-C.3).
+// Prisma ne gere NI les CHECK NI les triggers : il ne les voit pas, donc il ne
+// propose jamais de les supprimer. Ils survivent aux migrations suivantes.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------- utilisateurs
+
+/// Compte capable de se connecter. Distinct de `Vendeur` : les 8 chefs de table
+/// de juin 2026 ne figurent pas parmi les 99 vendeurs, ce sont des encadrants
+/// sans bloc de saisie. Un vendeur qui se connecte porte `Vendeur.utilisateurId`.
+model Utilisateur {
+  id           BigInt    @id @default(autoincrement())
+  loginId      String    @unique @map("login_id")
+  passwordHash String    @map("password_hash")
+  nom          String
+  actif        Boolean   @default(true)
+  creeLe       DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar      BigInt?   @map("cree_par")
+  archiveLe    DateTime? @map("archive_le") @db.Timestamptz(6)
+
+  rolesGlobaux  RoleGlobal[]
+  rolesCampagne RoleCampagne[]
+  vendeur       Vendeur?
+  tablesAnimees TablePhoning[]
+  /// Sites que ce compte encadre — chef de site, chef de vente VN ou VO. Durable,
+  /// contrairement a `tablesAnimees` qui appartient a une campagne.
+  sitesEncadres EncadrementSite[]
+
+  @@map("utilisateur")
+}
+
+/// Roles permanents, sans portee de campagne : `admin`, `lecteur`.
+/// La liste valide vit dans `backend/src/auth/roles.ts` — String libre en base,
+/// comme sur GEARBOX depuis la suppression des enums Prisma.
+model RoleGlobal {
+  utilisateurId BigInt   @map("utilisateur_id")
+  role          String
+  creeLe        DateTime @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar       BigInt?  @map("cree_par")
+
+  utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id])
+
+  @@id([utilisateurId, role])
+  @@map("role_global")
+}
+
+/// Droits de saisie, PAR CAMPAGNE (cahier des charges section 3 : etre chef de
+/// table en juin ne donne aucun droit sur la campagne de septembre).
+/// `chef_plaque` porte `plaqueId`, `chef_site` porte `siteId` — exactement un des
+/// deux, contrainte CHECK posee dans la migration.
+/// `chef_table` n'a PAS de ligne ici : il est porte par
+/// `TablePhoning.chefUtilisateurId`, qui appartient deja a une campagne.
+model RoleCampagne {
+  id            BigInt    @id @default(autoincrement())
+  campagneId    BigInt    @map("campagne_id")
+  utilisateurId BigInt    @map("utilisateur_id")
+  role          String
+  plaqueId      BigInt?   @map("plaque_id")
+  siteId        BigInt?   @map("site_id")
+  creeLe        DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar       BigInt?   @map("cree_par")
+  archiveLe     DateTime? @map("archive_le") @db.Timestamptz(6)
+
+  campagne    Campagne    @relation(fields: [campagneId], references: [id])
+  utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id])
+  plaque      Plaque?     @relation(fields: [plaqueId], references: [id])
+  site        Site?       @relation(fields: [siteId], references: [id])
+
+  @@index([campagneId, utilisateurId])
+  @@map("role_campagne")
+}
+
+// ---------------------------------------------------------------- referentiels
+
+model Plaque {
+  id BigInt @id @default(autoincrement())
+
+  /// Unicite SIMPLE, pas partielle. Voir la note REACTIVATION en tete de fichier :
+  /// un libelle deja porte par une plaque archivee se recupere en desarchivant
+  /// cette plaque, pas en creant un doublon.
+  libelle String @unique
+
+  /// CENTRE est appelee EAA dans les onglets TABLES du fichier source (F-A1.2).
+  alias     String?
+  ordre     Int       @default(0)
+  creeLe    DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar   BigInt?   @map("cree_par")
+  archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)
+
+  sites         Site[]
+  sessions      SessionPlaque[]
+  rolesCampagne RoleCampagne[]
+
+  @@map("plaque")
+}
+
+/// Concession. `plaqueId` est MODIFIABLE, y compris pour un site portant de
+/// l'historique (F-A2.2) : c'est pourquoi aucun RDV ne duplique `site_id` ni
+/// `plaque_id`. Ne jamais deriver la plaque autrement que par cette jointure.
+/// Un site peut n'avoir AUCUN vendeur (cas de l'onglet MDP) — F-A2.4.
+/// RATTACHEMENT D'UN ENCADRANT A UN SITE — durable, hors campagne.
+///
+/// Un site a ses encadrants ; une table se compose a chaque campagne. C'est la
+/// difference avec `RoleCampagne`, qui reste pour les exceptions ponctuelles
+/// (remplacement le temps d'une campagne).
+///
+/// L'ENCADRANT EST UN COMPTE et non un vendeur : ce sont eux qui se connectent et
+/// saisissent les RDV — de leur table ET de leur site.
+model EncadrementSite {
+  id     BigInt @id @default(autoincrement())
+  siteId BigInt @map("site_id")
+
+  /// `chef_de_site` | `chef_de_vente_vn` | `chef_de_vente_vo`.
+  /// Liste valide dans `backend/src/auth/roles.ts`, comparee au CHECK au
+  /// demarrage du serveur par `utils/verifierInvariants.ts`.
+  role String
+
+  utilisateurId BigInt    @map("utilisateur_id")
+  creeLe        DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar       BigInt?   @map("cree_par")
+  archiveLe     DateTime? @map("archive_le") @db.Timestamptz(6)
+
+  site        Site        @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Restrict)
+
+  /// Un seul titulaire par (site, role). Unique SIMPLE et non partiel : Prisma
+  /// gere les index, et un index partiel cree en SQL provoquerait un `DROP INDEX`
+  /// a chaque `migrate diff`. Retirer puis redonner le meme role au meme compte
+  /// REACTIVE la ligne au lieu d'en creer une seconde.
+  /// `map` porte le nom REEL de l'index en base. Sans lui, Prisma attend sa propre
+  /// convention (`..._site_id_role_key`) et propose un `RENAME INDEX` a chaque
+  /// `migrate diff` — une derive perpetuelle pour un nom.
+  @@unique([siteId, role], map: "encadrement_site_site_role_key")
+  @@index([utilisateurId])
+  @@map("encadrement_site")
+}
+
+model Site {
+  id BigInt @id @default(autoincrement())
+
+  /// Unicite simple, meme raison que `Plaque.libelle`.
+  code      String    @unique
+  libelle   String
+  plaqueId  BigInt    @map("plaque_id")
+  creeLe    DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar   BigInt?   @map("cree_par")
+  archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)
+
+  plaque        Plaque         @relation(fields: [plaqueId], references: [id])
+  vendeurs      Vendeur[]
+  /// Encadrants rattaches a ce site — chef de site, chefs de vente VN et VO.
+  encadrants    EncadrementSite[]
+  rolesCampagne RoleCampagne[]
+
+  @@map("site")
+}
+
+/// INTERDIT N.3 — les marques sont des DONNEES.
+/// `schema.sql` portait trois booleens `renault` / `dacia` / `alpine` sur le
+/// vendeur et un `check (marque in (...))` sur le rdv. Ajouter Mobilize, marque
+/// Renault Group commercialisee en concession, exigeait alors un ALTER TABLE, la
+/// reecriture d'un trigger et une migration du front. Ici, c'est une ligne.
+model Marque {
+  id BigInt @id @default(autoincrement())
+
+  /// Unique, comme `Site.code`. Reactivation plutot que recreation si archivee.
+  code      String    @unique
+  libelle   String
+  ordre     Int       @default(0)
+  creeLe    DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar   BigInt?   @map("cree_par")
+  archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)
+
+  vendeurs VendeurMarque[]
+  rdvs     Rdv[]
+  tables   TablePhoning[]
+
+  @@map("marque")
+}
+
+/// Vendeur. L'archivage se fait par `dateSortie`, PAS par `archive_le` : deux
+/// mecanismes pour la meme chose finiraient par diverger, et `dateSortie` porte
+/// en plus le QUAND, necessaire au calcul de l'effectif.
+///
+/// `dateEntree` est indispensable et manquait dans `schema.sql` : sans elle, un
+/// vendeur cree en novembre entre RETROACTIVEMENT dans l'effectif de septembre,
+/// et la moyenne RDV/vendeur d'une campagne passee change toute seule. C'est le
+/// bug `RANK!AG` du fichier Excel, par un autre chemin.
+model Vendeur {
+  id     BigInt @id @default(autoincrement())
+  nom    String
+  siteId BigInt @map("site_id")
+
+  /// L'ENCADREMENT N'EST PAS ICI. Deux drapeaux `chefDeSite` / `chefDeVente`
+  /// vivaient sur cette table : c'etait une erreur de modele, corrigee par la
+  /// migration `20260831180000`.
+  ///
+  /// Un encadrant est une PERSONNE AVEC UN COMPTE, rattachee a un site par
+  /// `EncadrementSite`, et rattachable a une table qui n'a rien a voir avec son
+  /// site — c'est le coeur de l'exercice : des groupes heterogenes, coaches par un
+  /// chef de vente venu d'une autre concession. Avec des drapeaux sur `vendeur`,
+  /// le selecteur ne pouvait proposer que les vendeurs du site courant, donc la
+  /// mixite etait litteralement inexprimable.
+  ///
+  /// Un vendeur QUI EST AUSSI encadrant existe des deux cotes, relie par
+  /// `utilisateurId`.
+
+  /// VN ou VO — LE METIER DU VENDEUR, un seul, jamais les deux.
+  ///
+  /// Lu dans la colonne TYPE de l'onglet RESULTATS du fichier source : un vendeur
+  /// y figure dans le bloc VN ou dans le bloc VO, et ses compteurs en decoulent
+  /// (« NB RDV RENAULT » + « NB RDV DACIA » pour un VN, « NB RDV VO » pour un VO).
+  /// Sur juin 2026 : 72 VN et 27 VO.
+  ///
+  /// Une premiere version modelisait une relation many-to-many autorisant les
+  /// deux. C'etait faux, et ca faisait apparaitre dans la grille de saisie un
+  /// selecteur VN/VO qui n'existe pas dans le metier.
+  ///
+  /// CONSEQUENCE SUR LA GRILLE : c'est ce champ, croise avec `marques`, qui
+  /// determine la forme du planning d'un vendeur. Une section par marque
+  /// autorisee s'il est VN ; une seule section sans marque s'il est VO.
+  typeVehicule String @map("type_vehicule")
+
+  /// Renseigne seulement si le vendeur se connecte a l'outil.
+  utilisateurId BigInt?   @unique @map("utilisateur_id")
+  dateEntree    DateTime? @map("date_entree") @db.Date
+  dateSortie    DateTime? @map("date_sortie") @db.Date
+
+  /// QUAND les capacites de ce vendeur ont ete modifiees pour la derniere fois, et
+  /// PAR QUI. C'est de la PROVENANCE, plus un statut.
+  ///
+  /// Ces colonnes portaient une notion de « confirme / placeholder » : le seed
+  /// posant des marques par defaut, l'ecran distinguait une donnee validee d'un
+  /// placeholder et affichait une progression. **Cette notion est retiree** — un
+  /// vendeur present en base est valide, point. Les colonnes restent : savoir qui
+  /// a change les marques d'un vendeur et quand est utile le jour ou un RDV est
+  /// refuse et que personne ne comprend pourquoi.
+  capacitesModifieesLe  DateTime? @map("capacites_confirmees_le") @db.Timestamptz(6)
+  capacitesModifieesPar BigInt?   @map("capacites_confirmees_par")
+
+  creeLe  DateTime @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar BigInt?  @map("cree_par")
+
+  /// ARCHIVAGE. A ne pas confondre avec `dateSortie`, et la distinction compte :
+  ///
+  ///   - `dateSortie` = cette personne a quitte l'entreprise. Donnee METIER, elle
+  ///     borne les effectifs de chaque campagne.
+  ///   - `archiveLe` = cette ligne n'a plus a apparaitre. Ses RDV restent en base,
+  ///     donc LES TOTAUX DES CAMPAGNES PASSEES NE BOUGENT PAS.
+  ///
+  /// L'archivage se defait. La purge definitive, elle, passe par l'ecran
+  /// Archivage et detruit les RDV avec le vendeur — voir la porte de purge dans
+  /// la migration `20260831140000`.
+  archiveLe  DateTime? @map("archive_le") @db.Timestamptz(6)
+  archivePar BigInt?   @map("archive_par")
+
+  site         Site            @relation(fields: [siteId], references: [id])
+  utilisateur  Utilisateur?    @relation(fields: [utilisateurId], references: [id])
+  marques      VendeurMarque[]
+  affectations Affectation[]
+  rdvs         Rdv[]
+
+  @@index([siteId])
+  @@map("vendeur")
+}
+
+/// Marques qu'un vendeur est autorise a vendre (F-A3.2), donc sur lesquelles il
+/// peut recevoir un RDV (R-C.1, garde-fou par trigger).
+///
+/// NE CONCERNE QUE LES VENDEURS VN. Un vendeur VO ne vend pas « une marque » : le
+/// fichier source ne lui donne aucune ventilation Renault/Dacia, seulement un
+/// total. Ces lignes pilotent aussi le NOMBRE DE SECTIONS de sa grille de saisie :
+/// une par marque autorisee. Le site Alpine n'en a qu'une, la plupart en ont deux.
+///
+/// ATTENTION — cette donnee N'EXISTE PAS dans le fichier Excel source : tous les
+/// blocs vendeur y portent une section Renault ET une section Dacia, quelle que
+/// soit la realite du terrain. Le seed pose donc un PLACEHOLDER. Tant qu'il n'est
+/// pas corrige vendeur par vendeur via l'ecran A3, R-C.1 ne protege RIEN.
+model VendeurMarque {
+  vendeurId BigInt   @map("vendeur_id")
+  marqueId  BigInt   @map("marque_id")
+  creeLe    DateTime @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar   BigInt?  @map("cree_par")
+
+  vendeur Vendeur @relation(fields: [vendeurId], references: [id])
+  marque  Marque  @relation(fields: [marqueId], references: [id])
+
+  @@id([vendeurId, marqueId])
+  @@map("vendeur_marque")
+}
+
+// ---------------------------------------------------------------- campagnes
+
+model Campagne {
+  id BigInt @id @default(autoincrement())
+
+  /// Unique : le seed et tout script analogue resolvent une campagne par son
+  /// libelle. Deux homonymes les corrompraient en silence.
+  libelle   String    @unique
+  dateDebut DateTime  @map("date_debut") @db.Date
+  dateFin   DateTime  @map("date_fin") @db.Date
+  cloturee  Boolean   @default(false)
+  creeLe    DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar   BigInt?   @map("cree_par")
+  archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)
+
+  jours         CampagneJour[]
+  creneaux      CampagneCreneau[]
+  sessions      SessionPlaque[]
+  rdvs          Rdv[]
+  rolesCampagne RoleCampagne[]
+
+  @@map("campagne")
+}
+
+/// Les jours retenus : ni forcement consecutifs, ni forcement 5 (F-A4.2).
+/// Remplace les 595 cellules d'en-tete du fichier Excel.
+model CampagneJour {
+  campagneId BigInt   @map("campagne_id")
+  jour       DateTime @db.Date
+  ordre      Int
+  creeLe     DateTime @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar    BigInt?  @map("cree_par")
+
+  campagne Campagne @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+  rdvs     Rdv[]
+
+  @@id([campagneId, jour])
+  @@map("campagne_jour")
+}
+
+/// Liste ordonnee, longueur libre (F-A4.3). Remplace les 2 178 cellules de
+/// creneaux et les 269 formules a reecrire du fichier Excel.
+model CampagneCreneau {
+  campagneId BigInt   @map("campagne_id")
+  code       String
+  libelle    String
+  ordre      Int
+  creeLe     DateTime @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar    BigInt?  @map("cree_par")
+
+  campagne Campagne @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+  rdvs     Rdv[]
+
+  @@id([campagneId, code])
+  @@map("campagne_creneau")
+}
+
+/// Campagne x plaque. Porte le MODE d'organisation, et c'est deliberement ici
+/// qu'il vit et pas sur la plaque : verifie sur juin 2026, CENTRE et SUD
+/// utilisent des tables, NORD et SUD-OUEST non — et rien ne dit que septembre
+/// sera identique. Le choix de juin ne doit pas contaminer celui de septembre.
+///
+/// Nommee `session_plaque` et non `session` : `session` collisionne avec la
+/// session d'authentification dans tout le code.
+model SessionPlaque {
+  id         BigInt @id @default(autoincrement())
+  campagneId BigInt @map("campagne_id")
+  plaqueId   BigInt @map("plaque_id")
+
+  /// `par_site` | `par_table`. Liste valide dans `backend/src/auth/roles.ts`.
+  mode               String    @default("par_site")
+  effectifCibleTable Int?      @map("effectif_cible_table")
+  creeLe             DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar            BigInt?   @map("cree_par")
+  archiveLe          DateTime? @map("archive_le") @db.Timestamptz(6)
+
+  campagne Campagne       @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+  plaque   Plaque         @relation(fields: [plaqueId], references: [id])
+  tables   TablePhoning[]
+
+  @@unique([campagneId, plaqueId])
+  @@map("session_plaque")
+}
+
+// ---------------------------------------------------------------- tables de phoning
+
+/// Groupe de vendeurs constitue POUR UNE CAMPAGNE, pouvant melanger des vendeurs
+/// de plusieurs sites de la meme plaque (verifie sur juin : la table 1 de CENTRE
+/// contient des vendeurs de Clermont, Ussel et Mozac).
+///
+/// Le libelle est `Table 1`, PAS `SEVERINE BESSON - TABLE 1` : le chef est porte
+/// par la cle etrangere, sinon le libelle devient faux le jour ou il change.
+/// `chef_id` (vers vendeur) a ete SUPPRIME — il doublait `chefUtilisateurId` sans
+/// contrainte de coherence. Le cas ou le chef est aussi vendeur reste couvert par
+/// `Vendeur.utilisateurId`.
+model TablePhoning {
+  id                BigInt  @id @default(autoincrement())
+  sessionPlaqueId   BigInt  @map("session_plaque_id")
+  libelle           String
+  chefUtilisateurId BigInt? @map("chef_utilisateur_id")
+
+  /// SPECIALISATION DECLAREE, et non deduite. `null` = table mixte, aucune
+  /// contrainte de marque — c'est le cas normal, et celui de juin 2026.
+  ///
+  /// Pourquoi cette colonne existe : F-B.5 demande de << respecter les marques
+  /// quand la table est specialisee >>. Une premiere version DEDUISAIT la
+  /// specialisation des membres deja presents. Resultat observe sur la vraie
+  /// session CENTRE de septembre : le premier vendeur tire au sort dans une table
+  /// vide fixait ses marques pour toujours, un vendeur Alpine est tombe dans la
+  /// table 2, qui n'a plus accepte que des Alpine et des VO — elle est devenue le
+  /// deversoir, et la repartition a donne 11/8/10 au lieu de 10/10/9.
+  ///
+  /// Une specialisation decidee par le hasard est l'inverse de ce que la regle
+  /// demande. Elle se declare.
+  marqueId BigInt? @map("marque_id")
+
+  /// 1..n par session. Le seed d'origine mettait 0 partout, alors que la
+  /// repartition automatique departage les tables a charge egale par le plus
+  /// petit `ordre` : 8 zeros rendaient le departage non deterministe, ce que la
+  /// graine 42 est precisement censee empecher.
+  ordre     Int       @default(0)
+  creeLe    DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar   BigInt?   @map("cree_par")
+  archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)
+
+  sessionPlaque SessionPlaque @relation(fields: [sessionPlaqueId], references: [id], onDelete: Cascade)
+  chef          Utilisateur?  @relation(fields: [chefUtilisateurId], references: [id])
+  marque        Marque?       @relation(fields: [marqueId], references: [id], onDelete: Restrict)
+  affectations  Affectation[]
+
+  /// Deux `Table 1` dans la meme session sont une erreur de saisie, pas un cas
+  /// metier. Rend aussi le seed idempotent.
+  @@unique([sessionPlaqueId, libelle])
+  /// Declare ici PARCE QUE PRISMA GERE LES INDEX : cree en SQL par la migration
+  /// `20260831090000` sans etre declare, il proposait un `DROP INDEX` a chaque
+  /// `migrate diff`. Classe de derive deja rencontree sur les index partiels.
+  @@index([marqueId])
+  @@map("table_phoning")
+}
+
+/// Affectation vendeur -> table, valable pour UNE campagne.
+/// NE JAMAIS transformer ceci en colonne de `Vendeur` : une premiere version du
+/// modele l'avait fait, et monter les tables de septembre ecrasait la composition
+/// de juin. L'historique devenait illisible.
+///
+/// `origine` distingue l'algorithme d'un arbitrage manuel : F-B.5 exige que la
+/// repartition soit reproductible DONC contestable, ce qui suppose de savoir
+/// laquelle des deux a produit chaque ligne.
+model Affectation {
+  id        BigInt @id @default(autoincrement())
+  tableId   BigInt @map("table_id")
+  vendeurId BigInt @map("vendeur_id")
+
+  /// `auto` | `manuel`
+  origine   String    @default("manuel")
+  creeLe    DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar   BigInt?   @map("cree_par")
+  archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)
+
+  table   TablePhoning @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  vendeur Vendeur      @relation(fields: [vendeurId], references: [id])
+
+  /// Unicite simple : desaffecter puis reaffecter le meme vendeur a la meme table
+  /// REACTIVE la ligne existante (`archive_le` remis a null) au lieu d'en inserer
+  /// une seconde. Une seule ligne par couple (table, vendeur), qui porte son
+  /// historique — et aucun index partiel a maintenir.
+  @@unique([tableId, vendeurId])
+  @@index([vendeurId])
+  @@map("affectation")
+}
+
+// ---------------------------------------------------------------- rdv
+
+/// Le RDV ne connait NI son site NI sa plaque. Il connait son vendeur ; site,
+/// plaque et marques autorisees se joignent. C'est ce qui permet de changer le
+/// rattachement d'un site a une autre plaque sans toucher une ligne de donnees.
+/// Ne jamais dupliquer `site_id` ni `plaque_id` ici, meme pour optimiser : la
+/// table fait ~24 000 lignes par an.
+///
+/// Les cles etrangeres COMPOSITES vers `campagne_jour` et `campagne_creneau` sont
+/// posees dans la migration manuelle. Elles sont le garde-fou de R-A.2 :
+/// supprimer un jour portant des RDV echoue EN BASE, donc l'interface doit
+/// traiter le cas explicitement au lieu de creer des orphelins silencieux.
+model Rdv {
+  id          BigInt   @id @default(autoincrement())
+  campagneId  BigInt   @map("campagne_id")
+  vendeurId   BigInt   @map("vendeur_id")
+  jour        DateTime @db.Date
+  creneauCode String   @map("creneau_code")
+
+  /// NULLABLE, et c'est le fichier source qui l'impose : un vendeur VO n'a aucune
+  /// ventilation par marque, seulement un total. Un trigger rend la marque
+  /// OBLIGATOIRE pour un vendeur VN et INTERDITE pour un vendeur VO.
+  marqueId BigInt? @map("marque_id")
+
+  /// `VN` | `VO`. STOCKE, bien qu'il soit deductible du vendeur.
+  ///
+  /// Pourquoi : si un vendeur change de metier, deriver le type ferait bouger les
+  /// totaux VN/VO d'une campagne DEJA CLOTUREE. C'est exactement la classe du bug
+  /// `RANK!AG`, corrigee ailleurs pour l'effectif. Ce n'est pas un agregat
+  /// denormalise mais l'instantane d'un fait au moment de l'evenement, au meme
+  /// titre que `cree_par`. Un trigger impose l'egalite avec le type du vendeur a
+  /// l'ecriture, donc les deux ne peuvent jamais diverger.
+  typeVehicule String  @map("type_vehicule")
+  client       String
+  commentaire  String?
+
+  creeLe     DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar    BigInt?   @map("cree_par")
+  modifieLe  DateTime? @map("modifie_le") @db.Timestamptz(6)
+  modifiePar BigInt?   @map("modifie_par")
+
+  /// INTERDIT N.1 — aucun DELETE. Un RDV mal saisi disparait des totaux, jamais
+  /// de l'historique, et on sait qui l'a retire et quand. Toutes les lectures
+  /// filtrent `archive_le is null`.
+  archiveLe  DateTime? @map("archive_le") @db.Timestamptz(6)
+  archivePar BigInt?   @map("archive_par")
+
+  campagne Campagne @relation(fields: [campagneId], references: [id])
+  vendeur  Vendeur  @relation(fields: [vendeurId], references: [id])
+  /// `onDelete: Restrict` explicitement, et non le `SetNull` que Prisma choisit par
+  /// defaut pour une relation optionnelle : un RDV dont la marque serait annulee
+  /// violerait aussitot le trigger « marque obligatoire pour un vendeur VN ». La
+  /// suppression d'une marque est de toute facon interdite par trigger.
+  marque Marque? @relation(fields: [marqueId], references: [id], onDelete: Restrict)
+
+  /// GARDE-FOU R-A.2 — cles etrangeres COMPOSITES. Un RDV ne peut porter qu'un
+  /// jour et un creneau QUI APPARTIENNENT A SA CAMPAGNE. Consequence voulue :
+  /// supprimer un jour portant des RDV echoue EN BASE, donc l'interface doit
+  /// lister les RDV concernes et proposer d'annuler ou de deplacer, au lieu de
+  /// creer des orphelins que personne ne verrait.
+  campagneJour    CampagneJour    @relation(fields: [campagneId, jour], references: [campagneId, jour])
+  campagneCreneau CampagneCreneau @relation(fields: [campagneId, creneauCode], references: [campagneId, code])
+
+  @@index([campagneId, vendeurId])
+  @@index([campagneId, jour, creneauCode])
+  @@map("rdv")
+}
