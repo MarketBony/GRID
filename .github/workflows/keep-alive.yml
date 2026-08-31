@@ -42,7 +42,14 @@ jobs:
             echo "::error::Secret SUPABASE_DB_URL manquant. A creer dans Settings > Secrets and variables > Actions, avec la chaine du pooler SESSION (port 5432)."
             exit 1
           fi
+          # `?schema=` et `pgbouncer=` sont des parametres PRISMA, pas libpq. `psql`
+          # et `pg_dump` les REFUSENT : « invalid URI query parameter: "schema" ».
+          # On les retire ici plutot que d'exiger une forme particuliere du secret —
+          # le runbook dit « la meme chaine que pour les migrations », et c'est
+          # celle-la qui doit marcher.
+          URL=$(printf '%s' "$SUPABASE_DB_URL"             | sed -E 's/[?&](schema|pgbouncer|connection_limit|pool_timeout)=[^&]*//g; s/\?&/?/; s/\?$//')
+
           # `psql` est preinstalle sur `ubuntu-latest` ; la version cliente est
           # sans importance pour un simple SELECT.
-          psql "$SUPABASE_DB_URL" -c "SELECT 1 AS keep_alive;"
+          psql "$URL" -c "SELECT 1 AS keep_alive;"
           echo "Base contactee — le projet Supabase reste actif."

@@ -106,6 +106,20 @@ jobs:
             echo "::error::Secret SUPABASE_DB_URL manquant. A creer dans Settings > Secrets and variables > Actions, avec la chaine du pooler SESSION (port 5432)."
             exit 1
           fi
+          # PIPEFAIL N'EST PAS UN DETAIL. `pg_dump | gzip > fichier` rend le code de
+          # sortie de GZIP, qui reussit toujours — meme quand `pg_dump` a echoue.
+          # Sans cette ligne, un echec du dump devient une SAUVEGARDE VIDE affichee
+          # en vert. C'est arrive au premier essai, et seule l'epreuve de
+          # restauration l'a attrape.
+          set -o pipefail
+
+          # `?schema=` et `pgbouncer=` sont des parametres PRISMA, pas libpq.
+          # `psql` et `pg_dump` les REFUSENT : « invalid URI query parameter:
+          # "schema" ». On les retire ici plutot que d'exiger une forme
+          # particuliere du secret — le runbook dit « la meme chaine que pour les
+          # migrations », et c'est celle-la qui doit marcher.
+          URL=$(printf '%s' "$SUPABASE_DB_URL" | sed -E 's/[?&](schema|pgbouncer|connection_limit|pool_timeout)=[^&]*//g; s/\?&/?/; s/\?$//')
+
           mkdir -p backups
           STAMP=$(date -u +%Y%m%d-%H%M%S)
           echo "FICHIER=backups/grid-${STAMP}.sql.gz" >> "$GITHUB_ENV"
@@ -113,11 +127,20 @@ jobs:
           # `--no-owner` / `--no-privileges` : le dump se restaure sous n'importe
           # quel role. Les GRANT sont donc absents et seront reposes par les
           # migrations — c'est voulu, ils dependent des roles de Supabase.
-          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" \
+          /usr/lib/postgresql/17/bin/pg_dump "$URL" \
             --schema=relance --no-owner --no-privileges \
             | gzip > "backups/grid-${STAMP}.sql.gz"
 
           ls -lh "backups/grid-${STAMP}.sql.gz"
+
+          # Deuxieme filet, independant du premier : un dump du schema `relance`
+          # pese des dizaines de kilo-octets. En dessous de 2 Ko il n'y a rien
+          # dedans, quelle qu'en soit la raison.
+          TAILLE=$(stat -c%s "backups/grid-${STAMP}.sql.gz")
+          if [ "$TAILLE" -lt 2048 ]; then
+            echo "::error::Dump anormalement petit (${TAILLE} octets) : il est vide ou tronque."
+            exit 1
+          fi
 
       # ---------------------------------------------------------------------
       # L'EPREUVE. C'est ce qui distingue ce workflow d'une intention.
