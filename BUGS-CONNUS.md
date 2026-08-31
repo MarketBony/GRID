@@ -7,6 +7,64 @@ verifie, pas seulement corrige de memoire.
 
 ---
 
+## Front sur Supabase — 01/09/2026
+
+### [CORRIGE] Un nom de canal Realtime ne peut pas contenir de deux-points
+
+Le canal `campagne:2` ne s'abonne **jamais**. `subscribe()` ne rend NI `SUBSCRIBED`,
+NI `CHANNEL_ERROR`, NI `TIMED_OUT` : la demande reste en suspens. Un canal nomme
+`essai-prive-<horodatage>`, teste cote a cote, passe `SUBSCRIBED` immediatement.
+
+Supabase Realtime reserve le deux-points a son propre adressage : un sujet `x` devient
+`realtime:x` sur le fil. Un sujet qui en contient deja un est mal decoupe.
+
+Le nom venait des salles socket.io, ou `campagne:${id}` etait la convention et ne posait
+aucun probleme. **Rien ne signale qu'une convention a change de maison.**
+
+**C'est le mode d'echec le plus insidieux du lot** : la saisie fonctionne parfaitement,
+seuls les compteurs des AUTRES cessent de bouger. Personne ne le remarque en travaillant
+seul. Le critere de recette n.5 existe pour cela, et il faut le JOUER a deux fenetres,
+jamais le supposer.
+
+Corrige par la migration `20260831230000` (le trigger emet sur `campagne-<id>`) et par
+`hooks/useTempsReel.ts`.
+
+### [A CONNAITRE] `MissingPartition` de Realtime au premier demarrage d'un projet
+
+Sur un projet Supabase tout neuf, l'abonnement echoue avec « Realtime was unable to find
+the expected messages partition » alors que les partitions de `realtime.messages`
+existent bel et bien et couvrent l'instant present (verifie : 5 partitions, celle du jour
+comprise). Le conteneur Realtime a demarre avant elles et garde une liste perimee.
+
+Un redemarrage du projet (`POST /v1/projects/{ref}/restart`) le corrige. A ne pas
+confondre avec le defaut ci-dessus, qui lui persiste apres redemarrage.
+
+### [OUVERT] L'Edge Function `gerer-comptes` n'existe pas encore
+
+`services/utilisateurs.ts` l'appelle deja pour **creer un compte**, **reinitialiser un
+mot de passe** et **supprimer une identite**. Ces trois actions echouent tant que la
+fonction n'est pas ecrite et deployee.
+
+Le reste de l'ecran Comptes fonctionne — lecture, roles, encadrement, purge — parce
+qu'il passe par PostgREST et par des RPC. En attendant, `npm --prefix backend run
+comptes-auth` fait le travail en ligne de commande.
+
+C'est la seule chose qui ne peut pas se faire sans code serveur : creer une identite
+Supabase Auth exige la cle `service_role`, qui ne doit jamais se trouver dans le
+navigateur.
+
+### [A CONNAITRE] Ecrire dans `utilisateur` en redemandant la ligne complete echoue
+
+`INSERT ... RETURNING *` exige le droit de lire TOUTES les colonnes, or `password_hash`
+et `auth_uid` ne sont accordes a personne. PostgreSQL repond `42501` **sur la table
+entiere**, ce qui envoie chercher une politique manquante la ou il n'y a qu'une question
+de droits colonne.
+
+Regle : ne jamais chainer un `.select()` sans liste de colonnes apres une ecriture sur
+`utilisateur`. Deux controles de `test:rls` la fixent dans les deux sens.
+
+---
+
 ## Bascule sans serveur — 31/08/2026 au soir
 
 ### [CORRIGE] Les triggers de validation etaient aveugles par la RLS

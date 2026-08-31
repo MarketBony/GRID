@@ -27,6 +27,92 @@ production, ou pousser signifie livrer. Ici seuls les commits locaux ont une uti
 immediate : des points de retour. Le depot GitHub devient necessaire en J7, pour la deploy
 key du VPS et les workflows de sauvegarde.
 
+## 01/09/2026 — Le front parle a Supabase, l'API a disparu
+
+Les 7 `services/*.ts` sont reecrits sur `supabase-js`. **Les ecrans n'ont pas bouge** :
+les signatures et les formes de reponse sont conservees a l'identique, y compris
+`ErreurApi` avec son `statut` et son `corps` — `Campagne.tsx` lit toujours un 409 pour
+afficher les RDV impactes par R-A.2, sauf que ce 409 est desormais fabrique par
+`services/campagnes.ts` a partir du sondage de la fonction SQL.
+
+### Les utils partages sont REUTILISES, pas recopies
+
+C'etait la promesse du plan, et elle est tenue litteralement : `agregats.ts`,
+`repartition.ts`, `importMarques.ts`, `tri.ts`, `presenceVendeur.ts` et `auth/roles.ts`
+sont **les memes fichiers**, servis au navigateur. Le seul changement est une entree dans
+l'`include` de `tsconfig.json`. On le voit dans l'onglet reseau : le navigateur charge
+`/backend/src/utils/agregats.ts`.
+
+Consequence directe : les 27 controles des agregats, les 20 de la repartition et les 19
+du parseur **valent toujours** pour le code qui tourne en production. Il n'y a pas eu de
+seconde implementation a redemontrer.
+
+Le partage est le meme partout : **le navigateur CALCULE, la base ECRIT**. La graine 42
+et le parseur d'import restent en TypeScript ; `session_appliquer_repartition` et
+`vendeur_appliquer_import_marques` se contentent d'ecrire, atomiquement.
+
+### La pagination defensive
+
+`toutesLesLignes` pagine ET compare au `count: 'exact'`. Si les deux divergent, elle
+LEVE au lieu d'afficher un total. La limite de PostgREST tronque **sans erreur** : un
+chiffre faux presente comme un chiffre juste serait exactement le defaut de l'Excel que
+ce produit remplace. Le reglage Supabase est a 5000, mais un reglage de tableau de bord
+n'est pas une garantie — il se perd a la recreation d'un projet.
+
+### Le temps reel : un conflit reel, et un piege
+
+`postgres_changes` etait le reflexe, et il est **inutilisable ici** : cette diffusion
+respecte la RLS, donc un chef de table ne recevrait aucun evenement pour les RDV des
+autres tables — la politique de `rdv` restreint la lecture au perimetre pour proteger le
+nom du client. Le compteur du tableau de bord aurait cesse de bouger, en silence.
+
+D'ou la diffusion **par trigger** : `rdv_diffusion` emet une charge utile sans nom de
+client sur un canal par campagne, exactement ce que faisait `emettre()` du temps de
+socket.io. L'auteur ignore son propre evenement en comparant `auteur` a son identifiant,
+ce qui remplace l'en-tete `x-socket-id` — une piece mobile de moins.
+
+**DEFAUT TROUVE ET CORRIGE : un nom de canal ne peut pas contenir de deux-points.**
+`campagne:2` ne s'abonne JAMAIS — pas d'erreur, pas de delai d'attente, rien. Realtime
+reserve le `:` a son propre adressage (`realtime:<sujet>`). Le nom venait des salles
+socket.io, ou il ne posait aucun probleme. Corrige en `campagne-2` par la migration
+`20260831230000`.
+
+### Un outil d'amorcage : `comptes-auth`
+
+Il faut bien creer le PREMIER compte : l'Edge Function exige un appelant `admin` deja
+connecte. `npm --prefix backend run comptes-auth` cree l'identite Supabase Auth et pose
+`auth_uid`, comme `mot-de-passe.ts` le faisait pour l'authentification precedente. Sans
+argument, il liste qui est relie et qui ne l'est pas.
+
+L'adresse est une **synthese** — `<loginId>@grid.bonyauto-mobile.com` — et **ce domaine
+ne recoit rien**. Personne ne doit croire qu'on peut ecrire a ces adresses.
+
+### Ce qui a reellement tourne, dans le navigateur, contre Supabase
+
+- connexion avec un identifiant, session Supabase etablie, palier reconnu ;
+- module C : 23 vendeurs, 5 jours x 11 creneaux, la grille et ses sections par marque ;
+- **saisie au clavier** : RDV pose, compteur du vendeur a jour, ventilation par marque
+  suivie, curseur descendu a la case suivante ;
+- `cree_par` **impose par le trigger** — la requete du navigateur ne l'envoie pas ;
+- tableau de bord : totaux, effectif calcule (99), moyenne, meilleure concession,
+  concessions a zero — tout recalcule dans le navigateur par `agregats.ts` ;
+- **temps reel prouve** : un RDV ecrit depuis le terminal est arrive dans le navigateur,
+  charge utile complete et **sans nom de client**.
+
+### Ce qui manque encore, et qui bloque un ecran
+
+**L'Edge Function `gerer-comptes` n'est PAS ecrite.** `services/utilisateurs.ts`
+l'appelle deja pour trois operations — creer un compte, reinitialiser un mot de passe,
+supprimer une identite. **Ces trois actions echoueront** tant que la fonction n'existe
+pas. Le reste de l'ecran Comptes fonctionne : la lecture, les roles, l'encadrement et la
+purge passent par PostgREST et par des RPC.
+
+C'est la seule chose qui ne peut pas se faire sans code serveur : creer une identite
+Supabase Auth exige la cle `service_role`, qui ne doit jamais se trouver dans le
+navigateur. En attendant, `comptes-auth` fait le travail en ligne de commande.
+
+---
+
 ## 31/08/2026, soir — GRID part sur Supabase, sans serveur
 
 **Ce qui a changé, et pourquoi.** L'outil était complet et vérifié mais n'avait **aucun

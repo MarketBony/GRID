@@ -92,6 +92,24 @@ curl -s "https://api.supabase.com/v1/projects/$REF/config/database/pooler" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
+### Amorcer les comptes
+
+Aucun compte ne peut se connecter tant qu'il n'a pas d'identite Supabase Auth. Il faut
+donc creer le PREMIER en ligne de commande — l'Edge Function, elle, exigera un appelant
+`admin` deja connecte.
+
+```bash
+npm --prefix backend run comptes-auth                       # qui est relie, qui ne l'est pas
+MOT_DE_PASSE="..." npm --prefix backend run comptes-auth -- admin
+```
+
+L'adresse est une SYNTHESE : `<loginId>@grid.bonyauto-mobile.com`. **Ce domaine ne recoit
+rien** — aucun message ne partira jamais vers ces adresses, et c'est pourquoi la
+confirmation d'e-mail est desactivee. L'ecran de connexion demande un IDENTIFIANT ; la
+composition de l'adresse est enfermee dans `services/api.ts`.
+
+Minimum de 12 caracteres, impose par le reglage du projet.
+
 ### La sequence
 
 ```bash
@@ -200,9 +218,9 @@ Secret requis pour les deux : `SUPABASE_DB_URL` (chaine du pooler **session**), 
 
 | Sujet | Etat |
 |---|---|
-| Reecriture des 7 `services/*.ts` sur `supabase-js` | a faire |
-| `hooks/useTempsReel.ts` sur Supabase Realtime + trigger de diffusion | a faire |
-| Edge Function `gerer-comptes` (creation de comptes) | a faire |
+| Reecriture des 7 `services/*.ts` sur `supabase-js` | **fait** (01/09) |
+| `hooks/useTempsReel.ts` + trigger de diffusion | **fait**, diffusion prouvee dans le navigateur |
+| Edge Function `gerer-comptes` | **a faire — bloque trois actions de l'ecran Comptes** : creer un compte, reinitialiser un mot de passe, supprimer une identite. En attendant : `npm --prefix backend run comptes-auth` |
 | Workflows sauvegarde et keep-alive | a faire |
 | Archiver les comptes `.test` presents sur Supabase | avant mise en service |
 | Reglage `site_url` de Supabase Auth vers l'URL Cloudflare | apres branchement |

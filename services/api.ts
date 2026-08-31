@@ -1,98 +1,198 @@
-import type { Session } from '../types';
+import type { Droits, Session, Utilisateur } from '../types';
+import { ErreurApi, supabase, txt, verifier } from './supabase';
 
 // ============================================================================
-// CLIENT HTTP.
+// SESSION ET DROITS.
 //
-// Toutes les URL sont RELATIVES (`/api/...`). En developpement, Vite proxifie
-// vers le backend sur 3001 ; en production, Caddy sert le front et l'API sous le
-// meme domaine. Le code du front ne connait donc aucune URL d'API et se comporte
-// a l'identique dans les deux environnements — il n'y a pas de variable
-// `VITE_API_URL` a se tromper de valeur.
+// L'authentification passe par Supabase Auth. Le resume des droits, lui, est
+// RECOMPOSE ICI a partir de la base — il n'est jamais lu dans le jeton.
+//
+// POURQUOI PAS DANS LE JETON. Les droits de cet outil sont PAR CAMPAGNE et
+// changent en cours de session : un chef de plaque qui recompose une table
+// modifie a l'instant le perimetre d'un chef de table. Un role grave dans le jeton
+// serait perime au moment ou il compte. C'etait deja la regle du portail
+// `campagneScope.ts`, et elle ne change pas de nature en changeant de langage.
+//
+// CE RESUME NE FAIT AUTORITE SUR RIEN (interdit n.5). Il sert a decider quels
+// onglets afficher. Chaque lecture et chaque ecriture sont revalidees par la RLS,
+// qui ne lui accorde aucune confiance — cacher un bouton n'est pas une securite.
 // ============================================================================
 
-const CLE_JETON = 'relance.jeton';
+export { ErreurApi } from './supabase';
 
-export const lireJeton = () => localStorage.getItem(CLE_JETON);
-export const ecrireJeton = (jeton: string) => localStorage.setItem(CLE_JETON, jeton);
-export const effacerJeton = () => localStorage.removeItem(CLE_JETON);
+/// SUPABASE AUTH EXIGE UN E-MAIL, NOS COMPTES ONT UN IDENTIFIANT.
+///
+/// `admin`, `sbesson`, `jlarget` n'ont pas d'adresse — ce sont des identifiants de
+/// connexion, et l'ecran continue de demander cela. On compose donc une adresse de
+/// SYNTHESE, ici et nulle part ailleurs.
+///
+/// CE DOMAINE NE RECOIT PAS DE COURRIER, et personne ne doit croire le contraire :
+/// aucun message ne partira jamais vers `sbesson@grid.bonyauto-mobile.com`. C'est
+/// pourquoi la confirmation d'e-mail est desactivee cote Supabase — sans cela,
+/// aucun compte n'aurait pu se connecter, faute de pouvoir confirmer une adresse
+/// qui n'existe pas.
+const DOMAINE_SYNTHESE = 'grid.bonyauto-mobile.com';
 
-/// Identifiant du socket temps reel, injecte dans chaque requete pour que le
-/// serveur ne renvoie pas a son auteur l'evenement qu'il vient de provoquer.
-let socketId: string | null = null;
-export const definirSocketId = (id: string | null) => {
-  socketId = id;
+export const adresseDeSynthese = (loginId: string) =>
+  `${loginId.trim().toLowerCase()}@${DOMAINE_SYNTHESE}`;
+
+const DROITS_VIDES: Droits = {
+  admin: false,
+  direction: false,
+  administre: false,
+  gereUtilisateurs: false,
+  lecteur: false,
+  sitesEncadres: [],
+  plaquesParCampagne: {},
+  sitesParCampagne: {},
+  tablesParCampagne: {},
 };
 
-export class ErreurApi<T = unknown> extends Error {
-  constructor(
-    message: string,
-    readonly statut: number,
-    /// Corps complet de la reponse. Indispensable pour R-A.2 : le 409 transporte
-    /// la liste des RDV impactes et les jours conserves, dont l'ecran a besoin
-    /// pour proposer un choix. Une erreur reduite a son message obligerait a
-    /// redemander l'information au serveur.
-    readonly corps?: T
-  ) {
-    super(message);
+const ajouter = (carte: Record<string, string[]>, cle: string, valeur: string) => {
+  const existant = carte[cle];
+  if (existant) {
+    if (!existant.includes(valeur)) existant.push(valeur);
+  } else {
+    carte[cle] = [valeur];
   }
-}
+};
 
-async function appeler<T>(methode: string, chemin: string, corps?: unknown): Promise<T> {
-  const entetes: Record<string, string> = {};
-  const jeton = lireJeton();
-  if (jeton) entetes['Authorization'] = `Bearer ${jeton}`;
-  if (corps !== undefined) entetes['Content-Type'] = 'application/json';
-  if (socketId) entetes['x-socket-id'] = socketId;
+/// Recompose le resume des droits en quatre lectures.
+///
+/// Transcription de `chargerDroits`, avec la meme repartition : les roles globaux,
+/// les roles PAR CAMPAGNE, les tables animees, et les encadrements DURABLES de
+/// site. Les deux dernieres origines ne se confondent pas — un encadrement de site
+/// suit d'une campagne a l'autre, une table appartient a une seule campagne.
+async function chargerDroits(utilisateurId: string): Promise<Droits> {
+  const id = Number(utilisateurId);
 
-  const reponse = await fetch(chemin, {
-    method: methode,
-    headers: entetes,
-    body: corps === undefined ? undefined : JSON.stringify(corps),
-  });
+  const [globaux, parCampagne, tables, encadrements] = await Promise.all([
+    supabase.from('role_global').select('role').eq('utilisateur_id', id),
+    supabase
+      .from('role_campagne')
+      .select('campagne_id, role, plaque_id, site_id')
+      .eq('utilisateur_id', id)
+      .is('archive_le', null),
+    supabase
+      .from('table_phoning')
+      .select('id, session_plaque!inner(campagne_id)')
+      .eq('chef_utilisateur_id', id)
+      .is('archive_le', null),
+    supabase
+      .from('encadrement_site')
+      .select('site_id')
+      .eq('utilisateur_id', id)
+      .is('archive_le', null),
+  ]);
 
-  if (reponse.status === 401) {
-    // Jeton absent, invalide ou expire : on nettoie pour que l'application
-    // reparte sur l'ecran de connexion plutot que de boucler sur des 401.
-    effacerJeton();
+  const droits: Droits = {
+    ...DROITS_VIDES,
+    sitesEncadres: [],
+    plaquesParCampagne: {},
+    sitesParCampagne: {},
+    tablesParCampagne: {},
+  };
+
+  for (const r of verifier(globaux)) {
+    if (r.role === 'admin') droits.admin = true;
+    if (r.role === 'direction') droits.direction = true;
+    if (r.role === 'lecteur') droits.lecteur = true;
   }
+  // `administre` est CALCULE, jamais recopie depuis un booleen envoye par
+  // ailleurs : c'est la meme regle que `peutAdministrer()` en base, et elle
+  // n'existe qu'a un seul endroit de chaque cote.
+  droits.administre = droits.admin || droits.direction;
+  droits.gereUtilisateurs = droits.admin;
 
-  if (!reponse.ok) {
-    let message = `Erreur ${reponse.status}`;
-    let corps: unknown;
-    try {
-      corps = await reponse.json();
-      const donnees = corps as { message?: unknown };
-      if (typeof donnees?.message === 'string') message = donnees.message;
-    } catch {
-      // Reponse non JSON : on garde le message par defaut.
+  // LES TROIS ROLES D'ENCADREMENT DONNENT LE MEME PERIMETRE. Chef de site, chef de
+  // vente VN, chef de vente VO : la distinction est une information
+  // d'organisation, pas une graduation de droits. Inventer une graduation que le
+  // metier ne demande pas produit des refus incomprehensibles.
+  for (const e of verifier(encadrements)) droits.sitesEncadres.push(txt(e.site_id));
+
+  for (const r of verifier(parCampagne)) {
+    const campagne = txt(r.campagne_id);
+    if (r.role === 'chef_plaque' && r.plaque_id !== null) {
+      ajouter(droits.plaquesParCampagne, campagne, txt(r.plaque_id));
     }
-    throw new ErreurApi(message, reponse.status, corps);
+    if (r.role === 'chef_site' && r.site_id !== null) {
+      ajouter(droits.sitesParCampagne, campagne, txt(r.site_id));
+    }
   }
 
-  if (reponse.status === 204) return undefined as T;
-  return (await reponse.json()) as T;
+  for (const t of verifier(tables)) {
+    const session = t.session_plaque as unknown as { campagne_id: number } | null;
+    if (session) ajouter(droits.tablesParCampagne, txt(session.campagne_id), txt(t.id));
+  }
+
+  return droits;
 }
 
-export const apiGet = <T>(chemin: string) => appeler<T>('GET', chemin);
-export const apiPost = <T>(chemin: string, corps?: unknown) => appeler<T>('POST', chemin, corps);
-export const apiPatch = <T>(chemin: string, corps?: unknown) => appeler<T>('PATCH', chemin, corps);
-export const apiPut = <T>(chemin: string, corps?: unknown) => appeler<T>('PUT', chemin, corps);
+/// Le compte metier derriere `auth.uid()`.
+///
+/// `utilisateur_courant()` est la MEME fonction que celle dont dependent les 48
+/// politiques. On la lit plutot que de rejouer la jointure ici : deux chemins vers
+/// la meme reponse finiraient par diverger, et c'est celui de la base qui fait foi.
+async function compteCourant(): Promise<Utilisateur | null> {
+  const { data: id, error } = await supabase.rpc('utilisateur_courant');
+  if (error || id === null || id === undefined) return null;
 
-/// `DELETE` n'existait pas : rien n'en avait besoin, l'interdit n.1 refusant toute
-/// suppression. La purge definitive d'un vendeur archive est la SEULE operation du
-/// produit qui en emploie une — voir `purgerVendeur`.
-export const apiDelete = <T>(chemin: string, corps?: unknown) =>
-  appeler<T>('DELETE', chemin, corps);
+  // `password_hash` et `auth_uid` ne sont accordes a personne : demander la ligne
+  // entiere par `*` echouerait en `42501` sur la table. Les colonnes sont donc
+  // nommees, et c'est une contrainte permanente sur cette table.
+  const reponse = await supabase
+    .from('utilisateur')
+    .select('id, login_id, nom, actif')
+    .eq('id', id as number)
+    .maybeSingle();
 
-// ---------------------------------------------------------------- auth
+  const ligne = verifier(reponse);
+  if (!ligne) return null;
+  return {
+    id: txt(ligne.id),
+    loginId: ligne.login_id,
+    nom: ligne.nom,
+    actif: ligne.actif,
+  };
+}
 
 export async function connexion(loginId: string, motDePasse: string): Promise<Session> {
-  const reponse = await apiPost<Session & { jeton: string }>('/api/auth/login', {
-    loginId,
-    motDePasse,
+  const { error } = await supabase.auth.signInWithPassword({
+    email: adresseDeSynthese(loginId),
+    password: motDePasse,
   });
-  ecrireJeton(reponse.jeton);
-  return { utilisateur: reponse.utilisateur, droits: reponse.droits };
+
+  if (error) {
+    // Le message brut de Supabase est en anglais et parle d'e-mail, alors que
+    // l'ecran demande un identifiant. On ne le montre pas tel quel.
+    throw new ErreurApi('Identifiant ou mot de passe incorrect.', 401, error);
+  }
+
+  const session = await sessionCourante();
+  if (!session) {
+    // CAS REEL A TRAITER : l'authentification Supabase a reussi, mais aucun compte
+    // metier ne porte cet `auth_uid`, ou il est desactive. L'un ou l'autre laisse
+    // une session Supabase valide et zero droit — l'utilisateur verrait des ecrans
+    // vides sans comprendre. On referme la session et on le dit.
+    await supabase.auth.signOut();
+    throw new ErreurApi(
+      "Ce compte existe mais n'est rattache a aucun profil actif. Contacter un administrateur.",
+      403
+    );
+  }
+  return session;
 }
 
-export const sessionCourante = () => apiGet<Session>('/api/auth/moi');
+/// Rend `null` si personne n'est connecte, plutot que de lever : c'est l'etat
+/// normal au premier chargement de l'application.
+export async function sessionCourante(): Promise<Session | null> {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) return null;
+
+  const utilisateur = await compteCourant();
+  if (!utilisateur) return null;
+
+  return { utilisateur, droits: await chargerDroits(utilisateur.id) };
+}
+
+export const deconnexion = () => supabase.auth.signOut();

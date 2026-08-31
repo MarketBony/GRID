@@ -1,13 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Session } from '../types';
-import { connexion as connexionApi, effacerJeton, lireJeton, sessionCourante } from '../services/api';
+import { connexion as connexionApi, deconnexion as deconnexionApi, sessionCourante } from '../services/api';
+import { supabase } from '../services/supabase';
 
 interface ValeurContexte {
   session: Session | null;
   chargement: boolean;
   connexion: (loginId: string, motDePasse: string) => Promise<void>;
-  deconnexion: () => void;
+  deconnexion: () => Promise<void>;
   /// Relit les droits en base. A appeler apres toute action susceptible de
   /// changer un perimetre — recomposition de table, cloture de campagne — parce
   /// que les droits sont PAR CAMPAGNE et peuvent bouger en pleine session.
@@ -21,14 +22,11 @@ export function FournisseurSession({ children }: { children: ReactNode }) {
   const [chargement, setChargement] = useState(true);
 
   const rafraichir = useCallback(async () => {
-    if (!lireJeton()) {
-      setSession(null);
-      return;
-    }
     try {
       setSession(await sessionCourante());
     } catch {
-      // Jeton perime ou compte desactive : `api.ts` a deja efface le jeton.
+      // Jeton perime, compte desactive, ou base injoignable. `sessionCourante`
+      // rend deja `null` dans les cas normaux ; ce `catch` couvre le reste.
       setSession(null);
     }
   }, []);
@@ -37,12 +35,27 @@ export function FournisseurSession({ children }: { children: ReactNode }) {
     rafraichir().finally(() => setChargement(false));
   }, [rafraichir]);
 
+  // ON SUIT SUPABASE, ON NE SE CONTENTE PAS DE LIRE UNE FOIS.
+  //
+  // Le jeton se renouvelle tout seul (`autoRefreshToken`), et une deconnexion dans
+  // un AUTRE onglet doit se propager ici — sinon l'ecran reste affiche alors que
+  // plus aucune requete ne passe, et l'utilisateur voit des paniques sans rapport.
+  // Le module C reste ouvert des heures pendant une session : ce cas n'est pas
+  // theorique.
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((evenement) => {
+      if (evenement === 'SIGNED_OUT') setSession(null);
+      if (evenement === 'SIGNED_IN' || evenement === 'TOKEN_REFRESHED') void rafraichir();
+    });
+    return () => data.subscription.unsubscribe();
+  }, [rafraichir]);
+
   const connexion = useCallback(async (loginId: string, motDePasse: string) => {
     setSession(await connexionApi(loginId, motDePasse));
   }, []);
 
-  const deconnexion = useCallback(() => {
-    effacerJeton();
+  const deconnexion = useCallback(async () => {
+    await deconnexionApi();
     setSession(null);
   }, []);
 

@@ -13,6 +13,7 @@
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
     "comptes-test": "tsx prisma/comptes-test.ts",
+    "comptes-auth": "tsx prisma/comptes-auth.ts",
     "test:garde-fous": "tsx prisma/tester-garde-fous.ts",
     "test:import": "tsx src/utils/importMarques.verif.ts",
     "test:agregats": "tsx prisma/tester-agregats.ts",

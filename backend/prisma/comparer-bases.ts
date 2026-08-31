@@ -75,6 +75,22 @@ const REQUETES: { nom: string; sql: string }[] = [
   },
 ];
 
+/// LES DIFFERENCES ATTENDUES, DECLAREES UNE PAR UNE.
+///
+/// Une difference legitime qui s'affiche en ECART a chaque execution finit par
+/// etre ignoree — et c'est ainsi qu'on rate la vraie. On les nomme donc ici, avec
+/// leur motif : ce qui n'est pas dans cette liste est un ecart, point.
+const ATTENDUS: { objet: string; ou: 'reference' | 'cible'; motif: string }[] = [
+  {
+    objet: 'rdv.rdv_diffusion',
+    ou: 'cible',
+    motif:
+      "le trigger de diffusion temps reel n'est pose que la ou `realtime.send` existe. " +
+      'Sur un PostgreSQL nu il echouerait a chaque ecriture de RDV — donc pendant le seed ' +
+      'et pendant les suites. Voir la migration 20260831220000.',
+  },
+];
+
 const inventaire = async (client: PrismaClient) => {
   const resultat = new Map<string, string[]>();
   for (const r of REQUETES) {
@@ -114,13 +130,26 @@ async function main() {
   for (const { nom } of REQUETES) {
     const ref = a.get(nom)!;
     const cib = b.get(nom)!;
-    const manquants = ref.filter((x) => !cib.includes(x));
-    const enTrop = cib.filter((x) => !ref.includes(x));
+    const attendu = (objet: string, ou: 'reference' | 'cible') =>
+      ATTENDUS.find((a) => a.objet === objet && a.ou === ou);
+
+    const manquants = ref.filter((x) => !cib.includes(x) && !attendu(x, 'reference'));
+    const enTrop = cib.filter((x) => !ref.includes(x) && !attendu(x, 'cible'));
+    const tolerees = [
+      ...ref.filter((x) => !cib.includes(x) && attendu(x, 'reference')),
+      ...cib.filter((x) => !ref.includes(x) && attendu(x, 'cible')),
+    ];
 
     const etat = manquants.length === 0 && enTrop.length === 0 ? 'OK   ' : 'ECART';
     console.log(`${etat} ${nom.padEnd(22)} reference ${String(ref.length).padStart(3)} · cible ${String(cib.length).padStart(3)}`);
     for (const m of manquants) console.log(`        MANQUE dans la cible : ${m}`);
     for (const t of enTrop) console.log(`        EN TROP dans la cible : ${t}`);
+    // Les differences declarees sont AFFICHEES, pas masquees : on doit pouvoir
+    // relire leur motif sans ouvrir le code.
+    for (const t of tolerees) {
+      const a = ATTENDUS.find((x) => x.objet === t)!;
+      console.log(`        attendu : ${t} — ${a.motif}`);
+    }
     ecarts += manquants.length + enTrop.length;
   }
 

@@ -62,6 +62,12 @@ Parité structurelle avec GEARBOX (`C:\Users\Operateur\Documents\gearbox3backup`
 arborescence, même pipeline, même discipline documentaire.
 
 - Front Vite + React + TypeScript, **à plat à la racine**, port 3000
+- **Les utils partagés sont RÉUTILISÉS, pas recopiés.** `agregats.ts`,
+  `repartition.ts`, `importMarques.ts`, `tri.ts`, `presenceVendeur.ts` et
+  `auth/roles.ts` vivent dans `backend/src/` et sont servis au navigateur — le
+  `tsconfig.json` du front les déclare dans son `include`. Leurs 66 contrôles
+  valent donc pour le code qui tourne en production. Ne jamais en faire une copie
+  côté front : ce serait une seconde implémentation à redémontrer
 - **Il n'y a plus d'API.** Le navigateur attaque Supabase en direct — PostgREST pour
   les lectures et les écritures simples, fonctions `security definer` pour tout ce
   qui doit être transactionnel. `backend/` ne conserve que `prisma/` : le schéma,
@@ -361,6 +367,13 @@ npm --prefix backend run seed
 # machine, et ils restent dans l'historique du terminal.
 MOT_DE_PASSE="..." npm --prefix backend run mot-de-passe -- admin
 npm --prefix backend run mot-de-passe          # sans argument : liste les comptes
+
+# Relier un compte a Supabase Auth. Il faut bien creer le PREMIER : l'Edge
+# Function exige un appelant `admin` deja connecte. Sans argument, liste qui est
+# relie et qui ne l'est pas.
+npm --prefix backend run comptes-auth
+MOT_DE_PASSE="..." npm --prefix backend run comptes-auth -- admin
+MOT_DE_PASSE="..." npm --prefix backend run comptes-auth -- --tous
 
 # Comptes de test — un par périmètre, pour éprouver les vues et la saisie.
 # Idempotent. Sans MOT_DE_PASSE, il en tire un au hasard et l'affiche une fois.

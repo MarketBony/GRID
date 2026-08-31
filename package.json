@@ -8,18 +8,18 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "dev:api": "npm --prefix backend run dev",
     "db:migrate": "npm --prefix backend run migrate:dev",
     "db:seed": "npm --prefix backend run seed",
-    "comptes-test": "npm --prefix backend run comptes-test"
+    "comptes-test": "npm --prefix backend run comptes-test",
+    "comptes-auth": "npm --prefix backend run comptes-auth"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.4",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.574.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "recharts": "^3.7.0",
-    "socket.io-client": "^4.8.1",
     "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {

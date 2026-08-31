@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
@@ -12,10 +16,38 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "types": ["node", "vite/client"],
+    "types": [
+      "node",
+      "vite/client"
+    ],
     "baseUrl": ".",
-    "paths": { "@/*": ["./*"] }
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
   },
-  "include": ["*.ts", "*.tsx", "pages/**/*", "components/**/*", "contexts/**/*", "hooks/**/*", "services/**/*", "lib/**/*", "utils/**/*"],
-  "exclude": ["node_modules", "dist", "backend"]
+  "include": [
+    "*.ts",
+    "*.tsx",
+    "pages/**/*",
+    "components/**/*",
+    "contexts/**/*",
+    "hooks/**/*",
+    "services/**/*",
+    "lib/**/*",
+    "utils/**/*",
+    "backend/src/utils/agregats.ts",
+    "backend/src/utils/repartition.ts",
+    "backend/src/utils/tri.ts",
+    "backend/src/utils/importMarques.ts",
+    "backend/src/utils/presenceVendeur.ts",
+    "backend/src/auth/roles.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "backend/node_modules",
+    "backend/dist"
+  ]
 }
