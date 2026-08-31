@@ -187,7 +187,21 @@ voulu : `anon` n'a meme pas l'usage du schema. Une fuite se voit, un ecran vide 
 Chaque push deploie. HTTPS et nom de domaine sont fournis par Cloudflare — c'est
 precisement ce qui rend ce chemin possible sans acces DNS.
 
-### LES VARIABLES SONT DES VARIABLES DE **BUILD**, PAS D'EXECUTION
+### Les variables sont VERSIONNEES — il n'y a rien a regler cote Cloudflare
+
+`.env.production`, a la racine, porte les deux valeurs et **est committe**. Le build est
+donc reproductible partout, sans aucun reglage d'hebergeur a refaire.
+
+Ce n'est pas un relachement : ces deux valeurs partent de toute facon dans le bundle,
+lisibles par quiconque ouvre les outils de developpement. Les cacher dans un tableau de
+bord n'apportait rien en securite — c'est la RLS qui protege — mais ajoutait une facon de
+casser le deploiement.
+
+**Ce qui n'a rien a faire dans ce fichier** : la cle `service_role` et le mot de passe de
+la base. Ils vivent dans `backend/.env.supabase`, ignore par git, et ne doivent jamais
+porter le prefixe `VITE_` — qui les enverrait dans le bundle.
+
+### Si l'on revient un jour aux variables d'hebergeur : BUILD, PAS EXECUTION
 
 C'est le piege qui a fait echouer le premier deploiement, et il ne se voit pas.
 

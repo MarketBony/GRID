@@ -14,6 +14,9 @@ backend/dist
 # Les modeles sont VERSIONNES : ils ne portent aucun secret, et sans eux personne
 # ne sait quelles variables remplir. `.env.*` les attrapait au passage.
 !.env.supabase.example
+# La configuration de production est VERSIONNEE : ces deux valeurs sont publiques
+# par conception et doivent etre presentes au BUILD. Voir le fichier lui-meme.
+!.env.production
 backend/.env
 ACCES-INFRA-SECRET.md
 
