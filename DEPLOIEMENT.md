@@ -231,6 +231,15 @@ deploiement.
 
 ## Exploitation — deux points qui ne peuvent pas attendre
 
+### Le secret unique des workflows
+
+Les deux workflows lisent `SUPABASE_DB_URL` — la chaine du pooler en mode **SESSION**
+(port 5432), la meme que pour les migrations. A creer dans *Settings > Secrets and
+variables > Actions*.
+
+Sans ce secret, les deux echouent AVEC UN MESSAGE EXPLICITE plutot qu'en silence : c'est
+delibere, un keep-alive qui ne fait rien sans le dire est pire que pas de keep-alive.
+
 ### Les sauvegardes sont a notre charge
 
 **Le palier gratuit de Supabase n'en garantit aucune.** Motif eprouve sur gearbox : un
@@ -258,7 +267,9 @@ Secret requis pour les deux : `SUPABASE_DB_URL` (chaine du pooler **session**), 
 |---|---|
 | Reecriture des 7 `services/*.ts` sur `supabase-js` | **fait** (01/09) |
 | `hooks/useTempsReel.ts` + trigger de diffusion | **fait**, diffusion prouvee dans le navigateur |
-| Edge Function `gerer-comptes` | **a faire — bloque trois actions de l'ecran Comptes** : creer un compte, reinitialiser un mot de passe, supprimer une identite. En attendant : `npm --prefix backend run comptes-auth` |
+| Edge Function `gerer-comptes` | **deployee** (version 3, `verify_jwt`). Refus verifie pour la cle publique, un encadrant et `direction` ; creation, connexion et suppression eprouvees de bout en bout |
+| Workflows keep-alive et sauvegarde | **ecrits**. Ne tournent qu'une fois le secret `SUPABASE_DB_URL` cree |
+| Les 14 comptes relies a Supabase Auth | **fait** — `admin` et les 7 chefs de table compris |
 | Workflows sauvegarde et keep-alive | a faire |
 | Archiver les comptes `.test` presents sur Supabase | avant mise en service |
 | Reglage `site_url` de Supabase Auth vers l'URL Cloudflare | apres branchement |

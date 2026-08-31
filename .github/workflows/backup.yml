@@ -1,0 +1,198 @@
+# ============================================================================
+# SAUVEGARDE HEBDOMADAIRE — et SA RESTAURATION, dans le meme passage.
+#
+# Le palier gratuit de Supabase NE GARANTIT AUCUNE SAUVEGARDE. C'est la
+# contrepartie assumee en quittant le VPS, et ce fichier est la facon dont on
+# l'honore.
+#
+# ---------------------------------------------------------------------------
+# UN DUMP JAMAIS RESTAURE N'EST PAS UNE SAUVEGARDE, C'EST UNE INTENTION
+# ---------------------------------------------------------------------------
+# C'est la meme regle que pour les contraintes de la base : une contrainte qu'on
+# n'a jamais vue refuser quelque chose n'est pas une contrainte. Un dump qu'on
+# n'a jamais vu se restaurer n'est pas une sauvegarde.
+#
+# Ce workflow RESTAURE donc le dump qu'il vient de produire, dans un PostgreSQL
+# jetable, et compte les lignes. Si la restauration echoue ou si les tables sont
+# vides, le workflow passe au ROUGE — et on l'apprend un lundi matin tranquille,
+# pas le jour ou on en a besoin.
+#
+# ---------------------------------------------------------------------------
+# CE QUI EST DANS LE DUMP, ET CE QUI N'Y EST PAS
+# ---------------------------------------------------------------------------
+# DANS : le schema `relance` en entier — les 16 tables, les campagnes, les RDV,
+# la composition des tables de phoning. C'est l'irremplacable : personne ne
+# ressaisira 1107 RDV.
+#
+# PAS DANS : les identites Supabase Auth (`auth.users`). Elles appartiennent a
+# Supabase, ne se restaurent pas proprement dans un projet neuf, et surtout elles
+# sont BON MARCHE a refaire — quatorze comptes, une commande :
+#
+#     MOT_DE_PASSE="..." npm --prefix backend run comptes-auth -- --tous
+#
+# Apres une restauration, les `auth_uid` du dump pointeront vers des identites
+# disparues : c'est `comptes-auth` qui les reconstruit et les relie. La procedure
+# est dans DEPLOIEMENT.md.
+#
+# ---------------------------------------------------------------------------
+# POURQUOI LE DUMP EST COMMITTE DANS LE DEPOT
+# ---------------------------------------------------------------------------
+# Gratuit, durable, zero identifiant supplementaire, et l'historique git trace
+# chaque sauvegarde. Motif repris de gearbox.
+#
+# CONTREPARTIE ASSUMEE : **LE DEPOT DOIT RESTER PRIVE** — les dumps contiennent
+# les donnees, dont des noms de clients. Et les dumps purges restent dans
+# l'historique git. Retention : les 8 derniers (~2 mois d'hebdomadaires).
+#
+# SECRET REQUIS : `SUPABASE_DB_URL` — le meme que le keep-alive.
+# ============================================================================
+name: Supabase backup
+
+on:
+  schedule:
+    - cron: '43 3 * * 1' # chaque lundi a 03:43 UTC
+  workflow_dispatch: {} # declenchement manuel, pour le premier essai
+
+concurrency:
+  group: supabase-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: write # necessaire pour committer le dump avec le GITHUB_TOKEN
+
+jobs:
+  sauvegarde:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Le PostgreSQL jetable qui sert de cible a l'epreuve de restauration.
+    # Meme version majeure que Supabase (17) : restaurer un dump 17 dans un
+    # serveur plus ancien echouerait, et on veut eprouver le vrai chemin.
+    services:
+      cible:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: epreuve
+          POSTGRES_DB: restauration
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Le `pg_dump` du runner refuserait un serveur plus recent que lui : on
+      # installe le client 17 depuis le depot officiel PGDG.
+      - name: Installer postgresql-client-17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: pg_dump du schema relance
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Secret SUPABASE_DB_URL manquant. A creer dans Settings > Secrets and variables > Actions, avec la chaine du pooler SESSION (port 5432)."
+            exit 1
+          fi
+          mkdir -p backups
+          STAMP=$(date -u +%Y%m%d-%H%M%S)
+          echo "FICHIER=backups/grid-${STAMP}.sql.gz" >> "$GITHUB_ENV"
+
+          # `--no-owner` / `--no-privileges` : le dump se restaure sous n'importe
+          # quel role. Les GRANT sont donc absents et seront reposes par les
+          # migrations — c'est voulu, ils dependent des roles de Supabase.
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" \
+            --schema=relance --no-owner --no-privileges \
+            | gzip > "backups/grid-${STAMP}.sql.gz"
+
+          ls -lh "backups/grid-${STAMP}.sql.gz"
+
+      # ---------------------------------------------------------------------
+      # L'EPREUVE. C'est ce qui distingue ce workflow d'une intention.
+      # ---------------------------------------------------------------------
+      - name: Preparer la cible (roles et auth.uid absents d'un PostgreSQL nu)
+        env:
+          PGPASSWORD: epreuve
+        run: |
+          # Le dump porte des politiques RLS qui nomment les roles de Supabase et
+          # des fonctions qui appellent `auth.uid()`. Un PostgreSQL nu ne les a
+          # pas : sans ce prelude, la restauration echouerait pour une raison qui
+          # n'a rien a voir avec l'integrite des donnees.
+          #
+          # C'est le meme prelude que la migration `20260831201000_rls_portail`,
+          # et pour la meme raison.
+          psql -h localhost -p 5433 -U postgres -d restauration -v ON_ERROR_STOP=1 <<'SQL'
+            CREATE ROLE anon NOLOGIN NOINHERIT;
+            CREATE ROLE authenticated NOLOGIN NOINHERIT;
+            CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
+            CREATE SCHEMA auth;
+            CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT NULL::uuid $$;
+          SQL
+
+      - name: Restaurer le dump dans la cible
+        env:
+          PGPASSWORD: epreuve
+        run: |
+          gunzip -c "$FICHIER" \
+            | psql -h localhost -p 5433 -U postgres -d restauration -v ON_ERROR_STOP=1 \
+            > /tmp/restauration.log 2>&1 || {
+              echo "::error::La restauration a ECHOUE. Le dump n'est pas exploitable."
+              tail -40 /tmp/restauration.log
+              exit 1
+            }
+          echo "Restauration terminee sans erreur."
+
+      - name: Compter ce qui a ete restaure
+        env:
+          PGPASSWORD: epreuve
+        run: |
+          # UN DUMP QUI SE RESTAURE SANS ERREUR MAIS SANS DONNEES passerait
+          # l'etape precedente. On compte donc, et on exige du non-vide sur les
+          # tables qui portent l'irremplacable.
+          psql -h localhost -p 5433 -U postgres -d restauration -v ON_ERROR_STOP=1 -c "
+            SELECT 'vendeur' AS table, count(*) FROM relance.vendeur
+            UNION ALL SELECT 'campagne', count(*) FROM relance.campagne
+            UNION ALL SELECT 'rdv', count(*) FROM relance.rdv
+            UNION ALL SELECT 'affectation', count(*) FROM relance.affectation
+            UNION ALL SELECT 'utilisateur', count(*) FROM relance.utilisateur
+            ORDER BY 1;"
+
+          psql -h localhost -p 5433 -U postgres -d restauration -v ON_ERROR_STOP=1 -t -c "
+            DO \$\$
+            DECLARE n int;
+            BEGIN
+              SELECT count(*) INTO n FROM relance.vendeur;
+              IF n = 0 THEN RAISE EXCEPTION 'aucun vendeur restaure : le dump est vide'; END IF;
+              SELECT count(*) INTO n FROM relance.campagne;
+              IF n = 0 THEN RAISE EXCEPTION 'aucune campagne restauree : le dump est vide'; END IF;
+              RAISE NOTICE 'Epreuve de restauration reussie.';
+            END \$\$;"
+
+      - name: Retention — garder les 8 derniers dumps
+        run: |
+          ls -1 backups/grid-*.sql.gz | sort -r | tail -n +9 | xargs -r rm -f
+          ls -1 backups/
+
+      - name: Commit et push du dump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backups/
+          if git diff --cached --quiet; then
+            echo "Rien a committer."
+          else
+            git commit -m "sauvegarde : dump Supabase $(date -u +%F), restauration eprouvee"
+            git push
+          fi

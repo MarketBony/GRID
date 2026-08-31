@@ -420,6 +420,31 @@ async function main() {
     );
   }
 
+  // `service_role` CONTOURNE LA RLS, PAS LES PRIVILEGES. C'est la cle de l'Edge
+  // Function : elle ignore les POLITIQUES mais reste soumise aux droits SQL. La
+  // migration du portail l'avait oubliee, et la creation de compte echouait sur
+  // « permission denied for table utilisateur » — une panne qui ressemblait a un
+  // probleme de RLS et n'en etait pas un.
+  for (const table of ['utilisateur', 'vendeur', 'rdv'] as const) {
+    await doitEtreVrai(
+      `droits  service_role PEUT ecrire dans ${table} (l Edge Function en depend)`,
+      `has_table_privilege('service_role', 'relance.${table}', 'INSERT')`,
+      true
+    );
+  }
+
+  // ET L'INTERDIT N.1 VAUT POUR ELLE AUSSI. « Personne » inclut la cle qui
+  // contourne tout le reste — c'est precisement celle dont on veut qu'elle ne
+  // puisse pas detruire l'historique par accident. Les purges legitimes passent
+  // par des fonctions `security definer`, qui n'ont pas besoin de ce droit.
+  for (const table of ['rdv', 'vendeur', 'campagne'] as const) {
+    await doitEtreVrai(
+      `interdit n.1  aucun droit DELETE sur ${table}, MEME pour service_role`,
+      `has_table_privilege('service_role', 'relance.${table}', 'DELETE')`,
+      false
+    );
+  }
+
   // DROITS COLONNE. La RLS filtre des lignes, jamais des colonnes : l'empreinte
   // bcrypt ne peut etre protegee que la.
   await doitEtreVrai(

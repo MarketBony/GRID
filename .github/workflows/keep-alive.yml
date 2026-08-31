@@ -1,0 +1,48 @@
+# ============================================================================
+# KEEP-ALIVE — sans ce fichier, l'outil sera EN PANNE le jour de la session.
+#
+# Le palier gratuit de Supabase met un projet en pause apres 7 JOURS
+# D'INACTIVITE. Or GRID ne sert que quelques jours par mois : entre deux
+# campagnes, il passe des semaines sans une seule requete.
+#
+# Le reveil d'un projet en pause n'est pas instantane et se fait depuis le
+# tableau de bord — c'est-a-dire au pire moment, un matin de session, par
+# quelqu'un qui voulait juste saisir des RDV.
+#
+# Une requete tous les 3 jours suffit, et laisse deux passages de marge avant le
+# seuil de 7 jours. Motif repris de `gearbox/.github/workflows/keep-alive.yml`,
+# qui tient depuis des mois.
+#
+# SECRET REQUIS : `SUPABASE_DB_URL` — la chaine du pooler en mode SESSION (5432).
+# A creer dans Settings > Secrets and variables > Actions.
+# ============================================================================
+name: Supabase keep-alive
+
+on:
+  schedule:
+    # Tous les 3 jours a 06:17 UTC. L'heure est decalee pour eviter les pics de
+    # charge de GitHub, ou les executions planifiees peuvent etre retardees de
+    # plusieurs dizaines de minutes.
+    #
+    # NB : `*/3` se reinitialise en debut de mois — l'intervalle peut donc etre
+    # de 1 a 3 jours a la bascule. Sans incidence : il reste toujours < 7 jours.
+    - cron: '17 6 */3 * *'
+  workflow_dispatch: {} # declenchement manuel, pour le premier essai
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: SELECT 1 vers Supabase
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Secret SUPABASE_DB_URL manquant. A creer dans Settings > Secrets and variables > Actions, avec la chaine du pooler SESSION (port 5432)."
+            exit 1
+          fi
+          # `psql` est preinstalle sur `ubuntu-latest` ; la version cliente est
+          # sans importance pour un simple SELECT.
+          psql "$SUPABASE_DB_URL" -c "SELECT 1 AS keep_alive;"
+          echo "Base contactee — le projet Supabase reste actif."

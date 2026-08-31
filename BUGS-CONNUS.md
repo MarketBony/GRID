@@ -7,6 +7,50 @@ verifie, pas seulement corrige de memoire.
 
 ---
 
+## Edge Function et exploitation — 01/09/2026
+
+### [CORRIGE] `service_role` contourne la RLS, mais PAS les privileges SQL
+
+L'Edge Function `gerer-comptes` echouait sur :
+
+```
+permission denied for table utilisateur
+```
+
+alors qu'elle s'execute avec la cle qui est censee tout pouvoir.
+
+`service_role` porte l'attribut `BYPASSRLS` : il ignore les **politiques**. Il n'ignore
+pas les **privileges** — ce sont deux couches distinctes, et la migration du portail
+n'accordait les droits de table qu'a `authenticated`. Le role passait donc a travers la
+RLS pour se heurter au mur d'en dessous.
+
+C'est la meme confusion qui guette a chaque fois : **la RLS s'applique APRES les droits
+SQL, jamais a leur place.** Le symptome ressemble a un probleme de politique et n'en est
+pas un.
+
+Corrige par la migration `20260901090000_droits_service_role`, qui accorde
+`SELECT, INSERT, UPDATE` — **pas `ALL`**. L'interdit n.1 vaut aussi pour cette cle : elle
+est precisement celle dont on veut qu'elle ne puisse pas detruire l'historique par
+accident. Les purges legitimes passent par des fonctions `security definer`, qui
+s'executent avec les droits de leur proprietaire et n'ont donc pas besoin de ce droit.
+
+Six controles de `test:rls` couvrent les deux sens : `service_role` PEUT ecrire, et n'a
+AUCUN droit de suppression.
+
+### [CORRIGE] Repondre 500 quand on ne peut pas etablir un droit
+
+L'Edge Function repondait « 500 — impossible de verifier vos droits » quand la
+verification echouait, ce qui arrive des qu'on lui presente la cle publique au lieu d'une
+session : l'appelant est alors vu comme `anon`, qui n'a aucun droit d'executer la
+fonction de controle.
+
+Envoyer chercher une panne la ou il n'y a qu'une absence de session est trompeur, et
+distinguer finement les causes serait un raffinement inutile. **On refuse des qu'on ne
+peut pas etablir le droit** — 403, echec ferme — et le detail reste dans les journaux de
+la fonction.
+
+---
+
 ## Premier deploiement Cloudflare — 01/09/2026
 
 ### [CORRIGE] Une configuration manquante donnait une PAGE BLANCHE
