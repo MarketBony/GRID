@@ -21,21 +21,39 @@ import { createClient } from '@supabase/supabase-js';
 const url = import.meta.env.VITE_SUPABASE_URL;
 const cle = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!url || !cle) {
-  // Un echec BRUYANT, et au demarrage. Sans ces deux variables, chaque requete
-  // echouerait separement avec un message different, et l'ecran se remplirait de
-  // pannes sans rapport apparent entre elles.
-  throw new Error(
-    'VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY sont requises. ' +
-      'En developpement : les copier depuis `backend/.env.supabase.example` dans un `.env` ' +
-      'a la racine. En production : les declarer dans Cloudflare Pages.'
-  );
-}
+/// LA CONFIGURATION EST-ELLE LA ? On le DIT, on ne s'effondre pas.
+///
+/// Une premiere version levait une exception ici, au chargement du module. C'etait
+/// « bruyant » dans la console — et une PAGE BLANCHE a l'ecran, parce qu'une
+/// exception a l'import empeche React de monter. Constate en vrai sur le premier
+/// deploiement Cloudflare : fond degrade, rien d'autre, aucune indication.
+///
+/// C'est exactement le mode d'echec que ce produit combat partout ailleurs. Le
+/// diagnostic est donc EXPOSE, et `index.tsx` affiche un ecran qui explique quoi
+/// faire au lieu de ne rien afficher du tout.
+///
+/// PIEGE DE FOND, et il vaut d'etre retenu : les variables `VITE_*` sont figees
+/// DANS LE BUNDLE AU MOMENT DU BUILD. Les declarer comme variables d'execution
+/// cote Cloudflare ne sert a RIEN — un fichier statique deja compile ne les lira
+/// jamais. Elles doivent etre des variables de BUILD.
+export const configurationSupabase = {
+  url,
+  cle,
+  complete: Boolean(url && cle),
+  manquantes: [!url && 'VITE_SUPABASE_URL', !cle && 'VITE_SUPABASE_ANON_KEY'].filter(
+    Boolean
+  ) as string[],
+};
 
-export const supabase = createClient(url, cle, {
-  db: { schema: 'relance' },
-  auth: { persistSession: true, autoRefreshToken: true },
-});
+/// `createClient` refuse une URL vide. Quand la configuration manque, l'application
+/// n'est de toute facon jamais montee — `index.tsx` affiche l'ecran de diagnostic a
+/// la place — donc ce client n'est jamais utilise.
+export const supabase = configurationSupabase.complete
+  ? createClient(url, cle, {
+      db: { schema: 'relance' },
+      auth: { persistSession: true, autoRefreshToken: true },
+    })
+  : (null as unknown as ReturnType<typeof createClient>);
 
 // ---------------------------------------------------------------- les erreurs
 

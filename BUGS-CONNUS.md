@@ -7,6 +7,36 @@ verifie, pas seulement corrige de memoire.
 
 ---
 
+## Premier deploiement Cloudflare — 01/09/2026
+
+### [CORRIGE] Une configuration manquante donnait une PAGE BLANCHE
+
+Premier deploiement sur `grid.bonyauto-mobile.workers.dev` : le fond degrade s'affiche,
+et **rien d'autre**. Aucun message, aucune interface de connexion.
+
+Cause immediate : les variables `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`
+n'etaient pas presentes AU MOMENT DU BUILD. Vite les fige dans le bundle a la
+compilation — les declarer comme variables d'EXECUTION cote Cloudflare ne sert a rien,
+un fichier deja compile ne les lira jamais.
+
+**Mais la vraie faute est ailleurs**, et elle est de conception : `services/supabase.ts`
+levait une exception au chargement du module. Une exception a l'import **empeche React
+de monter**, donc le message — pourtant explicite — n'existait que dans la console. Ce
+qui se voulait « un echec bruyant » etait en realite le mode d'echec le plus muet
+possible : une page vide, indiscernable d'une panne d'hebergement.
+
+Ce produit refuse les echecs silencieux partout ailleurs. Il n'y avait aucune raison de
+s'en accorder un au seul endroit ou l'application ne demarre pas du tout.
+
+Corrige : `configurationSupabase` expose le diagnostic au lieu de lever, et `index.tsx`
+affiche un ecran qui NOMME les variables manquantes et explique la distinction
+build/execution. Verifie en construisant sans les variables et en servant le resultat.
+
+**Regle a retenir : ne jamais lever une exception a l'import d'un module charge au
+demarrage.** Le cout n'est pas une erreur en console, c'est une application invisible.
+
+---
+
 ## Front sur Supabase — 01/09/2026
 
 ### [CORRIGE] Un nom de canal Realtime ne peut pas contenir de deux-points

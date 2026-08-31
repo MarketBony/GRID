@@ -174,17 +174,41 @@ voulu : `anon` n'a meme pas l'usage du schema. Une fuite se voit, un ecran vide 
 
 ---
 
-## Le front sur Cloudflare Pages
+## Le front sur Cloudflare
 
 | | |
 |---|---|
 | Depot | `MarketBony/GRID` |
+| URL | `https://grid.bonyauto-mobile.workers.dev` |
 | Commande de build | `npm run build` |
 | Repertoire de sortie | `dist` |
 | Variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 
 Chaque push deploie. HTTPS et nom de domaine sont fournis par Cloudflare — c'est
 precisement ce qui rend ce chemin possible sans acces DNS.
+
+### LES VARIABLES SONT DES VARIABLES DE **BUILD**, PAS D'EXECUTION
+
+C'est le piege qui a fait echouer le premier deploiement, et il ne se voit pas.
+
+Vite fige les variables `VITE_*` **dans le bundle au moment de la compilation**. Une
+variable declaree cote Cloudflare pour l'EXECUTION — « Variables and Secrets » d'un
+Worker, ou les bindings d'exécution — ne sera **jamais** lue : le fichier JavaScript
+servi est deja compile, il ne consulte plus rien.
+
+Elles doivent donc etre declarees comme variables d'ENVIRONNEMENT DE BUILD, la ou l'on
+configure la commande `npm run build`. Apres les avoir ajoutees, **relancer un
+deploiement** : les modifier ne recompile rien toute seule.
+
+Symptome quand elles manquent : depuis le correctif, un ecran « Configuration
+incomplete » qui les nomme. **Avant** ce correctif, c'etait une page blanche avec le
+seul fond degrade — l'application levait une exception a l'import, ce qui empeche React
+de monter. Voir `BUGS-CONNUS.md`.
+
+### Apres le premier deploiement
+
+Reporter l'URL dans *Authentication > URL Configuration* de Supabase (`site_url`), qui
+pointe encore sur `http://localhost:3000`.
 
 `npm run build` lance `tsc --noEmit` avant `vite build` : une erreur de typage arrete le
 deploiement.
