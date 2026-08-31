@@ -19,9 +19,15 @@ Trois usages du mot « relance » restent en place, et ce n'est pas un oubli :
 | Le préfixe `RELANCE:` des messages de trigger | Écrit dans les 19 fonctions de trigger et 13 migrations, et **retiré avant affichage** par `utils/messageTrigger.ts`. Aucun utilisateur ne le voit |
 | Le vocabulaire métier — `relance`, `table_phoning`, `campagne` | C'est le métier, pas le produit. Une « relance » est un appel sortant : le renommer casserait le vocabulaire imposé plus bas |
 
-Le logotype est composé en Syncopate dans le dégradé (`.logotype`). **Un logotype dédié
-reste à faire** — un G en damier aux couleurs du groupe, demandé par l'utilisateur le
-31/08/2026 ; il se substituera à la composition typographique sans autre changement.
+**Le logotype existe** depuis le 31/08/2026 : `public/grid.svg`, un G taillé dans un
+damier de grille de départ, incliné, avec trois traînées de vitesse. Son idée tient en
+une phrase — *le module du damier est l'épaisseur du trait*, de sorte que le damier ne
+se pose pas sur la lettre, il la constitue. Le dégradé Bony y court d'un seul tenant
+(`gradientUnits="userSpaceOnUse"`), traînées comprises.
+
+Ce fichier est la **source unique** : en-tête, écran de connexion et favicon le
+référencent tous les trois. Ne jamais le recopier en JSX — ce serait le premier pas
+vers deux logos différents dans la même application.
 
 Lire `CAHIER-DES-CHARGES.md` avant toute implémentation fonctionnelle.
 Lire `VIABILITE-FREEMIUM.md` avant toute décision d'infrastructure.
@@ -39,12 +45,15 @@ Ce fichier porte le contexte et les règles. Pour l'état réel du code :
 | `ETAT-PROJET.md` | Mémoire de référence : ce qui est fait, décisions, lotissement |
 | `ETAT-BACKEND.md` | API, base, invariants, sources de vérité uniques |
 | `BUGS-CONNUS.md` | Défauts identifiés, corrigés ou non |
-| `DEPLOIEMENT.md` | Runbook VPS (à écrire en J7) |
+| `DEPLOIEMENT.md` | Runbook : Supabase + Cloudflare Pages |
 
 Ne jamais dupliquer leur contenu ici.
 
-`VIABILITE-FREEMIUM.md` est **périmé** : il conclut sur Supabase Auth + Cloudflare Pages,
-abandonnés au profit du VPS existant. `schema.sql` et `seed_referentiels.sql` sont des
+`VIABILITE-FREEMIUM.md` avait conclu sur Supabase Auth + Cloudflare Pages. Cette
+conclusion a été abandonnée le 31/08/2026 au profit du VPS… puis **reprise le même
+jour**, le VPS étant écarté à son tour (« Gearbox reste Gearbox », et
+`grid.bonyauto-mobile.com` n'existe pas en DNS). Le document reste néanmoins périmé
+sur les chiffres et les détails ; l'architecture réelle est décrite ici. `schema.sql` et `seed_referentiels.sql` sont des
 références historiques, remplacées par `backend/prisma/`.
 
 ## Stack
@@ -53,25 +62,36 @@ Parité structurelle avec GEARBOX (`C:\Users\Operateur\Documents\gearbox3backup`
 arborescence, même pipeline, même discipline documentaire.
 
 - Front Vite + React + TypeScript, **à plat à la racine**, port 3000
-- API Express + Prisma + JWT + socket.io, dans `backend/`, port 3001
-- Le front n'appelle que des URL **relatives** (`/api/...`) : Vite proxifie en
-  développement, Caddy sert les deux sous le même domaine en production
-- PostgreSQL 17, schéma `relance`. **Local en développement, et sur le VPS en
-  production** — dans le `docker-compose` du VPS, à côté de gearbox. Supabase a été écarté
-  le 31/08/2026 sur décision de l'utilisateur : une dépendance externe de moins, et le
-  blocage des ports 5432/6543 par le réseau du bureau n'a plus d'incidence. Contrepartie
-  assumée : **les sauvegardes sont à notre charge**, donc au runbook de J7 de les décrire
-  et de les prouver par une restauration
+- **Il n'y a plus d'API.** Le navigateur attaque Supabase en direct — PostgREST pour
+  les lectures et les écritures simples, fonctions `security definer` pour tout ce
+  qui doit être transactionnel. `backend/` ne conserve que `prisma/` : le schéma,
+  les migrations, le seed et les suites de vérification
+- Le front appelle Supabase par `supabase-js`, avec `VITE_SUPABASE_URL` et
+  `VITE_SUPABASE_ANON_KEY`. **Ces deux valeurs partent dans le bundle, c'est normal
+  et sans risque** — à condition que `test:rls` soit vert : c'est la RLS qui protège,
+  pas la discrétion de la clé
+- PostgreSQL 17, schéma `relance`. **Local en développement, Supabase en
+  production** — projet `ganeczlhcprljuazldpp`, région `eu-west-3` (Paris)
 - Authentification JWT + bcrypt, comptes créés par un administrateur. Pas d'Entra ID
-- Déploiement sur le VPS qui héberge gearbox : son Caddy gagne une ligne
-  `import relance.caddy`. Son `docker-compose.yml` n'est pas modifié — Postgres et l'API
-  de relance vivent dans un `docker-compose` **séparé**, pour qu'un redémarrage de relance
-  ne touche jamais gearbox
-- URL cible : `grid.bonyauto-mobile.com`
+- Déploiement du front sur **Cloudflare Pages**, relié au dépôt : build
+  `npm run build`, sortie `dist`. HTTPS et nom de domaine fournis
+- **Aucune ressource partagée avec gearbox.** Exigence textuelle de l'utilisateur :
+  « Gearbox reste Gearbox ». Le VPS a été remis dans son état d'origine, il ne reste
+  aucune trace de GRID dessus. `grid.bonyauto-mobile.com` n'existe pas en DNS et la
+  zone Gandi n'est pas accessible : c'est ce qui a fermé la voie du VPS
+- **Sauvegardes à notre charge** : le palier gratuit de Supabase n'en garantit
+  aucune, et met le projet en pause après **7 jours d'inactivité** — GRID ne sert que
+  quelques jours par mois
 
-**Tout se développe en local d'abord.** La v1 ne part sur le VPS que quand les critères de
-recette passent en local. Effet de bord utile : la boucle quotidienne ne sort pas du
-poste, donc le blocage des ports 5432/6543 par le réseau du bureau ne gêne plus.
+**Tout se développe en local d'abord**, puis se rejoue sur Supabase avant d'être cru.
+Les deux bases doivent rester identiques : `npm --prefix backend run comparer` le
+vérifie objet par objet.
+
+*Le blocage des ports 5432/6543 par le réseau du bureau n'existe plus.* Il figurait
+dans ce fichier comme un fait acquis, et il a motivé plusieurs décisions
+d'architecture. **Mesuré le 31/08/2026 : les trois hôtes Supabase répondent.**
+Migrations, seed et suites tournent donc depuis le poste. À re-mesurer avant de
+rebâtir quoi que ce soit sur cette hypothèse — elle a déjà été fausse une fois.
 
 ## Charte Bony
 
@@ -215,9 +235,18 @@ l'urgence. Si une demande les enfreint, le dire et proposer l'alternative.
    n'est affectée. Un `ALTER TABLE ... DISABLE TRIGGER` aurait désarmé le garde-fou
    pour tout le monde, y compris pendant une session de saisie.
 
-   Le seul appelant légitime est `DELETE /api/vendeurs/:id`. Les deux moitiés de la
-   règle sont couvertes par `test:garde-fous` : le refus par défaut, ET l'ouverture
-   sur demande.
+   *Correction du 31/08/2026 :* cette section annonçait « un seul appelant
+   légitime, `DELETE /api/vendeurs/:id` ». Il y en avait **deux** — la suppression
+   d'un compte ouvrait la même porte. Et les deux ont déménagé : elles vivent
+   maintenant **à l'intérieur** de `relance.vendeur_purger()` et
+   `relance.utilisateur_purger()`, deux fonctions `security definer`.
+
+   La protection en sort renforcée : **aucun droit `DELETE` n'est accordé à
+   personne, sur aucune table**. La porte n'existe donc plus que dans ces deux
+   fonctions, qui exigent toujours que la ligne soit *déjà archivée* et que le nom
+   exact soit retapé. Trois serrures au lieu d'une — pas de `GRANT`, pas de
+   politique `FOR DELETE`, et les 19 triggers. `test:garde-fous` et `test:rls`
+   couvrent les deux sens : le refus par défaut ET l'ouverture sur demande.
 2. **Aucun agrégat stocké en base.** Pas de colonne `total_rdv`, pas de compteur
    dénormalisé, pas de table de synthèse. Tout se calcule en lecture par vue ou
    requête. C'est la cause racine de la fragilité du fichier Excel : 677 références
@@ -225,15 +254,27 @@ l'urgence. Si une demande les enfreint, le dire et proposer l'alternative.
 3. **Aucune structure en dur dans le code.** Les 4 plaques, les 19 sites, les 5 jours,
    les 11 créneaux, les 3 marques sont des **données**. Toute constante trouvée en dur
    dans le code est un bug, même si elle est correcte aujourd'hui.
-4. **L'autorisation est portée par le serveur, jamais par le front, et passe par un
-   portail unique.** Ce portail est `backend/src/auth/campagneScope.ts` : **aucune route
-   ne recopie une clause de périmètre.**
+4. **L'autorisation est portée par la BASE, et elle n'a aucun filet.**
 
-   *Reformulation du 28/08/2026.* La règle disait « RLS sur toutes les tables, sans
-   exception ». Elle est incompatible avec la parité GEARBOX retenue : Prisma se connecte
-   avec le rôle propriétaire des tables, qui contourne la RLS de toute façon — l'activer
-   aurait donné une garantie imaginaire. L'exigence de fond est intacte, et même plus
-   exigeante : sans RLS, le portail n'a **aucun filet**.
+   *Troisième reformulation, le 31/08/2026, et la plus lourde de conséquences.*
+   Les deux premières disaient « l'API fait autorité, par un portail unique ».
+   **Cette API n'existe plus.** Le front est statique, il porte une clé publique,
+   et tout ce qu'il sait, l'utilisateur le sait aussi.
+
+   La RLS est donc désormais **la seule chose** entre un chef de table et les
+   données de tout le groupe. Il n'y a rien derrière elle. Une politique oubliée
+   n'est pas une régression discrète, c'est une fuite.
+
+   Ce qui n'a pas changé : **le périmètre ne se recopie nulle part.** La vue
+   `relance.perimetre_saisie` est la transcription des quatre origines de droit, et
+   les politiques comme le front lisent celle-là et rien d'autre.
+
+   Les deux modes d'échec sont **silencieux**, et c'est tout le problème : trop
+   fermée, la RLS rend zéro ligne sans erreur ; trop ouverte, tout est lisible
+   depuis la console. D'où la règle absolue : **activer la RLS et écrire la
+   politique vont ensemble, dans la même migration**, et `test:rls` vérifie les
+   deux sens avant tout déploiement.
+
 5. **Pas de mise en forme conditionnelle des droits côté client seul.** Cacher un
    bouton n'est pas une sécurité. Le résumé de droits envoyé au front sert à l'affichage ;
    chaque appel est revalidé côté serveur.
@@ -297,7 +338,10 @@ Repris de GEARBOX.
    jamais « je documenterai après », c'est trop tard : un déploiement non documenté fait
    repartir la session suivante sur de fausses bases.
 4. Commit, puis **STOP avant le push** : montrer le diff et attendre un OK explicite.
-5. Déploiement VPS ensuite, avec compte rendu de ce qui a réellement tourné.
+5. **Migrations sur Supabase**, puis `comparer` pour prouver que les deux bases sont
+   identiques, puis les suites rejouées **sur Supabase**. Compte rendu de ce qui a
+   réellement tourné, jamais de ce qui était prévu.
+6. Le front part tout seul : chaque push sur le dépôt déclenche Cloudflare Pages.
 
 ## Commandes
 
@@ -324,10 +368,24 @@ MOT_DE_PASSE="..." npm run comptes-test
 
 # Les cinq suites de vérification. Aucune ne doit passer au rouge.
 npm --prefix backend run test:garde-fous    # 33 invariants, chacun doit REFUSER
+npm --prefix backend run test:rls           # 81 contrôles des politiques ET des RPC
 npm --prefix backend run test:import        # 19 tests du parseur, fonctions pures
 npm --prefix backend run test:agregats      # 27 tests des totaux, contre les 1107 RDV de juin
 npm --prefix backend run test:repartition   # 20 tests de la répartition graine 42
-SEED_MOT_DE_PASSE="..." npm --prefix backend run test:api   # 43 routes, serveur allumé
+
+# TOUTES SE JOUENT SUR LES DEUX BASES, et c'est le seul usage correct : une suite
+# verte en local ne dit rien de la production. Pour viser Supabase, charger son
+# environnement sans jamais l'afficher — le mot de passe ne doit pas finir dans
+# l'historique du terminal ni dans les arguments d'un processus :
+set -a; . ./backend/.env.supabase; set +a; export DATABASE_URL="$DIRECT_URL"
+
+# Comparer les deux bases objet par objet — tables, colonnes, CHECK, triggers,
+# fonctions, vues, politiques, index, migrations. « Migrations appliquées » ne
+# prouve pas que les deux schémas se ressemblent ; ceci le prouve.
+npm --prefix backend run comparer -- "<url de la base de référence>"
+
+# `test:api` (43 contrôles) a été SUPPRIMÉE avec l'API qu'elle testait. Son rôle est
+# repris par `test:rls`, qui vérifie les deux sens sur chaque palier.
 
 # Serveurs
 npm --prefix backend run dev   # API sur 3001

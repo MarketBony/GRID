@@ -57,6 +57,20 @@ model Utilisateur {
   id           BigInt    @id @default(autoincrement())
   loginId      String    @unique @map("login_id")
   passwordHash String    @map("password_hash")
+
+  /// Identite Supabase Auth (`auth.users.id`), sur laquelle repose TOUTE
+  /// l'autorisation depuis la bascule sans serveur : `relance.utilisateur_courant()`
+  /// resout `auth.uid()` en cet identifiant, et chaque politique RLS part de la.
+  ///
+  /// Nullable : un compte peut exister en base avant d'etre relie a Supabase Auth
+  /// (c'est l'etat transitoire pendant la creation par l'Edge Function). Un compte
+  /// sans `authUid` ne peut simplement pas se connecter.
+  ///
+  /// AUCUNE CLE ETRANGERE vers `auth.users` — Prisma ne sait pas referencer un
+  /// autre schema sans `multiSchema`, et une FK qu'il ignore serait proposee a la
+  /// suppression a chaque `migrate diff`. Motif detaille dans la migration
+  /// `20260831200000_auth_uid`.
+  authUid      String?   @unique @map("auth_uid") @db.Uuid
   nom          String
   actif        Boolean   @default(true)
   creeLe       DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)

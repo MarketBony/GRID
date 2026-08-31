@@ -11,6 +11,9 @@ backend/dist
 .env
 .env.*
 !.env.example
+# Les modeles sont VERSIONNES : ils ne portent aucun secret, et sans eux personne
+# ne sait quelles variables remplir. `.env.*` les attrapait au passage.
+!.env.supabase.example
 backend/.env
 ACCES-INFRA-SECRET.md
 

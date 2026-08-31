@@ -1,6 +1,99 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 28/08/2026, fin de J3.
+Mise a jour : 31/08/2026, apres la bascule sans serveur.
+
+---
+
+## 31/08/2026, soir — L'API a disparu, la base fait autorite
+
+**Tout ce qui suit cette section decrit une API Express qui n'existe plus.** Le contenu
+est conserve : il porte le raisonnement, les invariants et les pieges, dont la plupart
+restent vrais. Mais les routes, le portail `campagneScope.ts` et `test:api` ont ete
+remplaces par ce qui est decrit ici.
+
+`backend/` ne conserve que `prisma/` : schema, migrations, seed, et les suites.
+
+### Le portail, transcrit en SQL
+
+| Objet | Role |
+|---|---|
+| `relance.utilisateur_courant()` | `auth.uid()` -> `utilisateur.id`, NULL si le compte est inactif ou archive. **Toutes les autres en dependent** |
+| `relance.peut_administrer()` | `admin` ou `direction` |
+| `relance.peut_gerer_utilisateurs()` | `admin` SEUL — la frontiere qui empeche `direction` de se promouvoir |
+| `relance.campagne_ouverte(id)` | R-C.3 |
+| **`relance.perimetre_saisie`** (vue) | **SOURCE DE VERITE UNIQUE du perimetre.** L'union des quatre origines, transcription de `vendeursSaisissables` |
+| `relance.peut_saisir(vendeur, campagne)` | le meme perimetre en predicat — il LIT la vue, il ne le recalcule pas |
+| `relance.rdv_agrege` (vue) | les RDV **sans `client` ni `commentaire`**. Remplace `redacterRdvs` : le nom ne peut pas sortir puisqu'il n'est pas dans la vue |
+
+**Les deux vues contournent la RLS par construction** (pas de `security_invoker`) et
+doivent donc porter elles-memes le filtre `utilisateur_courant() IS NOT NULL`. C'est un
+defaut qui a ete introduit puis corrige le meme jour sur `rdv_agrege` — voir
+`BUGS-CONNUS.md`.
+
+### Trois verifications valent d'etre connues
+
+**`SECURITY DEFINER` sur les fonctions du portail n'est pas un confort : c'est ce qui
+casse la recursion.** `utilisateur_courant()` lit `utilisateur`, dont la politique appelle
+`utilisateur_courant()`. En `security invoker`, Postgres detecte la recursion et refuse la
+requete.
+
+**Ecrire `(select relance.…())` dans une politique, jamais `relance.…()`.** Appelee
+directement, la fonction est evaluee **une fois par ligne** ; enveloppee dans un
+sous-select, Postgres la remonte en `InitPlan` et ne l'evalue qu'une fois par requete. Sur
+1107 RDV, la difference se voit a l'ouverture du tableau de bord.
+
+**La RLS filtre des LIGNES, jamais des COLONNES.** `password_hash` et `auth_uid` ne sont
+protegeables que par un `GRANT SELECT (colonne, …)`. Consequence a respecter dans le
+front : **ne jamais chainer un `.select()` sans liste de colonnes apres une ecriture sur
+`utilisateur`** — un `INSERT ... RETURNING *` exige de lire toutes les colonnes et se
+solde par un `42501` sur la table entiere, qui se diagnostique tres mal. Deux controles de
+`test:rls` fixent la regle dans les deux sens.
+
+### Les 13 RPC — ce que PostgREST ne sait pas faire
+
+PostgREST n'a **pas de transaction cote client** : chaque appel HTTP est sa propre
+transaction. Or le produit comptait onze chemins d'ecriture tout-ou-rien. Chaque fonction
+ci-dessous porte une transaction et remplace exactement un `prisma.$transaction` :
+
+`campagne_definir_jours` · `campagne_definir_creneaux` · `table_archiver` ·
+`table_definir_vendeurs` · `session_appliquer_repartition` · `session_reprendre` ·
+`utilisateur_definir_roles` · `utilisateur_definir_encadrement` · `utilisateur_purger` ·
+`vendeur_creer` · `vendeur_modifier` · `vendeur_appliquer_import_marques` ·
+`vendeur_purger`
+
+**La graine 42 et le parseur d'import restent en TypeScript**, cote navigateur. Les
+retranscrire en PL/pgSQL creerait une seconde implementation du meme algorithme, et le
+jour ou les deux divergeraient on ne saurait plus laquelle fait foi. Le navigateur
+CALCULE, la fonction ECRIT — atomiquement.
+
+**`REVOKE ... FROM PUBLIC` n'est pas optionnel.** PostgreSQL accorde l'execution d'une
+fonction a `PUBLIC` par defaut ; combine a `SECURITY DEFINER`, cela aurait rendu la purge
+appelable avec la seule cle publique, sans aucun jeton. Les gardes internes
+(`exiger_*`) et `poser_capacites` ne sont accordes a personne.
+
+### Les suites
+
+| Suite | Contrôles | Base |
+|---|---|---|
+| `test:garde-fous` | 33 | les deux |
+| `test:rls` | **81** — politiques, colonnes, RPC, les deux portes de purge | les deux |
+| `test:agregats` | 27 | en memoire |
+| `test:repartition` | 20 | en memoire |
+| `test:import` | 19 | en memoire |
+| `comparer` | 9 categories d'objets, entre deux bases | les deux |
+
+`test:rls` se fait passer pour un compte **exactement comme PostgREST** : `SET LOCAL ROLE
+authenticated` puis `request.jwt.claim.sub`. Les politiques sont donc evaluees dans les
+memes conditions qu'en production. Elle ne laisse **aucune trace** — chaque controle
+tourne dans sa transaction, annulee, et les `auth_uid` sont poses dedans.
+
+**Ce qu'elle ne couvre pas, et qu'elle imprime en fin d'execution** : la limite de lignes
+de PostgREST, les reglages du tableau de bord Supabase, et l'Edge Function.
+
+**Les assertions portent sur les codes SQLSTATE, jamais sur les messages.** Les messages de
+PostgreSQL sont traduits : sur ce poste ils arrivent en francais, sur Supabase en anglais.
+Une premiere version comparait des bouts de phrase et passait 46 controles au rouge en
+changeant de machine, sans qu'aucune regle n'ait bouge.
 
 ---
 

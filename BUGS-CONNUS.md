@@ -1,9 +1,119 @@
 # BUGS-CONNUS
 
-Mise a jour : 31/08/2026, apres le chantier encadrants et comptes.
+Mise a jour : 31/08/2026, apres la bascule sans serveur.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
+
+---
+
+## Bascule sans serveur — 31/08/2026 au soir
+
+### [CORRIGE] Les triggers de validation etaient aveugles par la RLS
+
+Trouve par `test:rls`. Une saisie faite par un compte desactive etait refusee avec :
+
+> RELANCE: ce vendeur n'est pas autorise a vendre cette marque.
+
+**Le verdict etait faux** : le vendeur etait parfaitement autorise.
+`verifier_marque_autorisee()` s'executait avec les droits de l'appelant
+(`security invoker`). Depuis que `vendeur_marque` porte une politique, un appelant sans
+identite n'y voit **aucune ligne** — le trigger, ne trouvant pas l'autorisation, concluait
+qu'elle n'existait pas.
+
+Le trigger ne verifiait plus un invariant de la BASE mais un invariant **de ce que
+l'appelant voit**. Ce sont deux choses differentes, et la seconde n'a aucun interet.
+
+Rien n'etait ouvert pour autant : toutes les tables lues par ces triggers sont en lecture
+ouverte a tout compte authentifie, donc un utilisateur reel obtenait le bon verdict. Mais
+le jour ou une lecture est restreinte — et c'est ce qu'on venait de faire sur `rdv` — les
+verdicts deviennent faux **sans que rien ne le signale**.
+
+Corrige par `20260831202000_triggers_hors_rls` : les huit fonctions passent en
+`security definer` via `ALTER FUNCTION`, sans recopier leur corps. **Regle : un invariant
+qui depend du point de vue de celui qui ecrit n'est pas un invariant.**
+
+### [CORRIGE] `rdv_agrege` rendait tout a un compte desactive
+
+Mesure sur un compte `actif = false` :
+
+```
+relance.vendeur      ->  0 ligne    (correct, la RLS s'applique)
+relance.rdv_agrege   -> 22 lignes   (FAUX)
+```
+
+La vue n'active pas `security_invoker` : elle lit `rdv` avec les droits de son
+proprietaire, donc **hors RLS**. C'est exactement ce qu'on lui demande — le tableau de
+bord doit compter les RDV de tout le monde. Mais le contournement valait aussi pour ceux
+qui ne doivent plus rien voir.
+
+Un compte desactive **garde un jeton Supabase valide** : la desactivation est portee par
+`utilisateur.actif`, pas par Supabase Auth. Son role reste `authenticated`, et le `GRANT`
+sur la vue suffisait a tout lui montrer — indefiniment, sans qu'aucun ecran ne le montre.
+
+Corrige par `20260831203000_rdv_agrege_compte_actif`. **Regle : toute vue de `relance` qui
+n'active pas `security_invoker` doit porter `WHERE relance.utilisateur_courant() IS NOT
+NULL`.** Trois controles de `test:rls` le verifient, un par vue.
+
+### [CORRIGE] Deux controles de test ne prouvaient rien — reveles par une base vide
+
+Le premier passage de `test:garde-fous` sur Supabase a rendu **32/32 au lieu de 33/33**.
+
+Le test de non-regression R-B.1 cherchait en base « un vendeur de la meme plaque, libre de
+toute affectation ». **Sur une base fraichement seedee il n'en existe aucun** : CENTRE a
+30 vendeurs et 5 tables de 6, l'effectif est exactement sature. En local il ne passait que
+grace a deux vendeurs residuels laisses par d'anciennes executions.
+
+Deux defauts en un :
+- le controle ne tournait **que par accident**, sur une base polluee ;
+- son `if` n'avait **pas de `else`**, contrairement a toutes les autres branches du
+  fichier. Sa disparition etait donc **silencieuse** — seul le total changeait.
+
+Meme classe de defaut dans `test:rls` : « le chef de table ne voit aucun RDV hors de son
+perimetre » rendait 0 sur une base sans aucun RDV. Ce zero aurait ete identique avec une
+politique absente. La suite l'a signale d'elle-meme (« CONTROLE SANS OBJET »), ce qui vaut
+mieux qu'un vert mensonger mais ne remplace pas un vrai controle.
+
+Les deux fabriquent maintenant leur matiere **dans la transaction annulee**.
+
+**Regle : un controle qui depend de l'etat de la base ne prouve rien tant qu'on ne l'a pas
+vu tourner sur une base vide. Et un `if` sans `else` dans une suite de tests est un
+controle qui peut disparaitre sans bruit.**
+
+### [CORRIGE] Les assertions comparaient des messages traduits
+
+`test:rls` comparait des bouts de phrase (`permission denied`, `row-level security`). Les
+messages de PostgreSQL sont **localises** : sur ce poste ils arrivent en francais. Les
+46 controles sont passes au rouge d'un coup, sans qu'aucune regle n'ait bouge.
+
+Les assertions portent desormais sur les **codes SQLSTATE** (`42501`, `42703`, `P0001`),
+qui sont normalises. Piege associe : un SQLSTATE fait cinq caracteres **alphanumeriques**,
+pas cinq chiffres — `P0001` (une exception de trigger) echappait a la premiere expression
+reguliere, qui rangeait tous les refus de trigger en « aucun code ».
+
+Comme `42501` couvre **a la fois** un `GRANT` manquant et un refus de politique, une
+section verifie separement l'etat exact des droits (`has_table_privilege`,
+`has_column_privilege`). Sans elle, un `GRANT` oublie se ferait passer pour une politique
+qui fonctionne.
+
+### [A CONNAITRE] Le blocage des ports 5432/6543 n'existe plus
+
+`ETAT-PROJET.md` l'affirmait comme un fait acquis, et il a motive plusieurs decisions
+d'architecture — dont le choix d'un Postgres local sur le VPS, puis le detour par la CI
+pour les migrations. **Mesure le 31/08/2026 : les trois hotes Supabase repondent.**
+
+A re-mesurer avant de rebatir quoi que ce soit sur cette hypothese : elle a deja ete
+fausse une fois, et personne ne l'avait reverifiee.
+
+### [A CONNAITRE] Les comptes `.test` existent sur Supabase
+
+`comptes-test` a ete joue sur la base de production pour permettre a `test:rls` de tourner
+la-bas. Ces comptes sont **inertes** — sans `auth_uid`, ils ne peuvent pas se connecter —
+mais ils doivent etre archives avant la mise en service.
+
+*Dette : `test:rls` devrait provisionner ses cinq paliers dans la transaction annulee,
+comme elle le fait deja pour le palier `lecteur`. Le motif est ecrit, il reste a
+l'appliquer aux quatre autres.*
 
 ---
 
@@ -24,7 +134,7 @@ module qui exporte un composant n'exporte QUE des composants.**
 
 ### [A CONNAITRE] Un test d'integration qui cree une entite metier laisse une trace
 
-Consequence directe de l'interdit n.1 : `test:api` cree un vendeur et des RDV, et
+Consequence directe de l'interdit n.1 (`test:api` a depuis ete supprimee avec l'API ; le meme piege vaut pour toute suite qui ecrit) : elle creait un vendeur et des RDV, et
 l'application ne peut supprimer ni l'un ni les autres — les triggers
 `vendeur_pas_de_delete` et `rdv_pas_de_delete` s'y opposent, ce qui est exactement le
 comportement voulu en production.

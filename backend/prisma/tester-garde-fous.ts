@@ -270,23 +270,44 @@ async function main() {
     // cette campagne : un vendeur deja place ailleurs serait refuse par R-B.4, et
     // le test accuserait le mauvais invariant. C'est exactement ce qui est arrive
     // a la premiere ecriture de ce test.
-    const local = await prisma.vendeur.findFirst({
-      where: {
-        site: { plaqueId: plaqueDeLaTable },
-        affectations: {
-          none: { archiveLe: null, table: { sessionPlaque: { campagneId: juin.id } } },
-        },
-      },
+    // LE VENDEUR EST FABRIQUE ICI, PAS CHERCHE EN BASE — et c'est un correctif.
+    //
+    // Cette version cherchait un vendeur de la plaque encore libre sur la campagne.
+    // Sur une base FRAICHEMENT SEEDEE il n'en existe aucun : CENTRE compte
+    // 30 vendeurs et 5 tables de 6, l'effectif est exactement sature. Le test ne
+    // tournait donc que sur une base polluee par des executions precedentes — en
+    // local, deux vendeurs residuels le rendaient possible. Il a saute au premier
+    // passage sur Supabase, ou la base etait propre : 32 controles au lieu de 33.
+    //
+    // Un controle qui ne s'execute que par accident ne prouve rien, et sa
+    // disparition etait SILENCIEUSE : le `if` n'avait pas de `else`, contrairement
+    // a toutes les autres branches de ce fichier. Les deux defauts sont corriges —
+    // le vendeur est cree dans la transaction annulee, et l'absence de site
+    // remonte comme un echec au lieu de s'evaporer.
+    const siteDeLaPlaque = await prisma.site.findFirst({
+      where: { plaqueId: plaqueDeLaTable },
       select: { id: true },
     });
-    if (local) {
-      await doitAccepter('R-B.1  vendeur de LA MEME plaque accepte (non-regression)', (tx) =>
-        tx.affectation.upsert({
-          where: { tableId_vendeurId: { tableId: table1.id, vendeurId: local.id } },
-          update: { archiveLe: null },
-          create: { tableId: table1.id, vendeurId: local.id },
-        })
-      );
+    if (siteDeLaPlaque) {
+      await doitAccepter('R-B.1  vendeur de LA MEME plaque accepte (non-regression)', async (tx) => {
+        const neuf = await tx.vendeur.create({
+          data: {
+            nom: 'GARDE-FOU MEME PLAQUE',
+            siteId: siteDeLaPlaque.id,
+            // `VO` : aucune marque a poser, donc le controle porte bien sur
+            // R-B.1 et ne peut pas trebucher sur R-C.1 au passage.
+            typeVehicule: 'VO',
+          },
+          select: { id: true },
+        });
+        return tx.affectation.create({ data: { tableId: table1.id, vendeurId: neuf.id } });
+      });
+    } else {
+      resultats.push({
+        nom: 'R-B.1  vendeur de LA MEME plaque accepte (non-regression)',
+        ok: false,
+        detail: 'jeu de donnees insuffisant (aucun site sur la plaque de la table)',
+      });
     }
   }
 

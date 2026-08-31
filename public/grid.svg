@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 100" role="img" aria-labelledby="titre-grid">
+  <title id="titre-grid">GRID</title>
+  <!--
+    LOGOTYPE GRID — un G taillé dans le damier, lancé.
+    Demandé par l'utilisateur le 31/08/2026.
+
+    LA MÉTAPHORE. GRID, c'est la grille de départ : le damier, l'automobile, la
+    course. Et la boucle du produit dit la même chose — on aligne, on lance, on
+    chronomètre, on classe.
+
+    L'IDÉE, ET C'EST LA SEULE QUI COMPTE ICI : LE MODULE DU DAMIER EST L'ÉPAISSEUR
+    DU TRAIT. La lettre est construite sur une grille de 5 x 5 modules de 18, et
+    son trait fait exactement UN module. Conséquence : le damier ne se pose pas
+    sur le G, il le CONSTITUE — chaque segment de la lettre est une file de cases
+    alternées, comme un ruban de drapeau à damier plié en forme de G.
+
+        # # # # #
+        # . . . .
+        # . # # #     17 modules posés sur 25
+        # . . . #
+        # # # # #
+
+    Deux essais ont été jetés avant celui-ci, et leurs défauts valent d'être notés
+    parce qu'ils sont faciles à refaire :
+      - un G dont chaque case était détachée et coloriée à part : un tas de cubes,
+        aucune lettre, et un patchwork au lieu de la charte ;
+      - un damier seul, sans lettre : joli, mais ce n'était plus un logo, juste un
+        motif posé à côté du mot.
+
+    L'EFFET DE VITESSE tient à deux choses, pas à un filtre :
+      - `skewX(-12)` : la lettre penche vers l'avant. C'est l'italique des marques
+        automobiles, et c'est ce qui sépare un damier de cuisine d'un damier de
+        course ;
+      - LES TRAÎNÉES, trois barres qui fuient derrière le fût, de plus en plus
+        courtes et de plus en plus pâles. Elles subissent la même inclinaison que
+        la lettre, donc elles sortent du même geste — posées à l'horizontale, elles
+        auraient eu l'air collées après coup.
+
+    LE DÉGRADÉ BONY est UNIQUE et court sur toute la marque, traînées comprises,
+    en `userSpaceOnUse` : chaque case n'en prélève que sa tranche. C'est la
+    différence entre porter la charte et se contenter d'en reprendre les couleurs.
+    Le damier, lui, n'est pas une seconde couleur : c'est le même dégradé assombri
+    une case sur deux, ce qui le garde solidaire de la lettre à toute taille.
+
+    SOURCE UNIQUE. Ce fichier sert la marque de l'en-tête, celle de l'écran de
+    connexion et la favicon — référencé par `<img src="/grid.svg">` et par un
+    `<link rel="icon">`. Le recopier en JSX aurait créé une seconde version à
+    maintenir, donc un jour deux logos différents dans la même application.
+  -->
+  <defs>
+    <!-- `userSpaceOnUse` : le dégradé est calé sur le dessin entier, pas sur
+         chaque forme. Sans cela, chaque case rejouerait l'orange vers violet
+         complet dans ses 18 unités. -->
+    <linearGradient id="bony" gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="150" y2="0">
+      <stop offset="0" stop-color="#f75632"/>
+      <stop offset="1" stop-color="#8f12ab"/>
+    </linearGradient>
+
+    <clipPath id="lettre">
+      <path d="M10 5 H100 V23 H28 V77 H82 V59 H46 V41 H100 V95 H10 Z"/>
+    </clipPath>
+  </defs>
+
+  <g transform="translate(44 0) skewX(-12)">
+    <!-- LES TRAÎNÉES. Elles s'arrêtent avant le fût : le vide entre la lettre et
+         la première barre est ce qui fait lire un décrochement plutôt qu'un
+         empattement. Longueurs et opacités décroissent ensemble — l'une des deux
+         seule ne suffisait pas à donner le sens de la marche. -->
+    <g fill="url(#bony)">
+      <rect x="-32" y="27" width="34" height="8" opacity=".55"/>
+      <rect x="-20" y="50" width="22" height="8" opacity=".38"/>
+      <rect x="-26" y="73" width="28" height="8" opacity=".22"/>
+    </g>
+
+    <!-- LA LETTRE -->
+    <path d="M10 5 H100 V23 H28 V77 H82 V59 H46 V41 H100 V95 H10 Z" fill="url(#bony)"/>
+
+    <!-- LE DAMIER, découpé dans la lettre. Une case sur deux est assombrie ; le
+         détourage fait le reste, donc aucune case ne déborde du G. -->
+    <g clip-path="url(#lettre)" fill="#0b0b10" opacity=".34">
+      <rect x="28" y="5"  width="18" height="18"/>
+      <rect x="64" y="5"  width="18" height="18"/>
+      <rect x="10" y="23" width="18" height="18"/>
+      <rect x="46" y="23" width="18" height="18"/>
+      <rect x="82" y="23" width="18" height="18"/>
+      <rect x="28" y="41" width="18" height="18"/>
+      <rect x="64" y="41" width="18" height="18"/>
+      <rect x="10" y="59" width="18" height="18"/>
+      <rect x="46" y="59" width="18" height="18"/>
+      <rect x="82" y="59" width="18" height="18"/>
+      <rect x="28" y="77" width="18" height="18"/>
+      <rect x="64" y="77" width="18" height="18"/>
+    </g>
+  </g>
+</svg>

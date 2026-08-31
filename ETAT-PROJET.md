@@ -27,12 +27,126 @@ production, ou pousser signifie livrer. Ici seuls les commits locaux ont une uti
 immediate : des points de retour. Le depot GitHub devient necessaire en J7, pour la deploy
 key du VPS et les workflows de sauvegarde.
 
+## 31/08/2026, soir — GRID part sur Supabase, sans serveur
+
+**Ce qui a changé, et pourquoi.** L'outil était complet et vérifié mais n'avait **aucun
+point d'entrée public**. Toutes les voies passant par le VPS de gearbox sont fermées —
+exigence textuelle de l'utilisateur, « Gearbox reste Gearbox » ; le VPS a été remis dans
+son état d'origine. Et `grid.bonyauto-mobile.com` **n'existe pas en DNS**, la zone est
+chez Gandi, l'accès n'est pas disponible : rien côté serveur ne peut créer un nom qui ne
+résout pas.
+
+Décision : **front statique sur Cloudflare Pages, et Supabase attaqué directement par le
+navigateur.** Le backend Express disparaît. Zéro euro par mois.
+
+### Ce que ça coûte, dit sans l'enjoliver
+
+1. **La RLS est seule.** `auth/campagneScope.ts` n'existe plus. Les politiques sont la
+   seule chose entre un chef de table et les données du groupe, et il n'y a rien
+   derrière elles.
+2. **Le front est public** : modèle de données, requêtes et clé `anon` lisibles par
+   quiconque ouvre les outils de développement. C'est normal et sans risque — *à
+   condition* que `test:rls` soit vert.
+3. **`test:api` (43 contrôles) a disparu** avec l'API qu'elle testait. Son rôle est repris
+   par `test:rls`, qui compte aujourd'hui **81 contrôles** et vérifie les deux sens.
+
+### Ce qui a survécu intact — et c'est la majorité
+
+Les 12 migrations existantes, `agregats.ts` et ses 27 contrôles contre les 1107 RDV réels,
+`repartition.ts` (graine 42) et ses 20 contrôles, `importMarques.ts` et ses 19, `tri.ts`,
+`messageTrigger.ts`, `presenceVendeur.ts`, et **tous les écrans React**. Trois des cinq
+suites n'ont pas bougé d'une ligne. C'est ce qui a rendu la bascule supportable.
+
+### Cinq migrations ajoutées
+
+| Migration | Contenu |
+|---|---|
+| `20260831200000_auth_uid` | colonne `auth_uid` sur `utilisateur`. Pas de FK vers `auth.users` : Prisma ne sait pas référencer un autre schéma sans `multiSchema`, et une FK qu'il ignore serait proposée à la suppression à chaque `migrate diff` |
+| `20260831201000_rls_portail` | 6 fonctions, la vue `perimetre_saisie`, la vue `rdv_agrege`, RLS + **48 politiques sur les 17 tables**, 9 triggers de traçabilité |
+| `20260831202000_triggers_hors_rls` | les 8 triggers de validation passent en `security definer` — correctif, voir plus bas |
+| `20260831203000_rdv_agrege_compte_actif` | la vue agrégée filtre les comptes inactifs — correctif, voir plus bas |
+| `20260831210000_rpc_privilegies` | **13 fonctions transactionnelles**, les deux portes de purge, et le retrait des droits d'exécution à `PUBLIC` |
+
+### Trois défauts trouvés en chemin, tous corrigés
+
+**1. Les triggers de validation étaient aveuglés par la RLS.** Ils s'exécutaient avec les
+droits de l'appelant : depuis que `vendeur_marque` porte une politique, un appelant sans
+identité n'y voyait aucune ligne, et `verifier_marque_autorisee()` concluait « ce vendeur
+n'est pas autorisé à vendre cette marque » — un verdict **faux**. Le trigger ne vérifiait
+plus un invariant de la base mais un invariant *de ce que l'appelant voit*. Les huit
+fonctions sont passées en `security definer` par `ALTER FUNCTION`, sans recopier leur corps.
+
+**2. `rdv_agrege` rendait tout à un compte désactivé.** Mesuré : `vendeur` → 0 ligne
+(correct), `rdv_agrege` → toutes les lignes (faux). La vue contourne la RLS par
+construction — c'est ce qu'on lui demande, le tableau de bord doit compter les RDV de tout
+le monde — mais le contournement valait aussi pour ceux qui ne doivent plus rien voir. Un
+compte désactivé garde un jeton Supabase valide : il aurait lu les compteurs de toutes les
+plaques indéfiniment. **Règle à retenir : toute vue qui n'active pas `security_invoker`
+doit porter elle-même `WHERE relance.utilisateur_courant() IS NOT NULL`.**
+
+**3. Deux contrôles de test ne prouvaient rien, et c'est le déploiement sur une base
+propre qui l'a révélé.** Le premier passage de `test:garde-fous` sur Supabase a rendu
+**32/32 au lieu de 33/33**. Un test de non-régression R-B.1 cherchait un vendeur libre en
+base : sur une base fraîchement seedée il n'en existe aucun — CENTRE a 30 vendeurs et
+5 tables de 6, l'effectif est exactement saturé. Il ne tournait en local que grâce à des
+vendeurs résiduels d'anciennes exécutions, et son `if` n'avait **pas de `else`** : il
+disparaissait en silence. Même classe de défaut dans `test:rls`. Les deux fabriquent
+maintenant leur matière dans la transaction annulée.
+
+*Leçon générale : un contrôle qui dépend de l'état de la base ne prouve rien tant qu'on ne
+l'a pas vu tourner sur une base vide.*
+
+### Deux réglages Supabase qui étaient dangereux
+
+`db_schema` n'exposait pas `relance` (aucune requête n'aurait abouti) et `max_rows` était à
+**1000**, soit moins que les 1107 RDV de juin — la troncature silencieuse, exactement le
+défaut de l'Excel que le produit remplace. Porté à 5000, **et** le front paginera quand
+même : un réglage de tableau de bord n'est pas une garantie.
+
+Surtout : **`disable_signup` était à `false`**. N'importe qui pouvait se créer un compte
+avec la clé publique. La RLS tenait — `utilisateur_courant()` rend NULL pour un `auth.uid()`
+inconnu — mais la porte n'avait aucune raison d'être ouverte. Fermée, avec
+`mailer_autoconfirm` activé (sans quoi aucun compte n'aurait pu se connecter, nos adresses
+de synthèse n'existant pas) et le minimum de mot de passe porté de 6 à 12.
+
+### Ce qui a réellement tourné
+
+```
+16 migrations puis 17e (RPC)   ·  comparaison des deux bases : AUCUN ECART
+   17 tables · 144 colonnes · 11 CHECK · 28 triggers · 35 fonctions
+   2 vues · 48 politiques · 35 index
+
+Supabase   garde-fous 33/33   ·  rls 81/81
+Local      garde-fous 33/33   ·  rls 81/81   ·  agregats 27/27
+           repartition 20/20  ·  import 19/19
+tsc front + backend : vert    ·  derive Prisma : nulle
+```
+
+Et le contrôle qui compte le plus, fait **en HTTP réel avec la clé publique** : lecture des
+vendeurs, lecture des RDV, lecture de la vue agrégée, écriture d'un RDV, appel de
+`vendeur_purger`, appel de `session_appliquer_repartition` — **six tentatives, six refus**
+`42501 permission denied for schema relance`.
+
+### Reste à faire
+
+| Sujet | État |
+|---|---|
+| Réécriture des 7 `services/*.ts` sur `supabase-js` | **à faire** — c'est le gros du travail restant |
+| `hooks/useTempsReel.ts` sur Supabase Realtime | à faire, avec le trigger de diffusion |
+| Edge Function `gerer-comptes` (création de comptes, clé `service_role`) | à faire |
+| Workflows sauvegarde + keep-alive | à faire, adaptés de gearbox |
+| Comptes `.test` sur Supabase | **inertes** (aucun `auth_uid`, donc incapables de se connecter), à archiver avant mise en service |
+| Cloudflare Pages | à brancher par l'utilisateur |
+| Révocation des secrets exposés en conversation | à faire par l'utilisateur |
+
+---
+
 ## Cible
 
 Outil operationnel pour la campagne de **septembre 2026**, une semaine de developpement.
 L'Excel reste en place, non modifie, comme filet.
 
-### Le VPS, tel qu'il est — releve du 31/08/2026
+### ~~Le VPS, tel qu'il est — releve du 31/08/2026~~ — PERIME, voir la section du 31/08 au soir
 
 Reconnaissance en lecture seule. Le detail et le mode operatoire sont dans
 **DEPLOIEMENT.md**, qui est le seul document a suivre pour deployer.
@@ -71,7 +185,7 @@ memes conteneurs, memes duree de fonctionnement, `Caddyfile` inchange.
 DNS**. A creer chez le registrar, en A et AAAA vers le VPS, avant l'etape 6 — Caddy demande
 le certificat des la premiere requete et Let's Encrypt limite les tentatives echouees.
 
-### Decision du 31/08/2026 — pas de Supabase, Postgres sur le VPS
+### ~~Decision du 31/08/2026 — pas de Supabase, Postgres sur le VPS~~ — RENVERSEE le meme jour
 
 Prise par l'utilisateur. Ce qu'elle change :
 
@@ -97,12 +211,12 @@ Parite structurelle avec GEARBOX (`C:\Users\Operateur\Documents\gearbox3backup`)
 | Couche | Choix |
 |---|---|
 | Front | Vite + React 19 + TypeScript, a plat a la racine, port 3000 |
-| API | Express + Prisma + JWT + socket.io, `backend/`, port 3001 |
-| Base | PostgreSQL 17, schema `relance`. **Local en dev, sur le VPS en prod** |
-| Autorisation | **L'API fait autorite.** Portail unique, pas de RLS |
-| Temps reel | socket.io, salles par campagne |
-| Deploiement | VPS existant, Caddy de gearbox + `import relance.caddy` |
-| URL cible | `grid.bonyauto-mobile.com` |
+| API | **aucune.** Le navigateur attaque Supabase : PostgREST + 13 RPC transactionnelles |
+| Base | PostgreSQL 17, schema `relance`. Local en dev, **Supabase en prod** (`eu-west-3`) |
+| Autorisation | **La BASE fait autorite**, par RLS. 48 politiques, aucun filet derriere |
+| Temps reel | Supabase Realtime (a cabler) |
+| Deploiement | Cloudflare Pages, build `npm run build`, sortie `dist` |
+| URL cible | fournie par Cloudflare Pages |
 
 Le front n'appelle que des URL **relatives** (`/api/...`) : Vite proxifie en dev, Caddy
 sert les deux sous le meme domaine en prod. Aucune variable d'URL d'API a se tromper.

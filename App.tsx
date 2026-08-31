@@ -62,7 +62,10 @@ export default function App() {
   return (
     <div className="application">
       <header>
-        <span className="logotype">GRID</span>
+        <span className="logotype">
+          <img className="logotype-marque" src="/grid.svg" alt="" aria-hidden="true" />
+          <span className="logotype-mot">GRID</span>
+        </span>
 
         <nav>
           {ONGLETS_TOUS.map((o) => (

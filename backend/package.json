@@ -17,6 +17,8 @@
     "test:import": "tsx src/utils/importMarques.verif.ts",
     "test:agregats": "tsx prisma/tester-agregats.ts",
     "test:repartition": "tsx src/utils/repartition.verif.ts",
+    "comparer": "tsx prisma/comparer-bases.ts",
+    "test:rls": "tsx prisma/tester-rls.ts",
     "test:api": "tsx src/routes/api.verif.ts",
     "mot-de-passe": "tsx prisma/mot-de-passe.ts"
   },

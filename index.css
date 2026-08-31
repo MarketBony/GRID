@@ -13,8 +13,10 @@
    est identique : couleurs, polices, dégradé, verre.
 
    LOGO : le logotype GEARBOX est un logotype PRODUIT, pas la marque du groupe.
-   Il n'est donc pas réutilisé ici. `GRID` est composé en Syncopate dans le
-   dégradé Bony. Si un logotype dédié existe, il remplace `.logotype`.
+   Il n'est donc pas réutilisé ici. GRID a désormais le sien — un G en damier,
+   dessiné dans `public/grid.svg`, posé devant le mot composé en Syncopate dans le
+   dégradé. Le SVG est la SOURCE UNIQUE : en-tête, écran de connexion et favicon
+   le référencent tous les trois, pour qu'il n'existe jamais deux versions.
    ============================================================================ */
 
 :root {
@@ -191,7 +193,7 @@ html.dark .glass-menu {
 h1,
 h2,
 h3,
-.logotype {
+.logotype-mot {
   font-family: 'Syncopate', 'Albert Sans', sans-serif;
   letter-spacing: 0.02em;
 }
@@ -218,7 +220,30 @@ h3 {
   flex-wrap: wrap;
 }
 
+/* La marque : le G en damier, puis le mot.
+
+   LE DEGRADE EST SUR LE MOT, PAS SUR LE CONTENEUR. `background-clip: text` ne
+   peut pas cohabiter avec une image enfant : le conteneur porte la mise en page,
+   le mot porte le degrade. Poser les deux au meme endroit rendait le G invisible.
+
+   Le dessin lui-meme vit dans `public/grid.svg`, seul et unique exemplaire —
+   l'en-tete, l'ecran de connexion et la favicon le referencent tous les trois. */
 .logotype {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  white-space: nowrap;
+}
+
+.logotype-marque {
+  /* En `em` : la marque suit la taille du mot partout ou le logotype est repris,
+     sans avoir a redonner une hauteur a chaque emplacement. */
+  height: 1.75em;
+  width: auto;
+  display: block;
+}
+
+.logotype-mot {
   font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -226,7 +251,21 @@ h3 {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  white-space: nowrap;
+}
+
+/* Sur l'ecran de connexion, la marque est le premier element vu : elle y est
+   posee plus grande, et centree au-dessus du formulaire. */
+.connexion .logotype {
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.connexion .logotype-marque {
+  height: 3.4rem;
+}
+
+.connexion .logotype-mot {
+  font-size: 1.15rem;
 }
 
 .note {

@@ -26,7 +26,10 @@ export function Connexion() {
       {/* `glass-strong` et non `glass` : c'est un panneau de texte, la lisibilite
           passe avant la transparence. Meme arbitrage que sur GEARBOX. */}
       <form className="glass-strong" onSubmit={soumettre} style={{ borderRadius: 'var(--rayon)' }}>
-        <span className="logotype">GRID</span>
+        <span className="logotype">
+          <img className="logotype-marque" src="/grid.svg" alt="" aria-hidden="true" />
+          <span className="logotype-mot">GRID</span>
+        </span>
         <p className="sous-titre">
           Pilotage des campagnes de relance telephonique
           <br />
