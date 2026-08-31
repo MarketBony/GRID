@@ -452,6 +452,29 @@ Les colonnes `capacites_confirmees_le/par` restent, renommees
 les marques d'un vendeur et quand est utile le jour ou un RDV est refuse et que
 personne ne comprend pourquoi. Elles ne portent plus aucun statut.
 
+## Le tri des libelles ne passe PAS par la base
+
+`backend/src/utils/tri.ts` — **source de verite unique** du tri des libelles cote backend.
+
+`order by nom asc` en SQL trie selon la collation de la base, qui n'est pas la meme en
+developpement (`French_France.1252`) et dans le conteneur de production (`en_US.utf8`) :
+sur les 101 vendeurs reels, cinq noms accentues changent de place. Les quatre routes qui
+rendent une liste de personnes trient donc **en JavaScript** :
+
+| Route | Liste |
+|---|---|
+| `GET /api/saisie/:campagneId` | les vendeurs du perimetre — la liste du module C |
+| `GET /api/referentiels` | les vendeurs, et les encadrants disponibles |
+| `GET /api/tables/session/:id` | la reserve, et les chefs de table possibles |
+| `GET /api/dashboard/:campagneId` | les vendeurs des agregats |
+
+`agregats.ts` importe la meme cle pour son departage des ex aequo. **Toute nouvelle route
+qui rend une liste de personnes doit trier avec `trierPar`** : le `orderBy` de Prisma est
+conserve comme pre-tri, il ne decide pas.
+
+Consequence utile : la collation de la base de production n'a plus aucun effet sur ce que
+voit l'utilisateur, et le choix d'image Postgres n'est plus une decision de produit.
+
 ## Un seul vivier de personnes, deux selecteurs
 
 Les encadrants sont des **comptes**, et le meme vivier alimente deux ecrans :

@@ -1,4 +1,7 @@
 import type { TypeVehicule } from '../auth/roles';
+// Le departage des ex aequo compare des libelles. La cle de comparaison est
+// dans `tri.ts`, seul endroit du backend ou cette regle est ecrite.
+import { cleTri } from './tri';
 
 // ============================================================================
 // AGREGATS — FONCTIONS PURES. AUCUN PRISMA, AUCUN ACCES RESEAU.
@@ -39,6 +42,7 @@ import type { TypeVehicule } from '../auth/roles';
 
 /// Un RDV reduit a ce qui sert aux totaux. Pas de client : les agregats ne
 /// portent que des nombres, et rien ici ne doit pouvoir divulguer un nom.
+
 export interface LigneRdv {
   vendeurId: string;
   typeVehicule: TypeVehicule;
@@ -222,16 +226,6 @@ export interface Rang extends Totaux {
   /// pas entre deux concessions a egalite.
   exAequo: boolean;
 }
-
-/// Normalisation pour comparer deux libelles SANS dependre de la locale ni de la
-/// version d'ICU du serveur. `localeCompare` peut classer differemment selon
-/// l'environnement ; un classement qui change en changeant de machine n'est pas
-/// reproductible, donc pas contestable.
-const cleTri = (s: string) =>
-  s
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toUpperCase();
 
 const valeur = (t: Totaux, critere: Critere) =>
   critere === 'global' ? t.total : critere === 'vn' ? t.vn : t.vo;

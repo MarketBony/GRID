@@ -1,0 +1,21 @@
+# Contexte de build du FRONT : la racine du dépôt. Tout ce qui suit est écarté.
+node_modules
+backend
+dist
+dist-ssr
+.git
+.github
+.claude
+sauvegardes
+*.log
+*.local
+.env
+.env.*
+!.env.example
+
+# Documentation et références historiques : aucun rôle dans le bundle.
+*.md
+schema.sql
+seed_referentiels.sql
+brandbook.pdf
+scripts

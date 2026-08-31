@@ -1,5 +1,10 @@
 # ETAT-PROJET — memoire de reference
 
+**Le produit s'appelle GRID** depuis le 31/08/2026. Depot :
+`https://github.com/MarketBony/GRID` (prive). Ce qui garde volontairement le nom
+« relance » — le schema PostgreSQL, le prefixe des messages de trigger, le vocabulaire
+metier — est liste dans CLAUDE.md.
+
 Mise a jour : 28/08/2026, fin de J3.
 
 Ce fichier est la memoire globale du projet : ce qui est fait, ce qui reste, et les
@@ -26,6 +31,45 @@ key du VPS et les workflows de sauvegarde.
 
 Outil operationnel pour la campagne de **septembre 2026**, une semaine de developpement.
 L'Excel reste en place, non modifie, comme filet.
+
+### Le VPS, tel qu'il est — releve du 31/08/2026
+
+Reconnaissance en lecture seule. Le detail et le mode operatoire sont dans
+**DEPLOIEMENT.md**, qui est le seul document a suivre pour deployer.
+
+| | |
+|---|---|
+| Hote | `51.83.75.181`, Ubuntu 26.04, 8 vCPU, 22 Gio de RAM, 184 Gio libres |
+| Deja en place | gearbox, en trois conteneurs Docker, projet compose `gearbox` |
+| Point unique de contact | `gearbox-caddy-1` tient les ports 80 et 443 |
+| Postgres | **aucun** sur la machine : gearbox est sur Supabase |
+| Marge | 1,1 Gio de RAM utilises sur 22, 5 % du disque. GRID tient largement |
+
+**Exigence de l'utilisateur, textuelle :** « Je ne veux qu'il ne soit en aucun cas mele a
+Gearbox et qu'il entrave son fonctionnement. » Ce qui la tient :
+
+- projet compose `grid` distinct — conteneurs, volumes et reseaux separes ;
+- la base de GRID est sur un reseau **prive** et **ne publie aucun port** : ni gearbox ni
+  l'internet ne peuvent l'atteindre ;
+- aucun fichier de gearbox modifie, sauf **une** chose, inevitable : un bloc de site
+  ajoute a son `Caddyfile`, parce qu'un seul processus peut ecouter le port 443.
+  `caddy reload` valide avant d'appliquer — un bloc mal ecrit est refuse et gearbox
+  continue de servir l'ancienne configuration. Sauvegarde horodatee et retour arriere
+  d'une ligne dans DEPLOIEMENT.md.
+
+**Piege identifie et evite** : sur un reseau Docker, chaque service porte son nom comme
+alias DNS. Gearbox a deja `api` et `web`. Nommer nos services pareil aurait rendu ces noms
+ambigus et le Caddy de gearbox aurait proxifie **une requete sur deux vers GRID**. D'ou
+`grid-api` et `grid-web`, avec un controle explicite a l'etape 5 du runbook.
+
+**Deja valide sur le serveur, sans rien y installer** : le `docker-compose.yml` de GRID
+(`docker compose config`), et le Caddyfile de gearbox **augmente du bloc de GRID** —
+« Valid configuration », dans un conteneur Caddy jetable. Gearbox n'a pas ete touche :
+memes conteneurs, memes duree de fonctionnement, `Caddyfile` inchange.
+
+**Ce qui bloque encore le deploiement** : `grid.bonyauto-mobile.com` **n'existe pas en
+DNS**. A creer chez le registrar, en A et AAAA vers le VPS, avant l'etape 6 — Caddy demande
+le certificat des la premiere requete et Let's Encrypt limite les tentatives echouees.
 
 ### Decision du 31/08/2026 — pas de Supabase, Postgres sur le VPS
 
@@ -465,6 +509,21 @@ campagne sont libres**.
 | J6 | Module D — socle d'agregats, dashboard, export, panneaux live | **fait** |
 | J6+ | Passe UX, encadrants comme comptes, ecran Comptes, 4 paliers | **fait** |
 | J7 | v1 en ligne : depot GitHub, Postgres et API sur le VPS, Caddy, sauvegardes | **en cours** |
+
+Etat de J7 au 31/08/2026 :
+
+| Etape | Etat |
+|---|---|
+| Renommage en GRID | **fait** |
+| Depot GitHub `MarketBony/GRID` cree, distant configure en HTTPS | **fait** |
+| Premier push | **en attente de l'OK** |
+| `docker-compose.yml`, Dockerfiles, `nginx.conf`, `grid.caddy` | **ecrits et valides sur le VPS** |
+| `scripts/sauvegarde.sh` — dump + **epreuve de restauration** + rotation | **ecrit**, pas encore joue |
+| `DEPLOIEMENT.md` — runbook, ecrit apres reconnaissance | **fait** |
+| Enregistrement DNS `grid.bonyauto-mobile.com` | **a creer, bloquant** |
+| Clone, `.env`, build et demarrage sur le VPS | a faire |
+| Bloc Caddy et certificat | a faire |
+| Copie de sauvegarde **hors du VPS** | a faire, et a ne pas oublier |
 
 Hors perimetre avant la campagne : ecrans A1 (plaques) et A2 (sites), fournis par le seed
 et stables en septembre.

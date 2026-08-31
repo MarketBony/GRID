@@ -9,6 +9,7 @@ import { ecartCible, repartir, type TableCible, type VendeurAPlacer } from '../u
 import { emettre } from '../realtime';
 import { messageTrigger } from '../utils/messageTrigger';
 import type { TypeVehicule } from '../auth/roles';
+import { trierPar } from '../utils/tri';
 
 const router = Router();
 
@@ -226,9 +227,16 @@ router.get('/session/:sessionId', authentifier, avecDroits, async (req: RequeteA
     /// La RESERVE. Ce n'est pas un reliquat : F-B.8 dit que ces vendeurs restent
     /// saisissables par leur chef de site, et deux plaques sur quatre n'avaient
     /// aucune table en juin.
-    reserve: vendeurs.filter((v) => !affectes.has(v.id.toString())).map(projeterVendeur),
+    // TRI EN JAVASCRIPT, et non celui de la base : la collation de PostgreSQL
+    // n'est pas la meme en developpement (`French_France.1252`) et dans le
+    // conteneur de production (`en_US.utf8`), et cinq noms accentues sur 101
+    // changent de place entre les deux. Voir `utils/tri.ts`.
+    reserve: trierPar(
+      vendeurs.filter((v) => !affectes.has(v.id.toString())),
+      (v) => v.nom
+    ).map(projeterVendeur),
     marques: marques.map((m) => ({ id: m.id.toString(), code: m.code, libelle: m.libelle })),
-    chefsPossibles: utilisateurs.map((u) => ({
+    chefsPossibles: trierPar(utilisateurs, (u) => u.nom).map((u) => ({
       id: u.id.toString(),
       nom: u.nom,
       loginId: u.loginId,

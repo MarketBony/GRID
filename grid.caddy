@@ -1,0 +1,10 @@
+# GRID — bloc ajouté au Caddyfile de gearbox le <date de l'ajout>.
+# Le port 443 n'a qu'un seul propriétaire : ce bloc est le seul point de contact
+# entre les deux applications. Mode opératoire et retour arrière : le dépôt GRID,
+# DEPLOIEMENT.md. `grid-api` / `grid-web` et non `api` / `web` : ces deux noms
+# appartiennent déjà à gearbox sur ce réseau.
+grid.bonyauto-mobile.com {
+    reverse_proxy /api/* grid-api:3001
+    reverse_proxy /socket.io/* grid-api:3001
+    reverse_proxy * grid-web:80
+}

@@ -4,6 +4,7 @@ import { authentifier } from '../auth/middleware';
 import { avecDroits, type RequeteAutorisee } from '../auth/garde';
 import { vendeursSaisissables, redacterRdvs } from '../auth/campagneScope';
 import { presenceVendeur } from '../utils/presenceVendeur';
+import { trierPar } from '../utils/tri';
 
 const router = Router();
 
@@ -105,7 +106,11 @@ router.get('/:campagneId', authentifier, avecDroits, async (req: RequeteAutorise
   return res.json({
     campagne: enteteCampagne(campagne),
     perimetre: decrirePerimetre(droits, tables, vendeurs),
-    vendeurs: vendeurs.map((v) => {
+    // TRI EN JAVASCRIPT, et non celui de la base : la collation de PostgreSQL
+    // n'est pas la meme en developpement (`French_France.1252`) et dans le
+    // conteneur de production (`en_US.utf8`), et cinq noms accentues sur 101
+    // changent de place entre les deux. Voir `utils/tri.ts`.
+    vendeurs: trierPar(vendeurs, (v) => v.nom).map((v) => {
       // LA FORME DE SA GRILLE. Une section par marque autorisee pour un VN, une
       // seule section sans marque pour un VO.
       const sections =

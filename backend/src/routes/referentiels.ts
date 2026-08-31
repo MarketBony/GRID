@@ -3,6 +3,7 @@ import { prisma } from '../db';
 import { authentifier } from '../auth/middleware';
 import { avecDroits } from '../auth/garde';
 import { MODES_SESSION, ROLES_ENCADREMENT, TYPES_VEHICULE } from '../auth/roles';
+import { trierPar } from '../utils/tri';
 
 const router = Router();
 
@@ -96,7 +97,11 @@ router.get('/', authentifier, avecDroits, async (_req, res) => {
     plaques,
     sites,
     marques,
-    vendeurs: vendeurs.map((v) => ({
+    // TRI EN JAVASCRIPT, et non celui de la base : la collation de PostgreSQL
+    // n'est pas la meme en developpement (`French_France.1252`) et dans le
+    // conteneur de production (`en_US.utf8`), et cinq noms accentues sur 101
+    // changent de place entre les deux. Voir `utils/tri.ts`.
+    vendeurs: trierPar(vendeurs, (v) => v.nom).map((v) => ({
       id: v.id.toString(),
       nom: v.nom,
       siteId: v.siteId.toString(),
@@ -118,7 +123,7 @@ router.get('/', authentifier, avecDroits, async (_req, res) => {
       nom: e.utilisateur.nom,
       loginId: e.utilisateur.loginId,
     })),
-    encadrantsDisponibles: encadrants.map((u) => ({
+    encadrantsDisponibles: trierPar(encadrants, (u) => u.nom).map((u) => ({
       id: u.id.toString(),
       nom: u.nom,
       loginId: u.loginId,

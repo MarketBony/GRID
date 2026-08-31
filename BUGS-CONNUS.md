@@ -155,6 +155,58 @@ que le sujet ne resurgisse pas.
 
 ---
 
+## Corrige — 31/08/2026 (preparation du deploiement)
+
+### [CORRIGE] L'ordre des listes de vendeurs dependait de la COLLATION DU SERVEUR
+
+Trouve en preparant l'image Postgres de production, en comparant les ordres de tri sur les
+101 noms reels :
+
+| Environnement | `datcollate` | Resultat |
+|---|---|---|
+| Developpement (PostgreSQL sur Windows) | `French_France.1252` | reference |
+| `postgres:17-alpine`, locale par defaut | `en_US.utf8` | **5 noms accentues deplaces** |
+| `postgres:17-alpine`, `--locale=C.UTF-8` | `C.UTF-8` | tri par point de code : `ÉMILIEN` apres `ZOÉ` |
+
+`JÉRÉMY DA COSTA` et `RÉMI DEGAND` reculaient de huit rangs. Autrement dit : **la liste de
+l'ecran de saisie n'aurait pas eu le meme ordre en production que sur le poste ou l'outil a
+ete eprouve** — dans le module C, celui qu'un chef parcourt des yeux pendant une session.
+
+Aggravant : le premier `docker-compose.yml` que j'ai ecrit posait `--locale=C.UTF-8`, donc
+le pire des trois, avec un commentaire affirmant que c'etait pour eviter exactement ce
+probleme. Le commentaire etait juste sur le risque et faux sur le remede.
+
+**Le defaut de fond n'est pas le choix de la locale, c'est d'en dependre.** Le projet le
+dit deja deux fois — `agregats.ts` : « un classement qui change en changeant de machine
+n'est pas reproductible, donc pas contestable » ; `Vendeurs.tsx` : « un tri qui change de
+machine en machine n'est pas un tri ». Regler la locale du conteneur aurait fait
+disparaitre le symptome en laissant la dependance.
+
+Correction : `backend/src/utils/tri.ts`, **source de verite unique** du tri des libelles
+cote backend (cle accents retires + majuscules, second critere sur la chaine brute pour
+garantir un ordre total). Les quatre routes qui rendent une liste de personnes trient
+desormais en JavaScript : `saisie`, `referentiels`, `tables`, `dashboard`. `agregats.ts`
+perd sa copie privee de la cle et importe celle-la.
+
+Verifie : l'API rend les 101 vendeurs avec **zero ecart** par rapport au tri deterministe,
+et `JÉRÉMY DA COSTA` se place entre `JEAN-PIERRE FERRIER` et `JEROME SABIN`. La collation
+de la base de production n'a plus aucun effet sur ce que voit l'utilisateur — le choix
+d'image Postgres n'est plus une decision de produit.
+
+Restait, et reste, a traiter : le front porte **trois** copies de la meme normalisation
+(`Gestion.tsx`, `Saisie.tsx`, `Vendeurs.tsx`) et `Tables.tsx` utilise `localeCompare('fr')`,
+qui contredit la doctrine. Sans effet visible aujourd'hui puisque l'API rend deja l'ordre
+juste, mais c'est la meme duplication qu'interdit n.6 vise.
+
+### [A CONNAITRE] Le mot de passe SSH du VPS a circule en clair
+
+Transmis en clair dans la conversation du 31/08/2026, avec les acces du serveur.
+L'authentification par cle fonctionne et c'est celle utilisee. Deux gestes en attente :
+changer ce mot de passe, et desactiver l'authentification par mot de passe
+(`PasswordAuthentication no`) une fois la cle confirmee comme seul acces.
+
+---
+
 ## Corrige — 31/08/2026 (un garde-fou disparu en silence)
 
 ### [CORRIGE] Trois garde-fous ne tournaient que si le jeu de donnees s'y pretait

@@ -1,0 +1,41 @@
+# Contexte de build de l'API : `backend/`.
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+
+# ----------------------------------------------------------------------------
+# CE QUI NE MONTE PAS EN PRODUCTION, et pourquoi.
+#
+# `comptes-test.ts` en premier : il pose cinq comptes suffixés `.test`, et
+# ETAT-PROJET.md dit qu'ils ne doivent JAMAIS exister sur le serveur. Le seul
+# moyen sûr de tenir cette règle est que le fichier ne soit pas dans l'image.
+prisma/comptes-test.ts
+
+# Les suites de vérification écrivent en base. Elles n'ont rien à faire sur une
+# base de production, et elles tournent en local avant le commit — c'est le
+# pipeline.
+prisma/tester-agregats.ts
+prisma/tester-garde-fous.ts
+
+# Les 1107 RDV réels de juin 2026, lus par la seule suite `test:agregats`.
+prisma/rdv-juin-source.ts
+prisma/rdv-juin-source.js
+
+# Doublons JavaScript des données de seed, produits par les scripts
+# d'extraction. Les versions `.ts` sont les seules lues.
+prisma/donnees-source.js
+prisma/donnees-xlsx.js
+
+# ----------------------------------------------------------------------------
+# CE QUI MONTE, et pourquoi : `seed.ts` (+ `donnees-source.ts` et
+# `donnees-xlsx.ts`) et `mot-de-passe.ts`.
+#
+# La base de production naît vide. Les 4 plaques, 19 sites, 99 vendeurs et le
+# premier compte `admin` viennent du seed — sans lui, personne ne peut se
+# connecter pour créer quoi que ce soit. Et `mot-de-passe.ts` est le seul moyen
+# de réattribuer un accès si l'unique administrateur perd le sien.
+#
+# C'est aussi pour eux que `tsx` est en dependencies et non en devDependencies.

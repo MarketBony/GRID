@@ -14,6 +14,7 @@ import {
   type LigneVendeur,
 } from '../utils/agregats';
 import type { TypeVehicule } from '../auth/roles';
+import { trierPar } from '../utils/tri';
 
 const router = Router();
 
@@ -134,7 +135,11 @@ async function chargerCampagne(campagneId: string) {
     ])
   );
 
-  const vendeurs: LigneVendeur[] = vendeursBase.map((v) => {
+  // TRI EN JAVASCRIPT, et non celui de la base : la collation de PostgreSQL
+  // n'est pas la meme en developpement (`French_France.1252`) et dans le
+  // conteneur de production (`en_US.utf8`), et cinq noms accentues sur 101
+  // changent de place entre les deux. Voir `utils/tri.ts`.
+  const vendeurs: LigneVendeur[] = trierPar(vendeursBase, (v) => v.nom).map((v) => {
     const t = tableParVendeur.get(v.id.toString());
     return {
       id: v.id.toString(),
