@@ -62,7 +62,7 @@ export default function App() {
   return (
     <div className="application">
       <header>
-        <span className="logotype">RELANCE</span>
+        <span className="logotype">GRID</span>
 
         <nav>
           {ONGLETS_TOUS.map((o) => (

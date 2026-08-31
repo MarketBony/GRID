@@ -1,9 +1,27 @@
-# CLAUDE.md — Relance Bony
+# CLAUDE.md — GRID
 
 ## Ce qu'est ce projet
 
-Outil web de pilotage des campagnes de relance téléphonique du Groupe Bony
+**GRID** — outil web de pilotage des campagnes de relance téléphonique du Groupe Bony
 (concessions Renault / Dacia / Alpine). Remplace un classeur Excel de 25 onglets.
+
+Le nom, arrêté le 31/08/2026, suit la boucle du produit :
+**G**estion → lancement de session (**R**) → activité (**I**) → classement (**D**) —
+et la grille de saisie du module C est littéralement une grille.
+
+### Ce que le renommage NE touche pas, volontairement
+
+Trois usages du mot « relance » restent en place, et ce n'est pas un oubli :
+
+| Usage | Pourquoi il reste |
+|---|---|
+| Le schéma PostgreSQL `relance` | Le renommer voudrait dire une migration sur les 16 tables pour changer une chaîne que personne ne lit. Risque sans contrepartie |
+| Le préfixe `RELANCE:` des messages de trigger | Écrit dans les 19 fonctions de trigger et 13 migrations, et **retiré avant affichage** par `utils/messageTrigger.ts`. Aucun utilisateur ne le voit |
+| Le vocabulaire métier — `relance`, `table_phoning`, `campagne` | C'est le métier, pas le produit. Une « relance » est un appel sortant : le renommer casserait le vocabulaire imposé plus bas |
+
+Le logotype est composé en Syncopate dans le dégradé (`.logotype`). **Un logotype dédié
+reste à faire** — un G en damier aux couleurs du groupe, demandé par l'utilisateur le
+31/08/2026 ; il se substituera à la composition typographique sans autre changement.
 
 Lire `CAHIER-DES-CHARGES.md` avant toute implémentation fonctionnelle.
 Lire `VIABILITE-FREEMIUM.md` avant toute décision d'infrastructure.
@@ -49,7 +67,7 @@ arborescence, même pipeline, même discipline documentaire.
   `import relance.caddy`. Son `docker-compose.yml` n'est pas modifié — Postgres et l'API
   de relance vivent dans un `docker-compose` **séparé**, pour qu'un redémarrage de relance
   ne touche jamais gearbox
-- URL cible : `relance.bonyauto-mobile.com`
+- URL cible : `grid.bonyauto-mobile.com`
 
 **Tout se développe en local d'abord.** La v1 ne part sur le VPS que quand les critères de
 recette passent en local. Effet de bord utile : la boucle quotidienne ne sort pas du

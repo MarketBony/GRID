@@ -29,7 +29,7 @@ const serveurHttp = http.createServer(app);
 // En developpement, le front est servi par Vite sur 3000 et proxifie /api et
 // /socket.io vers ce serveur : les requetes arrivent donc en meme origine et CORS
 // ne sert a rien. En production, Caddy sert le front et l'API sous le MEME
-// domaine (`relance.bonyauto-mobile.com`), donc CORS ne sert a rien non plus.
+// domaine (`grid.bonyauto-mobile.com`), donc CORS ne sert a rien non plus.
 // D'ou une origine explicitement restreinte plutot qu'un `*` : si un jour une
 // requete cross-origin apparait, on veut le savoir, pas la voir passer.
 const originesAutorisees = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')

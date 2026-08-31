@@ -1,4 +1,4 @@
-# Relance Bony — outil de pilotage des campagnes de phoning
+# GRID — outil de pilotage des campagnes de phoning du Groupe Bony
 
 Remplace le classeur Excel `tableau_phoning_reltel_*.xlsx` (25 onglets, 677 références
 inter-feuilles codées en dur, plage de classement saturée à 99/99).

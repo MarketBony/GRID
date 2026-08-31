@@ -58,7 +58,7 @@ Parite structurelle avec GEARBOX (`C:\Users\Operateur\Documents\gearbox3backup`)
 | Autorisation | **L'API fait autorite.** Portail unique, pas de RLS |
 | Temps reel | socket.io, salles par campagne |
 | Deploiement | VPS existant, Caddy de gearbox + `import relance.caddy` |
-| URL cible | `relance.bonyauto-mobile.com` |
+| URL cible | `grid.bonyauto-mobile.com` |
 
 Le front n'appelle que des URL **relatives** (`/api/...`) : Vite proxifie en dev, Caddy
 sert les deux sous le meme domaine en prod. Aucune variable d'URL d'API a se tromper.
