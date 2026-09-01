@@ -449,6 +449,16 @@ npm --prefix backend run prisma:validate
 cd backend && npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script
 ```
 
+**Une suite de sécurité ne dépend PAS des données de production.** `test:rls`
+empruntait des comptes réels et supposait leur configuration — « la première table de
+juin », « `sbesson` n'a aucun encadrement ». Le jour où l'outil a commencé à servir,
+deux gestes légitimes faits depuis l'interface l'ont fait tomber à 82/87 sans qu'aucun
+échec ne dise quoi que ce soit sur la RLS ; et archiver les comptes `.test` la
+**désarmait entièrement**, 0 contrôle exécuté, en silence. Elle fabrique désormais son
+propre monde dans la transaction de chaque contrôle. Même règle pour
+`test:garde-fous` : les fixtures sont **créées**, jamais **choisies** en base. Ce qui
+doit être éprouvé, c'est la contrainte, pas l'état de la base ce jour-là.
+
 **Toute lecture paginée porte un ORDRE STABLE, et pas seulement un contrôle de
 volume.** `LIMIT/OFFSET` sur une requête non ordonnée n'a aucune stabilité garantie :
 la page 2 peut répéter des lignes de la page 1 et en omettre d'autres. On rapatrie

@@ -5,7 +5,7 @@
 « relance » — le schema PostgreSQL, le prefixe des messages de trigger, le vocabulaire
 metier — est liste dans CLAUDE.md.
 
-Mise a jour : 01/09/2026, apres le correctif des vendeurs sortis.
+Mise a jour : 01/09/2026, apres l'autonomie de `test:rls`.
 
 Ce fichier est la memoire globale du projet : ce qui est fait, ce qui reste, et les
 decisions prises. Pour la methode de travail, lire `CLAUDE.md`. Pour l'etat detaille de
@@ -45,13 +45,18 @@ donnee brute etait intacte, seule la lecture mentait. Nouveau trigger
 fabriquees dans la transaction, jamais choisies en base — trois controles viraient au
 rouge sur Supabase parce que la base y est reellement utilisee.
 
-**`test:rls` est a 82/87, et il faut le savoir.** La suite emprunte des comptes reels
-et suppose leur configuration ; deux changements legitimes faits depuis l'interface
-l'ont desaccordee. Les cinq echecs sont expliques un a un dans `BUGS-CONNUS.md`, et
-dans chaque cas c'est l'observe qui a raison — **aucune regression de securite**.
-Surtout : archiver les comptes `.test` desarme la suite ENTIEREMENT (0 controle
-execute), ils ont donc ete reactives. Ils ne pourront etre retires qu'une fois la
-suite rendue autonome.
+**`test:rls` EST DESORMAIS AUTONOME.** Elle empruntait des comptes et des donnees
+reels — « la premiere table de juin », « `sbesson` n'a aucun encadrement » — et deux
+changements legitimes faits depuis l'interface l'avaient fait tomber a 82/87, sans
+qu'aucun des cinq echecs ne dise quoi que ce soit sur la RLS. Pire, archiver les
+comptes `.test` la desarmait ENTIEREMENT : 0 controle execute.
+
+Elle fabrique maintenant son propre monde dans la transaction de chaque controle —
+plaque, sites, vendeurs, deux campagnes, une table, cinq comptes — et n'observe que
+lui. **87/87 sur Supabase avec les cinq comptes `.test` desactives** : ils ont donc
+pu etre archives, comme demande.
+
+Detail du decor et des deux defauts trouves au passage dans `BUGS-CONNUS.md`.
 
 ---
 

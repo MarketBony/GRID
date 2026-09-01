@@ -1,6 +1,6 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 01/09/2026, apres le correctif des vendeurs sortis.
+Mise a jour : 01/09/2026, apres l'autonomie de `test:rls`.
 
 ---
 
@@ -243,7 +243,7 @@ backend/
     mot-de-passe.ts          change un mot de passe, ou liste les comptes
     comparer-bases.ts        diff local <-> Supabase, objet par objet
     tester-garde-fous.ts     39 invariants de la base, chacun doit REFUSER
-    tester-rls.ts            87 controles des politiques ET des RPC
+    tester-rls.ts            87 controles des politiques ET des RPC — decor autonome
     tester-invariants.ts     10 controles code <-> base (interdit n.6)
     tester-agregats.ts       27 controles des totaux, contre les 1107 RDV de juin
     importer-rdv-juin.ts     charge les 1107 RDV de juin, et les recoupe au classeur

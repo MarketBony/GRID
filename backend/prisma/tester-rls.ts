@@ -38,6 +38,17 @@
 // toute cette suite passerait au vert sans rien prouver.
 //
 // ---------------------------------------------------------------------------
+// CETTE SUITE EST AUTONOME — elle n'observe QUE ce qu'elle a fabrique
+// ---------------------------------------------------------------------------
+// Elle ne lit aucun compte, aucun vendeur, aucune campagne de la production : tout
+// son monde est cree dans la transaction de chaque controle, et annule avec elle.
+// Voir `poserDecor` plus bas, qui porte le pourquoi en detail.
+//
+// Consequence directe, et raison du changement : les comptes `.test` peuvent etre
+// archives sans la desarmer. Verifie le 01/09/2026 — 87/87 sur Supabase avec les
+// cinq comptes desactives.
+//
+// ---------------------------------------------------------------------------
 // AUCUNE TRACE LAISSEE EN BASE
 // ---------------------------------------------------------------------------
 // Meme discipline que `tester-garde-fous.ts` : chaque controle tourne dans SA
@@ -128,6 +139,10 @@ async function sousIdentite<T>(
   let resultat: T;
   try {
     await prisma.$transaction(async (tx) => {
+      // LE DECOR D'ABORD, TOUJOURS. Il cree les comptes que `contexte` va
+      // designer, et le monde que le controle va observer. La preparation propre
+      // au controle vient ensuite : elle peut donc s'appuyer sur le decor.
+      await poserDecor(tx);
       if (preparation) await preparation(tx);
 
       if (contexte === 'anonyme') {
@@ -219,15 +234,22 @@ async function doitAccepter(
 /// zero ligne, un UPDATE qui n'affecte personne — et pour prouver qu'une lecture
 /// autorisee rend bien quelque chose. « Zero » n'est jamais une reussite par
 /// defaut : chaque controle dit le nombre qu'il attend.
+/// `attendu` accepte une FONCTION, et pas seulement un nombre. C'est necessaire
+/// depuis que le decor est fabrique dans la transaction : une valeur attendue qui
+/// depend du decor — « les deux membres de la table » — n'existe pas encore au
+/// moment ou le controle est declare. La fonction est donc evaluee APRES la
+/// mesure, quand `decor` porte les valeurs de LA transaction qui vient de tourner.
 async function doitValoir(
   nom: string,
   contexte: Contexte,
-  attendu: number,
+  attenduOuFonction: number | (() => number),
   mesure: (tx: Tx) => Promise<number>,
   preparation?: (tx: Tx) => Promise<void>
 ) {
   try {
     const obtenu = await sousIdentite(contexte, mesure, preparation);
+    const attendu =
+      typeof attenduOuFonction === 'function' ? attenduOuFonction() : attenduOuFonction;
     resultats.push({
       nom,
       ok: obtenu === attendu,
@@ -281,102 +303,232 @@ const nombre = async (tx: Tx, sql: string): Promise<number> => {
   return Number(lignes[0].n);
 };
 
-async function main() {
-  // ------------------------------------------------------------------ fixtures
-  //
-  // Rien n'est code en dur (interdit n.3) : tout est resolu depuis la base, ce qui
-  // rend la suite valable sur n'importe quel jeu de donnees respectant le seed.
+// ============================================================================
+// LE DECOR — un monde minuscule, complet, et fabrique dans CHAQUE transaction.
+//
+// POURQUOI IL EXISTE. Cette suite empruntait des comptes et des donnees REELS :
+// « la premiere table de juin », « le site d'identifiant le plus bas »,
+// « `sbesson` n'a aucun encadrement ». C'etait vrai le jour ou elle a ete ecrite.
+//
+// Le 01/09/2026, l'outil a commence a servir. `sbesson` est devenue chef de site
+// de MASS ; la ligne d'encadrement CLF d'`encadrant.test` a ete reprise par un
+// autre compte — l'unique `(site, role)` n'etant pas partiel, la redonner LIBERE
+// la ligne precedente. Deux gestes parfaitement legitimes, faits depuis
+// l'interface. La suite est passee a 82/87, et les cinq echecs ne disaient RIEN
+// sur la RLS : elle se comportait correctement dans les cinq cas.
+//
+// Pire : archiver les comptes `.test`, ce que demandait la mise en service,
+// faisait lever `P2025` a la preparation. Pas un seul des 87 controles ne
+// s'executait. LA SUITE QUI GARDE L'UNIQUE BARRIERE D'AUTORISATION ETAIT
+// DESARMEE PAR UN MENAGE, et rien ne le signalait.
+//
+// Une suite de securite ne peut pas dependre de ce que la production contient ce
+// jour-la. Elle fabrique donc son propre monde, et n'observe que lui.
+//
+// ---------------------------------------------------------------------------
+// CE QUE LE DECOR CONTIENT, ET POURQUOI CHAQUE PIECE
+// ---------------------------------------------------------------------------
+//
+//   plaque RLS
+//     site RLS-A   vendeurs A1 (table), A2 (hors table), A3 (table)
+//     site RLS-B   vendeurs B1, B2          <- les seuls sites de `encadrant.rls`
+//
+//   campagne RLS 1   2 jours, 1 creneau     <- celle ou le chef de table officie
+//   campagne RLS 2   2 jours, 1 creneau     <- pour prouver que ses droits n'y vont pas
+//
+//   session (RLS 1 x plaque RLS), mode par_table
+//     table « TABLE RLS », chef = chef.rls, membres A1 et A3
+//
+//   comptes  admin.rls · direction.rls · encadrant.rls · lecteur.rls · chef.rls
+//   encadrement  encadrant.rls -> site RLS-B  (RLS-A volontairement exclu)
+//
+// LES DEUX PERIMETRES SONT DISJOINTS, et c'est le point : le chef de table tient
+// A1 et A3, l'encadrant tient B1 et B2. Un controle qui confondrait les deux
+// origines de droit passerait au vert sur un decor ou elles se recouvrent.
+//
+// A2 n'est ni dans la table ni sur un site encadre : c'est le vendeur hors
+// perimetre de tout le monde, celui par lequel on prouve les refus.
+//
+// DEUX MEMBRES DE TABLE ET DEUX VENDEURS ENCADRES, jamais un seul : un controle
+// de COMPTE exact qui attend 1 peut passer par hasard, celui qui attend 2 non.
+//
+// ---------------------------------------------------------------------------
+// TOUT EST ANNULE, TOUJOURS
+// ---------------------------------------------------------------------------
+// `poserDecor` s'execute dans la transaction de `sousIdentite`, qui se termine
+// toujours par un ROLLBACK. Rien ne subsiste — ni les comptes, ni la plaque, ni
+// les `auth_uid` fictifs. C'est ce qui permet d'employer des noms FIXES sans
+// jamais entrer en collision : deux controles ne sont jamais simultanes.
+//
+// C'est aussi ce qui rend la suite jouable sur la base de PRODUCTION sans rien y
+// laisser — indispensable, puisqu'une politique RLS ne se teste utilement que la
+// ou elle est deployee.
+// ============================================================================
 
-  const juin = await prisma.campagne.findUniqueOrThrow({ where: { libelle: 'Juin 2026' } });
-  const septembre = await prisma.campagne.findUniqueOrThrow({
-    where: { libelle: 'Septembre 2026' },
+interface Decor {
+  siteA: bigint;
+  siteB: bigint;
+  /// Dans la table du chef.
+  vendeurDeSaTable: { id: bigint; nom: string; siteId: bigint };
+  /// Ni dans la table, ni sur un site encadre : hors perimetre de tous.
+  vendeurHorsPerimetre: { id: bigint; nom: string; siteId: bigint };
+  /// Sur le site encadre par `encadrant.rls`.
+  vendeurEncadre: { id: bigint; nom: string; siteId: bigint };
+  /// Les membres de la table, dans l'ordre de creation.
+  membresDeLaTable: bigint[];
+  /// Combien de vendeurs sur les sites encadres.
+  vendeursEncadres: number;
+  campagne1: { id: bigint; jours: string[]; creneau: string };
+  campagne2: { id: bigint; jours: string[]; creneau: string };
+  tableId: bigint;
+}
+
+/// Rempli par `poserDecor` a CHAQUE transaction. Les controles le lisent au
+/// moment de leur EXECUTION — jamais a la construction de leur fermeture — ce qui
+/// leur donne les identifiants du decor courant.
+let decor: Decor;
+
+const CHEF = 'chef.rls';
+const ADMIN = 'admin.rls';
+const DIRECTION = 'direction.rls';
+const ENCADRANT = 'encadrant.rls';
+const LECTEUR = 'lecteur.rls';
+
+async function poserDecor(tx: Tx): Promise<void> {
+  const compte = async (loginId: string, nom: string) =>
+    (
+      await tx.utilisateur.create({
+        data: { loginId, nom, passwordHash: 'x', actif: true },
+        select: { id: true },
+      })
+    ).id;
+
+  const idAdmin = await compte(ADMIN, 'ADMIN decor RLS');
+  const idDirection = await compte(DIRECTION, 'DIRECTION decor RLS');
+  const idEncadrant = await compte(ENCADRANT, 'ENCADRANT decor RLS');
+  const idLecteur = await compte(LECTEUR, 'LECTEUR decor RLS');
+  const idChef = await compte(CHEF, 'CHEF DE TABLE decor RLS');
+
+  await tx.roleGlobal.createMany({
+    data: [
+      { utilisateurId: idAdmin, role: 'admin' },
+      { utilisateurId: idDirection, role: 'direction' },
+      { utilisateurId: idLecteur, role: 'lecteur' },
+    ],
   });
 
-  // LE CHEF DE TABLE. `sbesson` anime la Table 1 de CENTRE sur JUIN, et rien sur
-  // septembre : c'est exactement ce qu'il faut pour eprouver « les droits sont par
-  // campagne ». Resolu par la base plutot que nomme en dur : si le seed change de
-  // chef, la suite suit.
-  const tableJuin = await prisma.tablePhoning.findFirstOrThrow({
-    where: {
-      archiveLe: null,
-      chefUtilisateurId: { not: null },
-      sessionPlaque: { campagneId: juin.id },
-      affectations: { some: { archiveLe: null } },
-    },
-    select: {
-      id: true,
-      libelle: true,
-      chef: { select: { loginId: true } },
-      affectations: {
-        where: { archiveLe: null },
-        select: { vendeur: { select: { id: true, nom: true, siteId: true, typeVehicule: true } } },
+  const plaque = await tx.plaque.create({
+    data: { libelle: 'PLAQUE RLS', ordre: 990 },
+    select: { id: true },
+  });
+  const siteA = await tx.site.create({
+    data: { code: 'RLS-A', libelle: 'Site RLS A', plaqueId: plaque.id },
+    select: { id: true },
+  });
+  const siteB = await tx.site.create({
+    data: { code: 'RLS-B', libelle: 'Site RLS B', plaqueId: plaque.id },
+    select: { id: true },
+  });
+
+  // TOUS EN `VO`, deliberement : un vendeur VO n'a aucune marque a poser, donc
+  // aucun controle ne peut trebucher sur R-C.1 en croyant eprouver la RLS. Les
+  // regles de marque sont couvertes par `test:garde-fous`, avec ses fixtures.
+  const vendeur = (nom: string, siteId: bigint) =>
+    tx.vendeur.create({
+      data: { nom, siteId, typeVehicule: 'VO' },
+      select: { id: true, nom: true, siteId: true },
+    });
+
+  const a1 = await vendeur('DECOR A1', siteA.id);
+  const a2 = await vendeur('DECOR A2', siteA.id);
+  const a3 = await vendeur('DECOR A3', siteA.id);
+  const b1 = await vendeur('DECOR B1', siteB.id);
+  await vendeur('DECOR B2', siteB.id);
+
+  await tx.encadrementSite.create({
+    data: { siteId: siteB.id, utilisateurId: idEncadrant, role: 'chef_de_site' },
+  });
+
+  /// Une campagne du decor : DEUX jours — le second permet a R-A.2 d'en retirer un
+  /// sans vider la campagne — et un seul creneau, qui suffit a composer un RDV.
+  const campagne = async (libelle: string, premier: string, second: string) => {
+    const c = await tx.campagne.create({
+      data: {
+        libelle,
+        dateDebut: new Date(premier),
+        dateFin: new Date(second),
+        cloturee: false,
       },
+      select: { id: true },
+    });
+    await tx.campagneJour.createMany({
+      data: [
+        { campagneId: c.id, jour: new Date(premier), ordre: 1 },
+        { campagneId: c.id, jour: new Date(second), ordre: 2 },
+      ],
+    });
+    await tx.campagneCreneau.create({
+      data: { campagneId: c.id, code: '08:00-09:00', libelle: '8h-9h', ordre: 1 },
+    });
+    return { id: c.id, jours: [premier, second], creneau: '08:00-09:00' };
+  };
+
+  const campagne1 = await campagne('CAMPAGNE RLS 1', '2026-03-02', '2026-03-03');
+  const campagne2 = await campagne('CAMPAGNE RLS 2', '2026-04-06', '2026-04-07');
+
+  const session = await tx.sessionPlaque.create({
+    data: { campagneId: campagne1.id, plaqueId: plaque.id, mode: 'par_table' },
+    select: { id: true },
+  });
+  const table = await tx.tablePhoning.create({
+    data: {
+      sessionPlaqueId: session.id,
+      libelle: 'TABLE RLS',
+      ordre: 1,
+      chefUtilisateurId: idChef,
     },
-    orderBy: { id: 'asc' },
+    select: { id: true },
   });
-  const chefDeTable = tableJuin.chef!.loginId;
-  const vendeurDeSaTable = tableJuin.affectations[0].vendeur;
-
-  // Un vendeur qui n'est PAS dans sa table, et pas non plus sur un site qu'il
-  // encadrerait — `sbesson` n'a aucun encadrement, donc n'importe quel vendeur
-  // hors table convient.
-  const idsDeSaTable = tableJuin.affectations.map((a) => a.vendeur.id);
-  const vendeurHorsTable = await prisma.vendeur.findFirstOrThrow({
-    where: { id: { notIn: idsDeSaTable }, archiveLe: null },
-    orderBy: { id: 'asc' },
+  await tx.affectation.createMany({
+    data: [
+      { tableId: table.id, vendeurId: a1.id, origine: 'manuel' },
+      { tableId: table.id, vendeurId: a3.id, origine: 'manuel' },
+    ],
   });
 
-  // L'ENCADRANT. Rattache durablement a CLF et MOZ : son perimetre ne depend pas
-  // de la campagne, c'est tout l'objet du modele d'encadrement.
-  const encadrements = await prisma.encadrementSite.findMany({
-    where: { utilisateur: { loginId: 'encadrant.test' }, archiveLe: null },
-    select: { siteId: true },
-  });
-  const sitesEncadres = encadrements.map((e) => e.siteId);
-  const vendeurEncadre = await prisma.vendeur.findFirstOrThrow({
-    where: { siteId: { in: sitesEncadres }, archiveLe: null },
-    orderBy: { id: 'asc' },
-  });
-  const vendeurNonEncadre = await prisma.vendeur.findFirstOrThrow({
-    where: { siteId: { notIn: sitesEncadres }, archiveLe: null },
-    orderBy: { id: 'asc' },
-  });
+  decor = {
+    siteA: siteA.id,
+    siteB: siteB.id,
+    vendeurDeSaTable: a1,
+    vendeurHorsPerimetre: a2,
+    vendeurEncadre: b1,
+    membresDeLaTable: [a1.id, a3.id],
+    vendeursEncadres: 2,
+    campagne1,
+    campagne2,
+    tableId: table.id,
+  };
+}
 
-  /// Compose un RDV valide pour un vendeur donne : jour et creneau de la campagne,
-  /// marque et type coherents avec son metier. Sans cela, un refus de trigger
-  /// (R-C.1, VN/VO) se ferait passer pour un refus de politique — et la suite
-  /// prouverait autre chose que ce qu'elle annonce.
-  async function rdvValide(vendeurId: bigint, campagneId: bigint) {
-    const v = await prisma.vendeur.findUniqueOrThrow({
-      where: { id: vendeurId },
-      select: { typeVehicule: true, marques: { select: { marqueId: true } } },
-    });
-    const j = await prisma.campagneJour.findFirstOrThrow({
-      where: { campagneId },
-      orderBy: { ordre: 'asc' },
-    });
-    const cr = await prisma.campagneCreneau.findFirstOrThrow({
-      where: { campagneId },
-      orderBy: { ordre: 'asc' },
-    });
-    return {
-      campagneId,
-      vendeurId,
-      jour: j.jour,
-      creneauCode: cr.code,
-      marqueId: v.typeVehicule === 'VN' ? v.marques[0].marqueId : null,
-      typeVehicule: v.typeVehicule,
-      client: 'CONTROLE RLS',
-    };
-  }
+/// Un RDV valide pour un vendeur du decor : jour et creneau de la campagne visee,
+/// `marqueId` nul puisque tous les vendeurs du decor sont VO. Sans cela, un refus
+/// de trigger se ferait passer pour un refus de politique — et la suite prouverait
+/// autre chose que ce qu'elle annonce.
+const rdvDecor = (
+  vendeur: { id: bigint },
+  campagne: { id: bigint; jours: string[]; creneau: string },
+  jour = 0
+) => ({
+  campagneId: campagne.id,
+  vendeurId: vendeur.id,
+  jour: new Date(campagne.jours[jour]!),
+  creneauCode: campagne.creneau,
+  marqueId: null,
+  typeVehicule: 'VO',
+  client: 'CONTROLE RLS',
+});
 
-  const rdvChefDeTableJuin = await rdvValide(vendeurDeSaTable.id, juin.id);
-  const rdvChefDeTableSeptembre = await rdvValide(vendeurDeSaTable.id, septembre.id);
-  const rdvHorsTable = await rdvValide(vendeurHorsTable.id, juin.id);
-  const rdvEncadreJuin = await rdvValide(vendeurEncadre.id, juin.id);
-  const rdvEncadreSeptembre = await rdvValide(vendeurEncadre.id, septembre.id);
-  const rdvNonEncadre = await rdvValide(vendeurNonEncadre.id, juin.id);
-
+async function main() {
   // =========================================================================
   // 0. LA COUCHE DES DROITS SQL — ce qui rend tout le reste interpretable.
   //
@@ -513,7 +665,7 @@ async function main() {
   await doitRefuser('anon  ecrire un RDV', 'anonyme', DROIT_INSUFFISANT, (tx) =>
     tx.$executeRawUnsafe(
       `INSERT INTO relance.rdv (campagne_id, vendeur_id, jour, creneau_code, type_vehicule, client)
-       VALUES (${juin.id}, ${vendeurDeSaTable.id}, '2026-06-11', 'X', 'VN', 'INTRUSION')`
+       VALUES (${decor.campagne1.id}, ${decor.vendeurDeSaTable.id}, '2026-06-11', 'X', 'VN', 'INTRUSION')`
     )
   );
   await doitRefuser('anon  lire le perimetre de quelqu un', 'anonyme', DROIT_INSUFFISANT, (tx) =>
@@ -524,11 +676,28 @@ async function main() {
   // 2. ADMIN — tout, gestion des comptes comprise.
   // =========================================================================
 
-  await doitValoir('admin  voit tous les RDV', { login: 'admin.test' }, await prisma.rdv.count(), (tx) =>
-    nombre(tx, 'SELECT count(*) AS n FROM relance.rdv')
+  // ADMIN N'EST BORNE PAR AUCUN PERIMETRE. On le prouve sur un RDV pose HORS de
+  // tout perimetre : un chef de table ne le verrait pas, un admin si.
+  //
+  // Une version precedente comparait au nombre TOTAL de RDV en base. C'etait
+  // exact, mais cela liait la suite au contenu de la production — et le nombre
+  // pouvait bouger pendant l'execution.
+  await doitValoir(
+    'admin  voit un RDV hors de tout perimetre',
+    { login: ADMIN },
+    1,
+    (tx) =>
+      nombre(
+        tx,
+        `SELECT count(*) AS n FROM relance.rdv WHERE vendeur_id = ${decor.vendeurHorsPerimetre.id}`
+      ),
+    (tx) =>
+      tx.rdv
+        .create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1), select: { id: true } })
+        .then(() => undefined)
   );
-  await doitAccepter('admin  saisit sur n importe quel vendeur', { login: 'admin.test' }, (tx) =>
-    tx.rdv.create({ data: rdvHorsTable })
+  await doitAccepter('admin  saisit sur n importe quel vendeur', { login: ADMIN }, (tx) =>
+    tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1) })
   );
   // CONTRAINTE DE CONTRAT, trouvee par cette suite et a respecter dans le front :
   // ecrire dans `utilisateur` en REDEMANDANT LA LIGNE COMPLETE est refuse, meme a
@@ -542,27 +711,27 @@ async function main() {
   // la fixent dans les deux sens.
   await doitRefuser(
     'contrat  ecrire dans utilisateur en redemandant la ligne COMPLETE',
-    { login: 'admin.test' },
+    { login: ADMIN },
     DROIT_INSUFFISANT,
     (tx) =>
       tx.utilisateur.create({
         data: { loginId: 'controle.rls.complet', nom: 'CONTROLE RLS', passwordHash: 'x' },
       })
   );
-  await doitAccepter('admin  cree un compte', { login: 'admin.test' }, (tx) =>
+  await doitAccepter('admin  cree un compte', { login: ADMIN }, (tx) =>
     tx.utilisateur.create({
       data: { loginId: 'controle.rls', nom: 'CONTROLE RLS', passwordHash: 'x' },
       select: { id: true },
     })
   );
-  await doitAccepter('admin  attribue un role global', { login: 'admin.test' }, async (tx) => {
+  await doitAccepter('admin  attribue un role global', { login: ADMIN }, async (tx) => {
     const u = await tx.utilisateur.create({
       data: { loginId: 'controle.rls.role', nom: 'CONTROLE RLS', passwordHash: 'x' },
       select: { id: true },
     });
     return tx.roleGlobal.create({ data: { utilisateurId: u.id, role: 'lecteur' } });
   });
-  await doitAccepter('admin  administre un referentiel', { login: 'admin.test' }, (tx) =>
+  await doitAccepter('admin  administre un referentiel', { login: ADMIN }, (tx) =>
     tx.marque.create({ data: { code: 'CONTROLE', libelle: 'Controle RLS', ordre: 99 } })
   );
 
@@ -574,15 +743,15 @@ async function main() {
   // controles ci-dessous sont les trois chemins par lesquels il essaierait.
   // =========================================================================
 
-  await doitAccepter('direction  saisit (acces total)', { login: 'direction.test' }, (tx) =>
-    tx.rdv.create({ data: rdvHorsTable })
+  await doitAccepter('direction  saisit (acces total)', { login: DIRECTION }, (tx) =>
+    tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1) })
   );
-  await doitAccepter('direction  administre un referentiel', { login: 'direction.test' }, (tx) =>
+  await doitAccepter('direction  administre un referentiel', { login: DIRECTION }, (tx) =>
     tx.marque.create({ data: { code: 'CONTROLE2', libelle: 'Controle RLS', ordre: 99 } })
   );
   await doitRefuser(
     'direction  creer un compte',
-    { login: 'direction.test' },
+    { login: DIRECTION },
     DROIT_INSUFFISANT,
     (tx) =>
       tx.utilisateur.create({
@@ -592,7 +761,7 @@ async function main() {
   );
   await doitRefuser(
     'direction  SE PROMOUVOIR admin',
-    { login: 'direction.test' },
+    { login: DIRECTION },
     DROIT_INSUFFISANT,
     async (tx) => {
       const moi = await tx.$queryRawUnsafe<{ id: bigint }[]>(
@@ -603,7 +772,7 @@ async function main() {
   );
   await doitRefuser(
     'direction  rattacher un encadrant a un site',
-    { login: 'direction.test' },
+    { login: DIRECTION },
     DROIT_INSUFFISANT,
     async (tx) => {
       const moi = await tx.$queryRawUnsafe<{ id: bigint }[]>(
@@ -611,7 +780,7 @@ async function main() {
       );
       return tx.encadrementSite.create({
         data: {
-          siteId: vendeurNonEncadre.siteId,
+          siteId: decor.vendeurHorsPerimetre.siteId,
           utilisateurId: moi[0].id,
           role: 'chef_de_vente_vo',
         },
@@ -627,32 +796,32 @@ async function main() {
   // retrouve sans droits en septembre. Les deux campagnes sont donc testees.
   // =========================================================================
 
-  await doitAccepter('encadrant  saisit sur son site — JUIN', { login: 'encadrant.test' }, (tx) =>
-    tx.rdv.create({ data: rdvEncadreJuin })
+  await doitAccepter('encadrant  saisit sur son site — JUIN', { login: ENCADRANT }, (tx) =>
+    tx.rdv.create({ data: rdvDecor(decor.vendeurEncadre, decor.campagne1) })
   );
   await doitAccepter(
     'encadrant  saisit sur son site — SEPTEMBRE (rattachement durable)',
-    { login: 'encadrant.test' },
-    (tx) => tx.rdv.create({ data: rdvEncadreSeptembre })
+    { login: ENCADRANT },
+    (tx) => tx.rdv.create({ data: rdvDecor(decor.vendeurEncadre, decor.campagne2) })
   );
   await doitRefuser(
     'encadrant  saisit HORS de ses sites',
-    { login: 'encadrant.test' },
+    { login: ENCADRANT },
     DROIT_INSUFFISANT,
-    (tx) => tx.rdv.create({ data: rdvNonEncadre })
+    (tx) => tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1) })
   );
   await doitRefuser(
     'encadrant  administre (creer un vendeur)',
-    { login: 'encadrant.test' },
+    { login: ENCADRANT },
     DROIT_INSUFFISANT,
     (tx) =>
       tx.vendeur.create({
-        data: { nom: 'CONTROLE RLS', siteId: vendeurEncadre.siteId, typeVehicule: 'VN' },
+        data: { nom: 'CONTROLE RLS', siteId: decor.vendeurEncadre.siteId, typeVehicule: 'VN' },
       })
   );
   await doitRefuser(
     'encadrant  gere les comptes',
-    { login: 'encadrant.test' },
+    { login: ENCADRANT },
     DROIT_INSUFFISANT,
     (tx) =>
       tx.utilisateur.create({
@@ -671,21 +840,21 @@ async function main() {
   // =========================================================================
 
   await doitAccepter(
-    `chef de table  saisit sur sa table — ${tableJuin.libelle}, JUIN`,
-    { login: chefDeTable },
-    (tx) => tx.rdv.create({ data: rdvChefDeTableJuin })
+    `chef de table  saisit sur sa table — ${'TABLE RLS'}, JUIN`,
+    { login: CHEF },
+    (tx) => tx.rdv.create({ data: rdvDecor(decor.vendeurDeSaTable, decor.campagne1) })
   );
   await doitRefuser(
     'chef de table  LE MEME VENDEUR sur une AUTRE campagne',
-    { login: chefDeTable },
+    { login: CHEF },
     DROIT_INSUFFISANT,
-    (tx) => tx.rdv.create({ data: rdvChefDeTableSeptembre })
+    (tx) => tx.rdv.create({ data: rdvDecor(decor.vendeurDeSaTable, decor.campagne2) })
   );
   await doitRefuser(
     'chef de table  un vendeur hors de sa table',
-    { login: chefDeTable },
+    { login: CHEF },
     DROIT_INSUFFISANT,
-    (tx) => tx.rdv.create({ data: rdvHorsTable })
+    (tx) => tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1) })
   );
 
   // Le NOM DU CLIENT ne sort pas du perimetre : c'est ce qui remplace
@@ -706,18 +875,17 @@ async function main() {
   // second. C'est ce qui remplace `redacterRdvs` : le nom du client hors perimetre
   // n'est pas caviarde, la ligne est ABSENTE.
   const poserLesDeuxRdv = async (tx: Tx) => {
-    await tx.rdv.create({ data: rdvChefDeTableJuin, select: { id: true } });
-    await tx.rdv.create({ data: rdvHorsTable, select: { id: true } });
+    await tx.rdv.create({ data: rdvDecor(decor.vendeurDeSaTable, decor.campagne1), select: { id: true } });
+    await tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1), select: { id: true } });
   };
 
-  const dejaSurSonVendeur = await prisma.rdv.count({ where: { vendeurId: vendeurDeSaTable.id } });
 
   await doitValoir(
     'chef de table  ne voit AUCUN RDV hors de son perimetre (un y est pourtant pose)',
-    { login: chefDeTable },
+    { login: CHEF },
     0,
     (tx) =>
-      nombre(tx, `SELECT count(*) AS n FROM relance.rdv WHERE vendeur_id = ${vendeurHorsTable.id}`),
+      nombre(tx, `SELECT count(*) AS n FROM relance.rdv WHERE vendeur_id = ${decor.vendeurHorsPerimetre.id}`),
     poserLesDeuxRdv
   );
 
@@ -725,10 +893,12 @@ async function main() {
   // base qui ne montre rien a personne.
   await doitValoir(
     'chef de table  voit BIEN les RDV de son perimetre',
-    { login: chefDeTable },
-    dejaSurSonVendeur + 1,
+    { login: CHEF },
+    // UN, et pas « ce qu'il y avait plus un » : le vendeur du decor vient d'etre
+    // cree, il ne peut porter que le RDV que la preparation vient de poser.
+    1,
     (tx) =>
-      nombre(tx, `SELECT count(*) AS n FROM relance.rdv WHERE vendeur_id = ${vendeurDeSaTable.id}`),
+      nombre(tx, `SELECT count(*) AS n FROM relance.rdv WHERE vendeur_id = ${decor.vendeurDeSaTable.id}`),
     poserLesDeuxRdv
   );
 
@@ -739,41 +909,46 @@ async function main() {
   // lecture seule. Le compte est cree ici, dans la transaction, puis annule.
   // =========================================================================
 
-  const creerLecteur = async (tx: Tx) => {
-    const u = await tx.utilisateur.create({
-      data: { loginId: 'lecteur.rls', nom: 'LECTEUR — controle', passwordHash: 'x' },
-      select: { id: true },
-    });
-    await tx.roleGlobal.create({ data: { utilisateurId: u.id, role: 'lecteur' } });
-  };
+  // `lecteur.rls` fait partie du DECOR : il n'y a plus de preparation a passer.
+  // Une version precedente le creait dans chaque controle — c'etait le premier
+  // endroit ou cette suite fabriquait sa propre donnee au lieu de l'emprunter, et
+  // c'est ce motif qui a fini par etre generalise a tout le reste.
 
+  // Le lecteur voit les AGREGATS — sans perimetre, mais sans nom de client non
+  // plus. Mesure sur le RDV du decor plutot que sur le total de la base : la
+  // question est « la vue lui est-elle ouverte ? », pas « combien y a-t-il de RDV
+  // en production ce matin ? ».
   await doitValoir(
     'lecteur  lit les agregats',
-    { login: 'lecteur.rls' },
-    await prisma.rdv.count(),
-    (tx) => nombre(tx, 'SELECT count(*) AS n FROM relance.rdv_agrege'),
-    creerLecteur
+    { login: LECTEUR },
+    1,
+    (tx) =>
+      nombre(
+        tx,
+        `SELECT count(*) AS n FROM relance.rdv_agrege WHERE vendeur_id = ${decor.vendeurHorsPerimetre.id}`
+      ),
+    (tx) =>
+      tx.rdv
+        .create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1), select: { id: true } })
+        .then(() => undefined)
   );
   await doitRefuser(
     'lecteur  saisit un RDV',
-    { login: 'lecteur.rls' },
+    { login: LECTEUR },
     DROIT_INSUFFISANT,
-    (tx) => tx.rdv.create({ data: rdvHorsTable }),
-    creerLecteur
+    (tx) => tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1) })
   );
   await doitRefuser(
     'lecteur  administre un referentiel',
-    { login: 'lecteur.rls' },
+    { login: LECTEUR },
     DROIT_INSUFFISANT,
-    (tx) => tx.marque.create({ data: { code: 'NON', libelle: 'Non', ordre: 99 } }),
-    creerLecteur
+    (tx) => tx.marque.create({ data: { code: 'NON', libelle: 'Non', ordre: 99 } })
   );
   await doitValoir(
     'lecteur  ne voit AUCUN RDV nominatif (perimetre vide)',
-    { login: 'lecteur.rls' },
+    { login: LECTEUR },
     0,
-    (tx) => nombre(tx, 'SELECT count(*) AS n FROM relance.rdv'),
-    creerLecteur
+    (tx) => nombre(tx, 'SELECT count(*) AS n FROM relance.rdv')
   );
 
   // =========================================================================
@@ -785,25 +960,25 @@ async function main() {
   // =========================================================================
 
   const desactiver = async (tx: Tx) => {
-    await tx.utilisateur.update({ where: { loginId: 'admin.test' }, data: { actif: false } });
+    await tx.utilisateur.update({ where: { loginId: ADMIN }, data: { actif: false } });
   };
   const archiver = async (tx: Tx) => {
     await tx.utilisateur.update({
-      where: { loginId: 'admin.test' },
+      where: { loginId: ADMIN },
       data: { archiveLe: new Date() },
     });
   };
 
   await doitValoir(
     'compte DESACTIVE  ne lit aucun vendeur (bien qu il soit admin)',
-    { login: 'admin.test' },
+    { login: ADMIN },
     0,
     (tx) => nombre(tx, 'SELECT count(*) AS n FROM relance.vendeur'),
     desactiver
   );
   await doitValoir(
     'compte ARCHIVE  ne lit aucun vendeur (bien qu il soit admin)',
-    { login: 'admin.test' },
+    { login: ADMIN },
     0,
     (tx) => nombre(tx, 'SELECT count(*) AS n FROM relance.vendeur'),
     archiver
@@ -819,21 +994,21 @@ async function main() {
   // Un controle par vue, et il en faudra un de plus a chaque vue ajoutee.
   await doitValoir(
     'compte DESACTIVE  ne lit AUCUN agregat (la vue contourne la RLS, elle filtre elle-meme)',
-    { login: 'admin.test' },
+    { login: ADMIN },
     0,
     (tx) => nombre(tx, 'SELECT count(*) AS n FROM relance.rdv_agrege'),
     desactiver
   );
   await doitValoir(
     'compte ARCHIVE  ne lit AUCUN agregat',
-    { login: 'admin.test' },
+    { login: ADMIN },
     0,
     (tx) => nombre(tx, 'SELECT count(*) AS n FROM relance.rdv_agrege'),
     archiver
   );
   await doitValoir(
     'compte DESACTIVE  n a aucun perimetre',
-    { login: 'admin.test' },
+    { login: ADMIN },
     0,
     (tx) => nombre(tx, 'SELECT count(*) AS n FROM relance.perimetre_saisie'),
     desactiver
@@ -841,9 +1016,9 @@ async function main() {
 
   await doitRefuser(
     'compte DESACTIVE  n ecrit rien',
-    { login: 'admin.test' },
+    { login: ADMIN },
     DROIT_INSUFFISANT,
-    (tx) => tx.rdv.create({ data: rdvHorsTable }),
+    (tx) => tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1) }),
     desactiver
   );
 
@@ -859,7 +1034,7 @@ async function main() {
   for (const table of ['rdv', 'vendeur', 'campagne', 'utilisateur'] as const) {
     await doitRefuser(
       `interdit n.1  DELETE sur ${table}, meme pour un admin`,
-      { login: 'admin.test' },
+      { login: ADMIN },
       DROIT_INSUFFISANT,
       (tx) => tx.$executeRawUnsafe(`DELETE FROM relance.${table} WHERE id = -1`)
     );
@@ -875,25 +1050,25 @@ async function main() {
 
   await doitRefuser(
     'colonnes  password_hash illisible, meme par un admin',
-    { login: 'admin.test' },
+    { login: ADMIN },
     DROIT_INSUFFISANT,
     (tx) => tx.$queryRawUnsafe('SELECT password_hash FROM relance.utilisateur LIMIT 1')
   );
   await doitRefuser(
     'colonnes  auth_uid d autrui illisible',
-    { login: 'admin.test' },
+    { login: ADMIN },
     DROIT_INSUFFISANT,
     (tx) => tx.$queryRawUnsafe('SELECT auth_uid FROM relance.utilisateur LIMIT 1')
   );
   await doitRefuser(
     'colonnes  le nom du client est ABSENT de rdv_agrege',
-    { login: 'admin.test' },
+    { login: ADMIN },
     COLONNE_INEXISTANTE,
     (tx) => tx.$queryRawUnsafe('SELECT client FROM relance.rdv_agrege LIMIT 1')
   );
   await doitRefuser(
     'colonnes  le commentaire est ABSENT de rdv_agrege',
-    { login: 'admin.test' },
+    { login: ADMIN },
     COLONNE_INEXISTANTE,
     (tx) => tx.$queryRawUnsafe('SELECT commentaire FROM relance.rdv_agrege LIMIT 1')
   );
@@ -907,7 +1082,7 @@ async function main() {
   // =========================================================================
 
   const cloturerJuin = async (tx: Tx) => {
-    await tx.campagne.update({ where: { id: juin.id }, data: { cloturee: true } });
+    await tx.campagne.update({ where: { id: decor.campagne1.id }, data: { cloturee: true } });
   };
   // C'EST LE TRIGGER QUI REPOND, PAS LA POLITIQUE, et l'ordre d'evaluation de
   // PostgreSQL l'explique : un trigger `BEFORE` s'execute AVANT que le `WITH CHECK`
@@ -919,9 +1094,9 @@ async function main() {
   // que le trigger d'insertion ne voit pas.
   await doitRefuser(
     'R-C.3  saisie sur une campagne CLOTUREE (le trigger repond avant la politique)',
-    { login: 'admin.test' },
+    { login: ADMIN },
     ERREUR_METIER,
-    (tx) => tx.rdv.create({ data: rdvHorsTable, select: { id: true } }),
+    (tx) => tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1), select: { id: true } }),
     cloturerJuin
   );
 
@@ -933,49 +1108,45 @@ async function main() {
   // d'echec silencieux. On verifie donc qu'elle rend un nombre NON NUL et exact.
   // =========================================================================
 
-  const vendeursDeSesSites = await prisma.vendeur.count({
-    where: {
-      siteId: { in: sitesEncadres },
-      archiveLe: null,
-      OR: [{ dateSortie: null }, { dateSortie: { gte: juin.dateDebut } }],
-    },
-  });
+  // LE COMPTE EXACT, pas « au moins un ». Une politique trop large rendrait un
+  // nombre plus grand, une politique trop etroite un nombre plus petit : seul
+  // l'egalite stricte attrape les deux. Le decor pose DEUX vendeurs sur le site
+  // encadre, precisement pour qu'un `1` obtenu par hasard ne passe pas.
   await doitValoir(
     'perimetre  l encadrant voit exactement les vendeurs de ses sites',
-    { login: 'encadrant.test' },
-    vendeursDeSesSites,
+    { login: ENCADRANT },
+    () => decor.vendeursEncadres,
     (tx) =>
       nombre(
         tx,
-        `SELECT count(*) AS n FROM relance.perimetre_saisie WHERE campagne_id = ${juin.id}`
+        `SELECT count(*) AS n FROM relance.perimetre_saisie WHERE campagne_id = ${decor.campagne1.id}`
       )
   );
   await doitValoir(
-    'perimetre  le chef de table voit exactement les vendeurs de sa table (JUIN)',
-    { login: chefDeTable },
-    idsDeSaTable.length,
+    'perimetre  le chef de table voit exactement les vendeurs de sa table',
+    { login: CHEF },
+    () => decor.membresDeLaTable.length,
     (tx) =>
       nombre(
         tx,
-        `SELECT count(*) AS n FROM relance.perimetre_saisie WHERE campagne_id = ${juin.id}`
+        `SELECT count(*) AS n FROM relance.perimetre_saisie WHERE campagne_id = ${decor.campagne1.id}`
       )
   );
   await doitValoir(
     'perimetre  le chef de table n a AUCUN vendeur sur l autre campagne',
-    { login: chefDeTable },
+    { login: CHEF },
     0,
     (tx) =>
       nombre(
         tx,
-        `SELECT count(*) AS n FROM relance.perimetre_saisie WHERE campagne_id = ${septembre.id}`
+        `SELECT count(*) AS n FROM relance.perimetre_saisie WHERE campagne_id = ${decor.campagne2.id}`
       )
   );
   await doitValoir(
     'perimetre  un compte anonyme n a aucun perimetre (vue vide, pas d erreur interne)',
-    { login: 'lecteur.rls' },
+    { login: LECTEUR },
     0,
-    (tx) => nombre(tx, 'SELECT count(*) AS n FROM relance.perimetre_saisie'),
-    creerLecteur
+    (tx) => nombre(tx, 'SELECT count(*) AS n FROM relance.perimetre_saisie')
   );
 
   // =========================================================================
@@ -989,12 +1160,12 @@ async function main() {
 
   await doitValoir(
     'tracabilite  cree_par est impose par la base, pas par le client',
-    { login: chefDeTable },
+    { login: CHEF },
     1,
     async (tx) => {
       const cree = await tx.rdv.create({
         // Le client ment deliberement : il se declare auteur sous l identifiant 1.
-        data: { ...rdvChefDeTableJuin, creePar: BigInt(1) },
+        data: { ...rdvDecor(decor.vendeurDeSaTable, decor.campagne1), creePar: BigInt(1) },
         select: { creePar: true },
       });
       const moi = await tx.$queryRawUnsafe<{ id: bigint }[]>(
@@ -1017,64 +1188,80 @@ async function main() {
   // ete appelable avec la seule cle publique, sans aucun jeton.
   // =========================================================================
 
+  /// LES PARAMETRES SONT UNE FONCTION, PAS DES VALEURS.
+  ///
+  /// Une premiere version prenait `...params: unknown[]`, donc evalues au moment
+  /// ou le controle est DECLARE — c'est-a-dire hors transaction, avec le decor de
+  /// la transaction PRECEDENTE, dont les lignes sont deja annulees. Les deux
+  /// controles qui creent vraiment un vendeur echouaient sur une violation de cle
+  /// etrangere : le site passe n'existait plus.
+  ///
+  /// La suite a donc attrape mon propre defaut, ce qui est exactement son role.
   const rpc =
-    (appel: string, ...params: unknown[]) =>
+    (appel: string, params: () => unknown[]) =>
     (tx: Tx) =>
-      tx.$queryRawUnsafe(`SELECT ${appel}`, ...params);
+      tx.$queryRawUnsafe(`SELECT ${appel}`, ...params());
 
   await doitRefuser(
     'RPC  anon ne peut executer AUCUNE fonction privilegiee',
     'anonyme',
     DROIT_INSUFFISANT,
-    rpc('relance.vendeur_purger($1, $2)', vendeurHorsTable.id, 'peu importe')
+    rpc('relance.vendeur_purger($1, $2)', () => [decor.vendeurHorsPerimetre.id, 'peu importe'])
   );
   await doitRefuser(
     'RPC  anon ne peut pas appeler la composition des tables',
     'anonyme',
     DROIT_INSUFFISANT,
-    rpc('relance.table_definir_vendeurs($1, $2)', tableJuin.id, [])
+    rpc('relance.table_definir_vendeurs($1, $2)', () => [decor.tableId, []])
   );
 
   // LES GARDES INTERNES NE SONT PAS EXPOSES. `poser_capacites` laisserait reecrire
   // les marques d'un vendeur sans passer par les controles de `vendeur_modifier`.
   await doitRefuser(
     'RPC  poser_capacites reste une brique interne, non exposee',
-    { login: 'admin.test' },
+    { login: ADMIN },
     DROIT_INSUFFISANT,
-    rpc('relance.poser_capacites($1, $2, $3, $4)', vendeurHorsTable.id, [], 'VO', BigInt(1))
+    rpc('relance.poser_capacites($1, $2, $3, $4)', () => [
+      decor.vendeurHorsPerimetre.id,
+      [],
+      'VO',
+      BigInt(1),
+    ])
   );
 
   // --- le palier est bien verifie DANS la fonction ---
 
   await doitRefuser(
     'RPC  un encadrant ne peut pas creer de vendeur',
-    { login: 'encadrant.test' },
+    { login: ENCADRANT },
     ERREUR_METIER,
-    rpc("relance.vendeur_creer($1, $2, 'VO')", 'REFUS RPC', vendeurEncadre.siteId)
+    rpc("relance.vendeur_creer($1, $2, 'VO')", () => ['REFUS RPC', decor.vendeurEncadre.siteId])
   );
   await doitRefuser(
     'RPC  un lecteur ne peut pas creer de vendeur',
-    { login: 'lecteur.rls' },
+    { login: LECTEUR },
     ERREUR_METIER,
-    rpc("relance.vendeur_creer($1, $2, 'VO')", 'REFUS RPC', vendeurEncadre.siteId),
-    creerLecteur
+    rpc("relance.vendeur_creer($1, $2, 'VO')", () => ['REFUS RPC', decor.vendeurEncadre.siteId])
   );
   await doitAccepter(
     'RPC  un admin cree un vendeur',
-    { login: 'admin.test' },
-    rpc("relance.vendeur_creer($1, $2, 'VO')", 'CONTROLE RPC', vendeurEncadre.siteId)
+    { login: ADMIN },
+    rpc("relance.vendeur_creer($1, $2, 'VO')", () => ['CONTROLE RPC', decor.vendeurEncadre.siteId])
   );
 
   // LA FRONTIERE ADMIN / DIRECTION, cote RPC cette fois. `direction` administre les
   // referentiels mais ne touche pas aux comptes : sans cela, il se promeut.
   await doitAccepter(
     'RPC  direction cree un vendeur (referentiel)',
-    { login: 'direction.test' },
-    rpc("relance.vendeur_creer($1, $2, 'VO')", 'CONTROLE RPC DIRECTION', vendeurEncadre.siteId)
+    { login: DIRECTION },
+    rpc("relance.vendeur_creer($1, $2, 'VO')", () => [
+      'CONTROLE RPC DIRECTION',
+      decor.vendeurEncadre.siteId,
+    ])
   );
   await doitRefuser(
     'RPC  direction ne peut pas attribuer un role global',
-    { login: 'direction.test' },
+    { login: DIRECTION },
     ERREUR_METIER,
     async (tx) => {
       const moi = await tx.$queryRawUnsafe<{ id: bigint }[]>(
@@ -1091,7 +1278,7 @@ async function main() {
   // on ne sort qu'en SQL, a la main, sur la base de production.
   await doitRefuser(
     'RPC  le DERNIER administrateur actif ne peut pas etre degrade',
-    { login: 'admin.test' },
+    { login: ADMIN },
     ERREUR_METIER,
     async (tx) => {
       const moi = await tx.$queryRawUnsafe<{ id: bigint }[]>(
@@ -1110,7 +1297,7 @@ async function main() {
       await tx.$executeRawUnsafe(
         `DELETE FROM relance.role_global rg
           WHERE rg.role = 'admin'
-            AND rg.utilisateur_id <> (SELECT u.id FROM relance.utilisateur u WHERE u.login_id = 'admin.test')`
+            AND rg.utilisateur_id <> (SELECT u.id FROM relance.utilisateur u WHERE u.login_id = '${ADMIN}')`
       );
     }
   );
@@ -1123,22 +1310,28 @@ async function main() {
   // une suite verte et une protection a moitie absente.
   const archiverLeVendeur = async (tx: Tx) => {
     await tx.vendeur.update({
-      where: { id: vendeurHorsTable.id },
+      where: { id: decor.vendeurHorsPerimetre.id },
       data: { archiveLe: new Date() },
     });
   };
 
   await doitRefuser(
     'purge  refusee si le vendeur n est PAS archive',
-    { login: 'admin.test' },
+    { login: ADMIN },
     ERREUR_METIER,
-    rpc('relance.vendeur_purger($1, $2)', vendeurHorsTable.id, vendeurHorsTable.nom)
+    rpc('relance.vendeur_purger($1, $2)', () => [
+      decor.vendeurHorsPerimetre.id,
+      decor.vendeurHorsPerimetre.nom,
+    ])
   );
   await doitRefuser(
     'purge  refusee si le nom retape ne correspond pas',
-    { login: 'admin.test' },
+    { login: ADMIN },
     ERREUR_METIER,
-    rpc('relance.vendeur_purger($1, $2)', vendeurHorsTable.id, 'PAS LE BON NOM'),
+    rpc('relance.vendeur_purger($1, $2)', () => [
+      decor.vendeurHorsPerimetre.id,
+      'PAS LE BON NOM',
+    ]),
     archiverLeVendeur
   );
 
@@ -1147,17 +1340,17 @@ async function main() {
   // protection, c'est une panne.
   await doitValoir(
     'purge  s applique quand le vendeur est archive ET le nom exact retape',
-    { login: 'admin.test' },
+    { login: ADMIN },
     0,
     async (tx) => {
       await tx.$queryRawUnsafe(
         'SELECT relance.vendeur_purger($1, $2)',
-        vendeurHorsTable.id,
-        vendeurHorsTable.nom
+        decor.vendeurHorsPerimetre.id,
+        decor.vendeurHorsPerimetre.nom
       );
       return nombre(
         tx,
-        `SELECT count(*) AS n FROM relance.vendeur WHERE id = ${vendeurHorsTable.id}`
+        `SELECT count(*) AS n FROM relance.vendeur WHERE id = ${decor.vendeurHorsPerimetre.id}`
       );
     },
     archiverLeVendeur
@@ -1170,11 +1363,11 @@ async function main() {
   // d'abord et demanderait ensuite serait exactement le defaut que R-A.2 combat.
   await doitValoir(
     'R-A.2  le sondage des jours rend RDV_IMPACTES et ne touche a rien',
-    { login: 'admin.test' },
+    { login: ADMIN },
     1,
     async (tx) => {
       const jours = await tx.campagneJour.findMany({
-        where: { campagneId: juin.id },
+        where: { campagneId: decor.campagne1.id },
         orderBy: { ordre: 'asc' },
         select: { jour: true },
       });
@@ -1187,30 +1380,30 @@ async function main() {
       const restants = jours.slice(1).map((j) => j.jour.toISOString().slice(0, 10));
       const r = await tx.$queryRawUnsafe<Record<string, unknown>[]>(
         'SELECT relance.campagne_definir_jours($1, $2::date[]) AS resultat',
-        juin.id,
+        decor.campagne1.id,
         restants
       );
       const rendu = r[0].resultat as { code?: string; applique?: boolean } | null;
-      const apres = await tx.campagneJour.count({ where: { campagneId: juin.id } });
+      const apres = await tx.campagneJour.count({ where: { campagneId: decor.campagne1.id } });
       return rendu?.code === 'RDV_IMPACTES' && rendu?.applique === false && apres === avant ? 1 : 0;
     },
     async (tx) => {
-      await tx.rdv.create({ data: rdvChefDeTableJuin, select: { id: true } });
+      await tx.rdv.create({ data: rdvDecor(decor.vendeurDeSaTable, decor.campagne1), select: { id: true } });
     }
   );
 
   // --- LA COMPOSITION D'UNE TABLE EST REMPLACEE, PAS EMPILEE ---
   await doitValoir(
     'RPC  table_definir_vendeurs remplace la composition (et n empile pas)',
-    { login: 'admin.test' },
+    { login: ADMIN },
     2,
     async (tx) => {
-      const deux = idsDeSaTable.slice(0, 2);
-      await tx.$queryRawUnsafe('SELECT relance.table_definir_vendeurs($1, $2)', tableJuin.id, deux);
+      const deux = decor.membresDeLaTable.slice(0, 2);
+      await tx.$queryRawUnsafe('SELECT relance.table_definir_vendeurs($1, $2)', decor.tableId, deux);
       return nombre(
         tx,
         `SELECT count(*) AS n FROM relance.affectation
-          WHERE table_id = ${tableJuin.id} AND archive_le IS NULL`
+          WHERE table_id = ${decor.tableId} AND archive_le IS NULL`
       );
     }
   );

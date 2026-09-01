@@ -1,6 +1,6 @@
 # BUGS-CONNUS
 
-Mise a jour : 01/09/2026, apres le signalement des vendeurs sortis.
+Mise a jour : 01/09/2026, apres l'autonomie de `test:rls`.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
@@ -90,7 +90,7 @@ Meme correctif que pour R-B.1 en son temps : **les fixtures sont fabriquees dans
 transaction annulee, jamais choisies en base.** Ce qui doit etre eprouve, c'est la
 contrainte, pas l'etat de la base ce jour-la. 39/39 sur les deux bases.
 
-### [CONNU, NON CORRIGE] `test:rls` est couple aux donnees de production
+### [CORRIGE] `test:rls` etait couple aux donnees de production
 
 **La suite la plus importante du produit** — 87 controles sur la seule barriere
 d'autorisation — emprunte des comptes REELS et suppose leur configuration :
@@ -122,11 +122,43 @@ s'execute. Les 5 comptes ont donc ete REACTIVES apres avoir ete archives a la de
 de l'utilisateur — un menage cosmetique ne vaut pas la mise hors service du garde-fou
 qui protege les donnees du groupe.
 
-**Correctif attendu :** `tester-rls.ts` doit fabriquer ses propres personas —
-comptes, encadrements, table, RDV — dans sa preparation, au lieu d'emprunter ceux de
-la production. C'est le meme remede que celui applique trois fois a
-`tester-garde-fous.ts` aujourd'hui. Tant que ce n'est pas fait, les comptes `.test`
-ne peuvent pas etre retires.
+**CORRIGE le 01/09/2026.** `tester-rls.ts` fabrique desormais son propre monde —
+`poserDecor` — dans la transaction de CHAQUE controle, et n'observe que lui :
+
+```
+plaque RLS
+  site RLS-A   A1 (table), A2 (hors table), A3 (table)
+  site RLS-B   B1, B2                <- les seuls sites de `encadrant.rls`
+campagne RLS 1   2 jours, 1 creneau  <- ou officie `chef.rls`
+campagne RLS 2                       <- pour prouver que ses droits n'y vont pas
+table « TABLE RLS », chef `chef.rls`, membres A1 et A3
+comptes  admin.rls · direction.rls · encadrant.rls · lecteur.rls · chef.rls
+```
+
+Les deux perimetres sont **disjoints** — le chef tient A1 et A3, l'encadrant B1 et
+B2 — et chacun compte **deux** membres : un controle qui attend 1 peut passer par
+hasard, celui qui attend 2 non. A2 n'est ni dans la table ni sur un site encadre :
+c'est le vendeur hors perimetre par lequel on prouve les refus.
+
+Tout est annule avec la transaction, donc rien ne subsiste et les noms fixes
+n'entrent jamais en collision — deux controles ne sont jamais simultanes.
+
+**La preuve :** 87/87 sur Supabase **avec les cinq comptes `.test` desactives**. Ils
+peuvent enfin etre archives, ce qui etait la demande initiale.
+
+Deux ajustements ont ete necessaires, et les deux etaient des defauts reels :
+
+- `doitValoir` acceptait une valeur attendue evaluee a la DECLARATION du controle.
+  Une valeur qui depend du decor n'existe pas encore a ce moment-la : elle accepte
+  desormais une fonction, evaluee apres la mesure ;
+- le helper `rpc` figeait ses parametres hors transaction — donc avec le decor de
+  la transaction PRECEDENTE, deja annulee. Les deux controles qui creent vraiment
+  un vendeur echouaient sur une violation de cle etrangere. **La suite a attrape
+  mon propre defaut**, ce qui est exactement son role.
+
+Contrepartie mesuree : 2 min 12 sur Supabase contre quelques secondes avant — le
+decor est rebati a chaque controle, soit ~25 lignes x 87 allers-retours reseau. En
+local, 5 secondes. C'est le prix de l'independance, et il est payant.
 
 ---
 
