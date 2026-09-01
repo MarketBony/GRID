@@ -16,6 +16,7 @@ import { useTempsReel } from '../hooks/useTempsReel';
 import { exporterDashboard } from '../utils/exportExcel';
 import { libelleJour } from '../utils/grille';
 import { BandeauKpi, BarresHorizontales, BarresParJour } from '../components/Graphiques';
+import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 
 // ============================================================================
 // ECRAN DASHBOARD — module D.
@@ -45,7 +46,10 @@ const LIBELLES_AXE: Record<Axe, string> = {
 
 export function Dashboard() {
   const [campagnes, setCampagnes] = useState<CampagneResume[]>([]);
-  const [campagneId, setCampagneId] = useState<string | null>(null);
+  // LA CAMPAGNE COURANTE EST PARTAGEE, pas locale : `App` demonte cet ecran quand
+  // on change d'onglet, et un `useState` mourrait avec lui. Voir
+  // `contexts/CampagneContext.tsx`.
+  const { campagneId, choisir: setCampagneId } = useCampagneCourante();
   const [donnees, setDonnees] = useState<DonneesDashboard | null>(null);
   const [axe, setAxe] = useState<Axe>('site');
   const [critere, setCritere] = useState<'global' | 'vn' | 'vo'>('global');
@@ -66,8 +70,8 @@ export function Dashboard() {
     chargerCampagnes()
       .then((cs) => {
         setCampagnes(cs);
-        const ouverte = cs.find((c) => !c.cloturee) ?? cs[0];
-        if (ouverte) setCampagneId(ouverte.id);
+        const retenue = choisirDansListe(cs, campagneId, (l) => l.find((c) => !c.cloturee) ?? l[0]);
+        if (retenue) setCampagneId(retenue);
         else setChargement(false);
       })
       .catch((e) => {

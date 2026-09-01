@@ -14,6 +14,7 @@ import {
   type ImpactJour,
 } from '../services/campagnes';
 import { useReferentiels } from '../hooks/useReferentiels';
+import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 
 // ============================================================================
 // ECRAN A4 — CAMPAGNE (F-A4.1 a F-A4.6)
@@ -40,7 +41,9 @@ export function Campagne() {
   // contraint par un CHECK verifie au demarrage du serveur.
   const { donnees } = useReferentiels();
   const [liste, setListe] = useState<CampagneResume[]>([]);
-  const [idCourant, setIdCourant] = useState<string | null>(null);
+  // Meme campagne courante que les autres ecrans : ouvrir l'onglet Campagnes doit
+  // montrer celle qu'on regardait, pas la premiere de la liste.
+  const { campagneId: idCourant, choisir: setIdCourant } = useCampagneCourante();
   const [detail, setDetail] = useState<CampagneDetail | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [succes, setSucces] = useState<string | null>(null);
@@ -57,7 +60,8 @@ export function Campagne() {
     chargerCampagnes()
       .then((cs) => {
         setListe(cs);
-        if (cs.length > 0) setIdCourant(cs[0].id);
+        const retenue = choisirDansListe(cs, idCourant, (l) => l[0]);
+        if (retenue) setIdCourant(retenue);
       })
       .catch((e) => setMessage(e instanceof Error ? e.message : 'Chargement impossible.'));
   }, []);

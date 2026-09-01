@@ -14,6 +14,7 @@ import {
 import { chargerCampagnes, chargerCampagne, type CampagneResume } from '../services/campagnes';
 import { useTempsReel } from '../hooks/useTempsReel';
 import { comparerLibelle } from '../backend/src/utils/tri';
+import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 
 // ============================================================================
 // ECRAN TABLES — module B, le constructeur.
@@ -36,7 +37,8 @@ type Selection = { vendeurId: string; nom: string; depuis: string | 'reserve' } 
 
 export function Tables() {
   const [campagnes, setCampagnes] = useState<CampagneResume[]>([]);
-  const [campagneId, setCampagneId] = useState<string | null>(null);
+  // Partagee avec les autres ecrans — voir `contexts/CampagneContext.tsx`.
+  const { campagneId, choisir: setCampagneId } = useCampagneCourante();
   const [sessions, setSessions] = useState<
     { id: string; plaqueLibelle: string; mode: string }[]
   >([]);
@@ -57,8 +59,8 @@ export function Tables() {
     chargerCampagnes()
       .then((cs) => {
         setCampagnes(cs);
-        const ouverte = cs.find((c) => !c.cloturee) ?? cs[0];
-        if (ouverte) setCampagneId(ouverte.id);
+        const retenue = choisirDansListe(cs, campagneId, (l) => l.find((c) => !c.cloturee) ?? l[0]);
+        if (retenue) setCampagneId(retenue);
         else setChargement(false);
       })
       .catch((e) => {

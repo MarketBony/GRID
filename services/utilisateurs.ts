@@ -95,7 +95,23 @@ export async function chargerComptes(): Promise<{ comptes: Compte[]; rolesGlobau
         campagne: { libelle: string; cloturee: boolean } | null;
       } | null;
     }[];
-    vendeur: { id: number; nom: string } | null;
+    // UN TABLEAU, PAS UN OBJET, ET SURTOUT PAS `null`.
+    //
+    // `vendeur.utilisateur_id` fait de `vendeur` un ENFANT de `utilisateur` :
+    // PostgREST rend donc toujours un tableau — vide quand le compte n'est pas
+    // un vendeur, jamais `null`.
+    //
+    // Cette declaration disait `{ id, nom } | null`. TypeScript la validait,
+    // puisqu'il ne verifie que la coherence du front avec ses propres
+    // declarations, jamais avec ce que le serveur renvoie. Et `[]` est VRAI en
+    // JavaScript : l'etiquette « vendeur » s'affichait sur TOUS les comptes, y
+    // compris `admin`, avec un `id` et un `nom` a `undefined`.
+    //
+    // C'est le piege que `CLAUDE.md` decrit mot pour mot — « un typecheck vert
+    // ne prouve rien sur le contrat de l'API » — et il avait deja coute une page
+    // blanche sur l'ecran Vendeurs. Constate le 01/09/2026 en regardant l'ecran,
+    // pas en compilant.
+    vendeur: { id: number; nom: string }[];
   };
 
   const comptes = (verifier(reponse) as unknown as Ligne[]).map((u) => ({
@@ -125,7 +141,10 @@ export async function chargerComptes(): Promise<{ comptes: Compte[]; rolesGlobau
       campagneLibelle: t.session_plaque?.campagne?.libelle ?? '',
       campagneCloturee: t.session_plaque?.campagne?.cloturee ?? false,
     })),
-    vendeur: u.vendeur ? { id: txt(u.vendeur.id), nom: u.vendeur.nom } : null,
+    // Un compte est rattache a AU PLUS un vendeur (`vendeur.utilisateur_id` est
+    // unique). On prend donc le premier, et l'absence se lit sur la longueur du
+    // tableau — pas sur sa verite.
+    vendeur: u.vendeur?.[0] ? { id: txt(u.vendeur[0]!.id), nom: u.vendeur[0]!.nom } : null,
   }));
 
   return { comptes, rolesGlobaux: ROLES_GLOBAUX };

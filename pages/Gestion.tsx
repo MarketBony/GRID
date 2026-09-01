@@ -211,8 +211,13 @@ export function Gestion() {
                   onSupprimer={() => {
                     const saisi = window.prompt(
                       `SUPPRESSION DÉFINITIVE du compte de ${c.nom}.\n\n` +
-                        'Elle n’est possible que si ce compte n’explique plus rien — aucune table ' +
-                        'animée, aucun rôle de campagne.\n\n' +
+                        'Irréversible : le compte, son identité de connexion et ses rôles ' +
+                        'disparaissent. Pour un retrait réversible, utiliser « désactiver ».' +
+                        '\n\n' +
+                        'Elle n’est possible que si ce compte n’explique plus rien — aucune ' +
+                        'table animée, aucun rôle de campagne. Sinon la base refusera, et elle ' +
+                        'aura raison : il documenterait encore une campagne passée.' +
+                        '\n\n' +
                         `Pour confirmer, taper le nom exact :\n${c.nom}`
                     );
                     if (saisi === null) return;
@@ -325,11 +330,32 @@ function LigneCompte({
         <button type="button" className="lien" onClick={onBasculerActif} disabled={occupe}>
           {compte.actif ? 'désactiver' : 'réactiver'}
         </button>
-        {!compte.actif && (
-          <button type="button" className="destructif" onClick={onSupprimer} disabled={occupe}>
-            supprimer
-          </button>
-        )}
+        {/* LA SUPPRESSION SE VOIT TOUJOURS, MEME QUAND ELLE EST IMPOSSIBLE.
+
+            Elle n'apparaissait que sur un compte DEJA DESACTIVE : rien, sur un
+            compte actif, ne laissait deviner qu'elle existait. On la cherchait,
+            on ne la trouvait pas, on en concluait qu'elle n'avait pas ete faite —
+            constate le 01/09/2026.
+
+            Un bouton absent n'enseigne rien ; un bouton desactive qui dit
+            POURQUOI enseigne la marche a suivre. La protection ne bouge pas d'un
+            cran : desactiver d'abord, retaper le nom exact ensuite, et les deux
+            verrous poses en base par `relance.utilisateur_purger` par-dessus. */}
+        <button
+          type="button"
+          className="destructif"
+          onClick={onSupprimer}
+          disabled={occupe || compte.actif}
+          title={
+            compte.actif
+              ? 'Désactiver le compte d’abord : la suppression définitive ne s’applique ' +
+                'qu’à un compte déjà retiré du service.'
+              : 'Suppression définitive. La base la refusera si ce compte anime une table ' +
+                'ou porte un rôle de campagne : il expliquerait encore une campagne passée.'
+          }
+        >
+          supprimer
+        </button>
       </td>
     </tr>
   );

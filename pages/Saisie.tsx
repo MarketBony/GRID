@@ -15,6 +15,7 @@ import {
   type RdvSaisie,
   type SectionVendeur,
 } from '../services/saisie';
+import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 
 // ============================================================================
 // ECRAN DE SAISIE — module C.
@@ -37,7 +38,8 @@ import {
 
 export function Saisie() {
   const [campagnes, setCampagnes] = useState<CampagneResume[]>([]);
-  const [campagneId, setCampagneId] = useState<string | null>(null);
+  // Partagee avec les autres ecrans — voir `contexts/CampagneContext.tsx`.
+  const { campagneId, choisir: setCampagneId } = useCampagneCourante();
   const [donnees, setDonnees] = useState<PerimetreSaisie | null>(null);
   const [vendeurId, setVendeurId] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -78,12 +80,16 @@ export function Saisie() {
         // On ouvre sur une campagne ou l'utilisateur a QUELQUE CHOSE A FAIRE, pas
         // sur la plus recente. Un chef de table de juin qui atterrit sur septembre
         // voit un ecran vide, et un ecran vide se lit comme une panne.
-        const defaut =
-          cs.find((c) => !c.cloturee && c.vendeursSaisissables > 0) ??
-          cs.find((c) => c.vendeursSaisissables > 0) ??
-          cs.find((c) => !c.cloturee) ??
-          cs[0];
-        if (defaut) setCampagneId(defaut.id);
+        const retenue = choisirDansListe(
+          cs,
+          campagneId,
+          (l) =>
+            l.find((c) => !c.cloturee && c.vendeursSaisissables > 0) ??
+            l.find((c) => c.vendeursSaisissables > 0) ??
+            l.find((c) => !c.cloturee) ??
+            l[0]
+        );
+        if (retenue) setCampagneId(retenue);
         else setChargement(false);
       })
       .catch((e) => {

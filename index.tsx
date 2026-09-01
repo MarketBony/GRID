@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { FournisseurSession } from './contexts/SessionContext';
 import { FournisseurTheme } from './contexts/ThemeContext';
+import { FournisseurCampagne } from './contexts/CampagneContext';
 import { configurationSupabase } from './services/supabase';
 import './index.css';
 
@@ -61,7 +62,9 @@ createRoot(racine).render(
     <FournisseurTheme>
       {configurationSupabase.complete ? (
         <FournisseurSession>
-          <App />
+          <FournisseurCampagne>
+            <App />
+          </FournisseurCampagne>
         </FournisseurSession>
       ) : (
         <EcranConfiguration manquantes={configurationSupabase.manquantes} />

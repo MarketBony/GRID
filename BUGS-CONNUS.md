@@ -1,9 +1,69 @@
 # BUGS-CONNUS
 
-Mise a jour : 01/09/2026, apres le chargement des RDV de juin.
+Mise a jour : 01/09/2026, apres la mise en service.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
+
+---
+
+## Mise en service — 01/09/2026
+
+### [CORRIGE] La campagne courante se reinitialisait a chaque changement d'onglet
+
+Se mettre sur juin au tableau de bord, faire un tour dans la saisie, revenir : on
+retrouvait septembre. Signale par l'utilisateur.
+
+Cause : `App` DEMONTE l'ecran quitte et remonte l'ecran choisi. Chaque ecran portait
+son `campagneId` dans un `useState` local, qui mourait avec lui.
+
+Ce n'etait pas seulement agacant, c'etait **trompeur** : deux ecrans pouvaient
+afficher deux campagnes differentes en meme temps, sans que rien ne le signale. On
+lisait alors des chiffres de juin a cote d'une composition de tables de septembre.
+
+`contexts/CampagneContext.tsx` porte desormais UNE campagne courante pour les quatre
+ecrans qui en ont une (saisie, tableau de bord, tables, campagnes). Elle survit aussi
+a un rechargement de page (`sessionStorage`, lu et ecrit sous `try/catch` : une
+exception de stockage empecherait l'application de monter, et ca n'en vaut pas le
+risque).
+
+Chaque ecran GARDE SON DEFAUT, qui ne s'applique que quand il n'y a rien a respecter
+— la saisie ouvre sur une campagne ou l'on a quelque chose a faire, le tableau de
+bord sur une campagne ouverte. Et chacun verifie que l'identifiant retenu figure dans
+sa propre liste : un identifiant memorise peut designer une campagne archivee depuis.
+
+### [CORRIGE] L'etiquette « vendeur » s'affichait sur TOUS les comptes
+
+`admin` etait presente comme etant aussi un vendeur. Aucun compte ne l'est
+aujourd'hui — `vendeur.utilisateur_id` est vide sur les 100 vendeurs, verifie.
+
+Cause : `vendeur.utilisateur_id` fait de `vendeur` un ENFANT de `utilisateur`.
+PostgREST rend donc toujours un **tableau**, vide quand il n'y a rien, jamais `null`.
+`services/utilisateurs.ts` le declarait `{ id, nom } | null` et testait
+`u.vendeur ? … : null`. **`[]` est vrai en JavaScript** : l'etiquette s'affichait
+partout, avec un `id` et un `nom` a `undefined`.
+
+C'est mot pour mot le piege que `CLAUDE.md` decrit — « un typecheck vert ne prouve
+rien sur le contrat de l'API » : TypeScript ne verifie que la coherence du front avec
+ses PROPRES declarations, jamais avec ce que le serveur renvoie. Une declaration
+fausse est un mensonge que le compilateur valide. Le meme defaut avait deja coute une
+page blanche sur l'ecran Vendeurs.
+
+Trouve en REGARDANT l'ecran, pas en compilant — et pas cherche : il est apparu en
+verifiant autre chose.
+
+### [CORRIGE] La suppression definitive d'un compte etait invisible
+
+Elle existait — `relance.utilisateur_purger`, l'action `supprimer-identite` de
+l'Edge Function, le bouton — mais celui-ci n'etait rendu que sur un compte **deja
+desactive**. Rien, sur un compte actif, ne laissait deviner qu'elle existait : on la
+cherchait, on ne la trouvait pas, on en concluait qu'elle n'avait pas ete faite.
+
+Le bouton est desormais toujours rendu, DESACTIVE tant que le compte est actif, avec
+une infobulle qui dit la marche a suivre. Un bouton absent n'enseigne rien ; un bouton
+desactive qui dit pourquoi enseigne le chemin. **La protection ne bouge pas d'un
+cran** : desactiver d'abord, retaper le nom exact ensuite, et les deux verrous poses
+en base par-dessus (compte deja archive, aucun historique).
 
 ---
 

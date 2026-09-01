@@ -5,7 +5,7 @@
 « relance » — le schema PostgreSQL, le prefixe des messages de trigger, le vocabulaire
 metier — est liste dans CLAUDE.md.
 
-Mise a jour : 01/09/2026, apres le chargement des 1107 RDV de juin.
+Mise a jour : 01/09/2026, apres la mise en service.
 
 Ce fichier est la memoire globale du projet : ce qui est fait, ce qui reste, et les
 decisions prises. Pour la methode de travail, lire `CLAUDE.md`. Pour l'etat detaille de
@@ -26,6 +26,42 @@ a committer mais le commit initial n'a pas ete fait.
 production, ou pousser signifie livrer. Ici seuls les commits locaux ont une utilite
 immediate : des points de retour. Le depot GitHub devient necessaire en J7, pour la deploy
 key du VPS et les workflows de sauvegarde.
+
+## 01/09/2026 — Mise en service : comptes de test retires, premier compte nominatif
+
+**Les 5 comptes `.test` sont desactives** et leurs 2 encadrements de site liberes, par
+le meme chemin que l'ecran Comptes (`modifierCompte` retire de tout encadrement en
+desactivant : un encadrant fantome dans un selecteur est pire qu'une case vide). Ils
+restent visibles sous « Afficher les comptes desactives », et supprimables
+definitivement.
+
+**Compte `tlabonne` cree** — THEO LABONNE, palier `admin` (id 92). Connexion eprouvee,
+et palier relu EN BASE et non deduit de ce qui a ete demande :
+`peut_administrer` et `peut_gerer_utilisateurs` rendent `true`.
+
+Le mot de passe demande, `17061969`, a ete **refuse par l'Edge Function** : 8
+caracteres pour un plancher a 12. Un compte a donc ete cree avec un mot de passe
+genere. Le plancher est un choix, pas une fatalite — mais 8 chiffres formant une date
+de naissance est la premiere chose qu'on essaie sur une application accessible depuis
+Internet et qui porte des noms de clients.
+
+### Trois defauts corriges au passage, dont deux non demandes
+
+**La campagne courante se reinitialisait a chaque changement d'onglet** (signale).
+`App` demonte l'ecran quitte ; chaque ecran portait son `campagneId` en local. Pire
+que l'agacement : deux ecrans pouvaient afficher deux campagnes differentes en meme
+temps. Un `CampagneContext` partage la porte desormais, avec survie au rechargement.
+
+**L'etiquette « vendeur » s'affichait sur tous les comptes.** PostgREST rend un
+TABLEAU pour un embed enfant, jamais `null`, et `[]` est vrai en JavaScript. La
+declaration TypeScript disait `| null` et le compilateur validait — le piege exact que
+`CLAUDE.md` decrit.
+
+**La suppression definitive d'un compte etait invisible** tant que le compte etait
+actif. Le bouton est desormais toujours rendu, desactive avec une infobulle qui dit la
+marche a suivre. Aucune protection n'a ete relachee.
+
+---
 
 ## 01/09/2026 — Les 1107 RDV de juin sont en base, et ils ont revele un defaut grave
 
