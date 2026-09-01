@@ -1,6 +1,7 @@
 import { supabase, txt, txtOuNull, verifier } from './supabase';
 import { GRAINE, ecartCible, repartir, type TableCible, type VendeurAPlacer } from '../backend/src/utils/repartition';
 import { trierPar } from '../backend/src/utils/tri';
+import { etaitPresent } from '../backend/src/utils/presenceVendeur';
 import type { TypeVehicule } from '../types';
 
 // ============================================================================
@@ -69,9 +70,35 @@ interface LigneVendeur {
   id: number;
   nom: string;
   type_vehicule: string;
+  date_entree: string | null;
+  date_sortie: string | null;
   site: { id: number; code: string; libelle: string; plaque_id: number } | null;
   vendeur_marque: { marque_id: number }[];
 }
+
+/// UN VENDEUR N'APPARTIENT PAS A UNE CAMPAGNE OU IL N'ETAIT PAS LA.
+///
+/// C'est la MEME regle que la vue `relance.perimetre_saisie`, et que le dashboard
+/// (`etaitPresent`, deja importe la-bas). Cet ecran ne l'appliquait pas : il ne
+/// filtrait que `archive_le`.
+///
+/// Consequence constatee le 01/09/2026, signalee par l'utilisateur : trois
+/// vendeurs sortis fin juillet et fin aout figuraient encore dans les tables de la
+/// session de SEPTEMBRE. L'ecran des tables et l'ecran de saisie ne disaient donc
+/// pas la meme chose sur la meme campagne — celui de saisie, qui lit la vue, avait
+/// raison.
+///
+/// Les affectations elles-memes restent en base : elles racontent une composition
+/// qui a existe, et l'interdit n.1 ne les detruit pas. C'est l'APPARTENANCE A
+/// CETTE CAMPAGNE qui est fausse, pas la ligne.
+const estPresent = (v: LigneVendeur, campagne: { dateDebut: Date; dateFin: Date }): boolean =>
+  etaitPresent(
+    {
+      dateEntree: v.date_entree ? new Date(v.date_entree) : null,
+      dateSortie: v.date_sortie ? new Date(v.date_sortie) : null,
+    },
+    campagne
+  );
 
 const versVendeurTable = (v: LigneVendeur): VendeurTable => ({
   id: txt(v.id),
@@ -83,8 +110,12 @@ const versVendeurTable = (v: LigneVendeur): VendeurTable => ({
   marqueIds: (v.vendeur_marque ?? []).map((m) => txt(m.marque_id)),
 });
 
+// `date_entree` et `date_sortie` SONT NECESSAIRES ICI, meme si aucun ecran ne les
+// affiche : elles decident si un vendeur appartient a CETTE campagne. Sans elles,
+// l'ecran des tables composait avec des gens partis. Voir `estPresent` plus bas.
 const SELECT_VENDEUR =
-  'id, nom, type_vehicule, site(id, code, libelle, plaque_id), vendeur_marque(marque_id)';
+  'id, nom, type_vehicule, date_entree, date_sortie, ' +
+  'site(id, code, libelle, plaque_id), vendeur_marque(marque_id)';
 
 export async function chargerTables(sessionId: string): Promise<PerimetreTables> {
   const n = Number(sessionId);
@@ -104,6 +135,14 @@ export async function chargerTables(sessionId: string): Promise<PerimetreTables>
   };
 
   const plaqueId = session.plaque?.id ?? -1;
+
+  // Les bornes de la campagne, une fois pour toutes. `campagne.date_debut` est un
+  // `date` PostgreSQL rendu en `AAAA-MM-JJ` : `new Date` le lit en UTC a minuit,
+  // ce qui convient — on compare des jours, jamais des instants.
+  const bornes = {
+    dateDebut: new Date(session.campagne?.date_debut ?? '1970-01-01'),
+    dateFin: new Date(session.campagne?.date_fin ?? '2999-12-31'),
+  };
 
   const [tables, vendeurs, marques, comptes] = await Promise.all([
     supabase
@@ -151,12 +190,17 @@ export async function chargerTables(sessionId: string): Promise<PerimetreTables>
 
   const lignesTables = verifier(tables) as unknown as LigneTable[];
   const tousVendeurs = (verifier(vendeurs) as unknown as LigneVendeur[]).filter(
-    (v) => v.site?.plaque_id === plaqueId
+    (v) => v.site?.plaque_id === plaqueId && estPresent(v, bornes)
   );
 
   const affectes = new Set<string>();
   const projetees: TablePhoning[] = lignesTables.map((t) => {
-    const actives = (t.affectation ?? []).filter((a) => !a.archive_le && a.vendeur);
+    // On ecarte aussi les membres ABSENTS de la campagne. Le cas arrive quand une
+    // date de sortie est renseignee APRES la composition des tables : l'affectation
+    // etait juste au moment ou elle a ete posee, elle ne l'est plus.
+    const actives = (t.affectation ?? []).filter(
+      (a) => !a.archive_le && a.vendeur && estPresent(a.vendeur, bornes)
+    );
     const membres = trierPar(
       actives.map((a) => versVendeurTable(a.vendeur!)),
       (m) => m.nom

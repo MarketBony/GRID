@@ -5,7 +5,7 @@
 « relance » — le schema PostgreSQL, le prefixe des messages de trigger, le vocabulaire
 metier — est liste dans CLAUDE.md.
 
-Mise a jour : 01/09/2026, apres la mise en service.
+Mise a jour : 01/09/2026, apres le correctif des vendeurs sortis.
 
 Ce fichier est la memoire globale du projet : ce qui est fait, ce qui reste, et les
 decisions prises. Pour la methode de travail, lire `CLAUDE.md`. Pour l'etat detaille de
@@ -26,6 +26,34 @@ a committer mais le commit initial n'a pas ete fait.
 production, ou pousser signifie livrer. Ici seuls les commits locaux ont une utilite
 immediate : des points de retour. Le depot GitHub devient necessaire en J7, pour la deploy
 key du VPS et les workflows de sauvegarde.
+
+## 01/09/2026 — Les vendeurs sortis, et ce que le correctif a fait remonter
+
+Signale par l'utilisateur : des vendeurs sortis en aout apparaissaient dans la session
+de septembre. La vue `perimetre_saisie` les excluait bien ; c'est l'ecran des TABLES
+qui ne filtrait que `archive_le`. Corrige a trois niveaux — affichage, trigger
+d'ecriture, et la ligne restee en base. Verifie a l'ecran : les trois disparaissent de
+septembre, et LAROCHE reste en juin ou il a travaille.
+
+**Le correctif en a revele un plus grave.** Deux vendeurs avaient une `date_entree`
+egale a leur `date_sortie` alors qu'ils avaient 13 et 16 RDV en juin : le tableau de
+bord de juin affichait **1078 au lieu de 1107**, sans erreur ni avertissement. La
+donnee brute etait intacte, seule la lecture mentait. Nouveau trigger
+`vendeur_dates_contre_rdv`, dates fautives retirees, juin revenu a 1107.
+
+`test:garde-fous` passe de 33 a **39 controles** et ses fixtures sont desormais
+fabriquees dans la transaction, jamais choisies en base — trois controles viraient au
+rouge sur Supabase parce que la base y est reellement utilisee.
+
+**`test:rls` est a 82/87, et il faut le savoir.** La suite emprunte des comptes reels
+et suppose leur configuration ; deux changements legitimes faits depuis l'interface
+l'ont desaccordee. Les cinq echecs sont expliques un a un dans `BUGS-CONNUS.md`, et
+dans chaque cas c'est l'observe qui a raison — **aucune regression de securite**.
+Surtout : archiver les comptes `.test` desarme la suite ENTIEREMENT (0 controle
+execute), ils ont donc ete reactives. Ils ne pourront etre retires qu'une fois la
+suite rendue autonome.
+
+---
 
 ## 01/09/2026 — Mise en service : comptes de test retires, premier compte nominatif
 

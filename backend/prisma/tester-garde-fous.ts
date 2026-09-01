@@ -311,6 +311,163 @@ async function main() {
     }
   }
 
+  // ---------------------------------------------------------------- presence
+  //
+  // UN VENDEUR ABSENT DE LA CAMPAGNE N'ENTRE PAS DANS SES TABLES.
+  //
+  // La regle vivait dans la vue `perimetre_saisie` (lecture) et dans
+  // `session_reprendre` — dont le commentaire disait « verifie ici EN PLUS du
+  // trigger ». Ce trigger n'existait pas : `table_definir_vendeurs`,
+  // `session_appliquer_repartition` et un INSERT direct par PostgREST ne
+  // verifiaient rien. Constate le 01/09/2026, signale par l'utilisateur : trois
+  // vendeurs sortis en juillet et aout figuraient dans la session de septembre.
+  //
+  // Les deux bornes sont eprouvees, parce qu'elles se trompent dans des sens
+  // opposes : sorti AVANT le debut, entre APRES la fin.
+  if (table1) {
+    const plaqueDeLaTable = table1.sessionPlaque.plaqueId;
+    const siteDeLaPlaque = await prisma.site.findFirst({
+      where: { plaqueId: plaqueDeLaTable },
+      select: { id: true },
+    });
+
+    if (siteDeLaPlaque) {
+      // Le vendeur est FABRIQUE dans la transaction annulee, jamais cherche en
+      // base : un controle qui ne s'execute que si le jeu de donnees s'y prete
+      // ne prouve rien, et sa disparition serait silencieuse. Lecon de R-B.1.
+      const avecDates = (dateEntree: Date | null, dateSortie: Date | null) => async (tx: Tx) => {
+        const neuf = await tx.vendeur.create({
+          data: {
+            nom: 'GARDE-FOU PRESENCE',
+            siteId: siteDeLaPlaque.id,
+            typeVehicule: 'VO', // aucune marque a poser : on ne teste que la presence
+            dateEntree,
+            dateSortie,
+          },
+          select: { id: true },
+        });
+        return tx.affectation.create({ data: { tableId: table1.id, vendeurId: neuf.id } });
+      };
+
+      // Juin 2026 court du 11 au 15.
+      await doitRefuser(
+        'presence  vendeur SORTI avant la campagne, affecte a une table',
+        'est sorti le',
+        avecDates(null, new Date('2026-05-31'))
+      );
+
+      await doitRefuser(
+        'presence  vendeur ENTRE apres la campagne, affecte a une table',
+        "il n'etait pas encore la",
+        avecDates(new Date('2026-07-01'), null)
+      );
+
+      // Non-regression : un vendeur PRESENT passe. Un garde-fou qui refuse tout
+      // est aussi inutile qu'un garde-fou qui n'a jamais rien refuse.
+      await doitAccepter(
+        'presence  vendeur present pendant la campagne accepte (non-regression)',
+        avecDates(new Date('2026-01-01'), new Date('2026-12-31'))
+      );
+    } else {
+      resultats.push({
+        nom: "presence  affectation d'un vendeur absent",
+        ok: false,
+        detail: 'jeu de donnees insuffisant (aucun site sur la plaque de la table)',
+      });
+    }
+  }
+
+  // ------------------------------------------------- dates contre RDV existants
+  //
+  // ON NE DECLARE PAS ABSENT QUELQU'UN DONT LES RDV PROUVENT LA PRESENCE.
+  //
+  // Constate le 01/09/2026 : deux vendeurs ont recu une `date_entree` posterieure
+  // a juin alors qu'ils y avaient 13 et 16 RDV. Le tableau de bord de juin est
+  // passe de 1107 a 1078 SANS erreur ni avertissement — la donnee brute restait
+  // juste, seule la lecture mentait.
+  //
+  // LE JEU EST FABRIQUE DANS LA TRANSACTION, comme pour R-B.1 et R-B.5 : la base
+  // locale n'a aucun RDV de juin — ils ne vivent que sur Supabase — et un controle
+  // qui ne tourne que sur une des deux bases ne garde que la moitie du temps.
+  {
+    const jourJuin = await prisma.campagneJour.findFirst({
+      where: { campagneId: juin.id },
+      orderBy: { ordre: 'asc' },
+      select: { jour: true },
+    });
+    const creneauJuin = await prisma.campagneCreneau.findFirst({
+      where: { campagneId: juin.id },
+      orderBy: { ordre: 'asc' },
+      select: { code: true },
+    });
+    const siteQuelconque = await prisma.site.findFirst({
+      where: { archiveLe: null },
+      orderBy: { id: 'asc' },
+      select: { id: true },
+    });
+
+    /// Un vendeur VO — donc sans marque a poser — porteur d'UN RDV de juin.
+    /// `VO` evite de trebucher sur R-C.1 : ce n'est pas ce qu'on teste ici.
+    const avecUnRdvEnJuin = async (tx: Tx) => {
+      const v = await tx.vendeur.create({
+        data: { nom: 'GARDE-FOU DATES', siteId: siteQuelconque!.id, typeVehicule: 'VO' },
+        select: { id: true },
+      });
+      await tx.rdv.create({
+        data: {
+          campagneId: juin.id,
+          vendeurId: v.id,
+          jour: jourJuin!.jour,
+          creneauCode: creneauJuin!.code,
+          typeVehicule: 'VO',
+          client: 'GARDE-FOU',
+        },
+      });
+      return v.id;
+    };
+
+    if (jourJuin && creneauJuin && siteQuelconque) {
+      // Juin court du 11 au 15 : une entree en juillet et une sortie en mai
+      // excluent toutes deux le vendeur de la campagne ou il a des RDV.
+      await doitRefuser(
+        'dates  entree APRES une campagne ou le vendeur a des RDV',
+        'disparaitraient des totaux',
+        async (tx) => {
+          const id = await avecUnRdvEnJuin(tx);
+          return tx.vendeur.update({ where: { id }, data: { dateEntree: new Date('2026-07-31') } });
+        }
+      );
+
+      await doitRefuser(
+        'dates  sortie AVANT une campagne ou le vendeur a des RDV',
+        'disparaitraient des totaux',
+        async (tx) => {
+          const id = await avecUnRdvEnJuin(tx);
+          return tx.vendeur.update({ where: { id }, data: { dateSortie: new Date('2026-05-31') } });
+        }
+      );
+
+      // Non-regression : des dates COHERENTES avec ses RDV passent. Un garde-fou
+      // qui refuse toute date rendrait impossible de declarer un depart.
+      await doitAccepter(
+        'dates  sortie APRES la campagne acceptee (non-regression)',
+        async (tx) => {
+          const id = await avecUnRdvEnJuin(tx);
+          return tx.vendeur.update({
+            where: { id },
+            data: { dateEntree: null, dateSortie: new Date('2026-08-31') },
+          });
+        }
+      );
+    } else {
+      resultats.push({
+        nom: 'dates  coherence avec les RDV existants',
+        ok: false,
+        detail: 'jeu de donnees insuffisant (jour, creneau ou site de juin introuvable)',
+      });
+    }
+  }
+
   // ---------------------------------------------------------------- R-B.5
   // Une table SPECIALISEE n'accueille que des vendeurs autorises sur sa marque.
   //
@@ -437,31 +594,25 @@ async function main() {
 
     // Non-regression : une table MIXTE (`marque_id` a null) n'impose rien. C'est
     // le cas normal, et le seul observe en juin 2026.
-    const libre = await prisma.vendeur.findFirst({
-      where: {
-        site: { plaqueId: plaqueDeLaTable },
-        affectations: {
-          none: { archiveLe: null, table: { sessionPlaque: { campagneId: juin.id } } },
-        },
-      },
-      select: { id: true },
-    });
-    if (libre || siteDeLaPlaque) {
+    //
+    // LE VENDEUR EST FABRIQUE, JAMAIS CHOISI EN BASE — et c'est un correctif du
+    // 01/09/2026. Cette version prenait « un vendeur de la plaque encore libre sur
+    // la campagne ». Sur une base REELLEMENT UTILISEE, ce vendeur peut etre
+    // n'importe qui : sur Supabase il est tombe sur BAPTISTE DUBOIS, entre le
+    // 01/09/2026, qu'un nouveau trigger refuse a bon droit dans une table de JUIN.
+    // Le test accusait alors R-B.5 d'un refus qui venait d'ailleurs.
+    //
+    // Meme lecon que R-B.1 plus haut : un controle qui depend de ce que la base
+    // contient ce jour-la ne teste pas ce qu'il croit tester. Sans date d'entree ni
+    // de sortie, le vendeur fabrique est present sur toutes les campagnes.
+    if (siteDeLaPlaque) {
       await doitAccepter('R-B.5  table MIXTE : aucune contrainte (non-regression)', async (tx) => {
         await tx.tablePhoning.update({ where: { id: table1.id }, data: { marqueId: null } });
-        const vendeurId =
-          libre?.id ??
-          (
-            await tx.vendeur.create({
-              data: { nom: 'GARDE-FOU MIXTE', siteId: siteDeLaPlaque!, typeVehicule: 'VN' },
-              select: { id: true },
-            })
-          ).id;
-        return tx.affectation.upsert({
-          where: { tableId_vendeurId: { tableId: table1.id, vendeurId } },
-          update: { archiveLe: null },
-          create: { tableId: table1.id, vendeurId },
+        const neuf = await tx.vendeur.create({
+          data: { nom: 'GARDE-FOU MIXTE', siteId: siteDeLaPlaque, typeVehicule: 'VN' },
+          select: { id: true },
         });
+        return tx.affectation.create({ data: { tableId: table1.id, vendeurId: neuf.id } });
       });
     } else {
       resultats.push({
@@ -484,11 +635,39 @@ async function main() {
   // concessions differentes, et un chef de vente en chef de table d'une AUTRE
   // concession pour les coacher ». Avec un drapeau sur `vendeur`, le selecteur ne
   // pouvait proposer que les vendeurs du site : la mixite etait inexprimable.
-  const siteA = await prisma.site.findFirstOrThrow({
+  // LES SITES SONT FABRIQUES DANS CHAQUE TRANSACTION, jamais pris en base — et
+  // c'est un correctif du 01/09/2026.
+  //
+  // Cette version prenait le site d'identifiant le plus bas. Sur une base neuve il
+  // n'a aucun encadrant, et tout passait. Sur SUPABASE, ou l'outil sert
+  // reellement, MASS avait deja un chef de site : `encadrementSite.create`
+  // heurtait l'unique `(site, role)` et TROIS controles viraient au rouge sans que
+  // rien ne soit casse.
+  //
+  // Pire, le controle voisin — « un SECOND encadrant sur le MEME (site, role) est
+  // refuse » — passait alors au VERT pour la mauvaise raison : c'est le PREMIER
+  // `create` qui echouait, pas le second. Un test qui reussit par accident est
+  // plus dangereux qu'un test qui echoue.
+  //
+  // Meme lecon que R-B.1 et R-B.5 : ce qui doit etre eprouve, c'est la contrainte,
+  // pas l'etat de la base ce jour-la.
+  const plaquePourEncadrement = await prisma.plaque.findFirstOrThrow({
     where: { archiveLe: null },
     orderBy: { id: 'asc' },
     select: { id: true },
   });
+
+  /// Un site VIERGE, cree dans la transaction annulee. Le code est unique en base :
+  /// on le suffixe pour que deux appels dans la meme transaction ne se heurtent pas.
+  const siteVierge = async (tx: Tx, suffixe: string) =>
+    tx.site.create({
+      data: {
+        code: `GF-${suffixe}`,
+        libelle: `GARDE-FOU ${suffixe}`,
+        plaqueId: plaquePourEncadrement.id,
+      },
+      select: { id: true },
+    });
   const deuxComptes = await prisma.utilisateur.findMany({
     where: { actif: true, archiveLe: null },
     orderBy: { id: 'asc' },
@@ -499,21 +678,23 @@ async function main() {
   if (deuxComptes.length >= 2) {
     const [a, b] = deuxComptes;
 
-    await doitAccepter('R-A3.7  un premier encadrant sur (site, role)', (tx) =>
-      tx.encadrementSite.create({
-        data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: a!.id },
-      })
-    );
+    await doitAccepter('R-A3.7  un premier encadrant sur (site, role)', async (tx) => {
+      const s = await siteVierge(tx, 'A');
+      return tx.encadrementSite.create({
+        data: { siteId: s.id, role: 'chef_de_site', utilisateurId: a!.id },
+      });
+    });
 
     await doitRefuser(
       'R-A3.7  un SECOND encadrant sur le MEME (site, role)',
       'Unique constraint',
       async (tx) => {
+        const s = await siteVierge(tx, 'A');
         await tx.encadrementSite.create({
-          data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: a!.id },
+          data: { siteId: s.id, role: 'chef_de_site', utilisateurId: a!.id },
         });
         return tx.encadrementSite.create({
-          data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: b!.id },
+          data: { siteId: s.id, role: 'chef_de_site', utilisateurId: b!.id },
         });
       }
     );
@@ -521,38 +702,40 @@ async function main() {
     // Les trois roles COEXISTENT sur un meme site : un chef de site, un chef de
     // vente VN, un chef de vente VO. C'est le cas des gros sites.
     await doitAccepter('R-A3.7  les trois roles coexistent sur un site', async (tx) => {
+      const s = await siteVierge(tx, 'A');
       await tx.encadrementSite.create({
-        data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: a!.id },
+        data: { siteId: s.id, role: 'chef_de_site', utilisateurId: a!.id },
       });
       await tx.encadrementSite.create({
-        data: { siteId: siteA.id, role: 'chef_de_vente_vn', utilisateurId: b!.id },
+        data: { siteId: s.id, role: 'chef_de_vente_vn', utilisateurId: b!.id },
       });
       return tx.encadrementSite.create({
-        data: { siteId: siteA.id, role: 'chef_de_vente_vo', utilisateurId: a!.id },
+        data: { siteId: s.id, role: 'chef_de_vente_vo', utilisateurId: a!.id },
       });
     });
 
     // UN MEME COMPTE ENCADRE PLUSIEURS SITES. Ce n'est pas une tolerance : c'est
     // le cas normal d'un chef de vente qui couvre deux concessions.
-    const siteB = await prisma.site.findFirst({
-      where: { archiveLe: null, id: { not: siteA.id } },
-      select: { id: true },
-    });
-    if (siteB) {
-      await doitAccepter('R-A3.7  un meme compte encadre DEUX sites', async (tx) => {
-        await tx.encadrementSite.create({
-          data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: a!.id },
-        });
-        return tx.encadrementSite.create({
-          data: { siteId: siteB.id, role: 'chef_de_site', utilisateurId: a!.id },
-        });
+    await doitAccepter('R-A3.7  un meme compte encadre DEUX sites', async (tx) => {
+      const s1 = await siteVierge(tx, 'A');
+      const s2 = await siteVierge(tx, 'B');
+      await tx.encadrementSite.create({
+        data: { siteId: s1.id, role: 'chef_de_site', utilisateurId: a!.id },
       });
-    }
+      return tx.encadrementSite.create({
+        data: { siteId: s2.id, role: 'chef_de_site', utilisateurId: a!.id },
+      });
+    });
 
-    await doitRefuser('CHECK  role d encadrement inconnu', 'encadrement_site_role_check', (tx) =>
-      tx.encadrementSite.create({
-        data: { siteId: siteA.id, role: 'chef_de_tout', utilisateurId: a!.id },
-      })
+    await doitRefuser(
+      'CHECK  role d encadrement inconnu',
+      'encadrement_site_role_check',
+      async (tx) => {
+        const s = await siteVierge(tx, 'A');
+        return tx.encadrementSite.create({
+          data: { siteId: s.id, role: 'chef_de_tout', utilisateurId: a!.id },
+        });
+      }
     );
 
     // Un compte DESACTIVE ne doit pas rester rattache : il donnerait un encadrant
@@ -561,9 +744,10 @@ async function main() {
       'R-A3.7  un compte desactive ne peut pas encadrer',
       'est desactive',
       async (tx) => {
+        const s = await siteVierge(tx, 'A');
         await tx.utilisateur.update({ where: { id: b!.id }, data: { actif: false } });
         return tx.encadrementSite.create({
-          data: { siteId: siteA.id, role: 'chef_de_vente_vn', utilisateurId: b!.id },
+          data: { siteId: s.id, role: 'chef_de_vente_vn', utilisateurId: b!.id },
         });
       }
     );
@@ -572,8 +756,9 @@ async function main() {
       'Interdit n.1  DELETE sur encadrement_site',
       'suppression interdite',
       async (tx) => {
+        const s = await siteVierge(tx, 'A');
         const e = await tx.encadrementSite.create({
-          data: { siteId: siteA.id, role: 'chef_de_site', utilisateurId: a!.id },
+          data: { siteId: s.id, role: 'chef_de_site', utilisateurId: a!.id },
         });
         return tx.$executeRawUnsafe('DELETE FROM relance.encadrement_site WHERE id = $1', e.id);
       }

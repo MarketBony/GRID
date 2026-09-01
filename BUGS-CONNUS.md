@@ -1,9 +1,132 @@
 # BUGS-CONNUS
 
-Mise a jour : 01/09/2026, apres la mise en service.
+Mise a jour : 01/09/2026, apres le signalement des vendeurs sortis.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
+
+---
+
+## Vendeurs sortis — 01/09/2026
+
+### [CORRIGE] Des vendeurs sortis en aout figuraient dans la session de septembre
+
+Signale par l'utilisateur. Trois vendeurs portant une date de sortie apparaissaient
+encore dans les tables de la campagne de septembre.
+
+**La vue `relance.perimetre_saisie` les excluait correctement** — l'ecran de SAISIE
+ne les proposait pas. C'est l'ecran des TABLES qui les montrait : il ne filtrait que
+`archive_le`, jamais la presence pendant la campagne. Deux ecrans, une campagne, deux
+reponses.
+
+`presenceVendeur.ts` porte pourtant la regle, et son propre bandeau dit « ni dans la
+saisie, ni dans les tables » — mais plus personne ne l'appliquait aux tables : seul
+`services/dashboard.ts` l'importait encore. La regle etait ecrite, pas branchee.
+
+Corrige a trois niveaux :
+
+| Niveau | Ce qui a change |
+|---|---|
+| Affichage | `services/tables.ts` applique `etaitPresent` a la reserve ET aux membres des tables |
+| Ecriture | trigger `affectation_vendeur_present` — un vendeur absent ne peut plus etre affecte |
+| Donnees | l'affectation de septembre restee active a ete archivee par `table_definir_vendeurs` |
+
+Le trigger manquait alors que `relance.session_reprendre` le supposait deja : son
+commentaire dit « verifie ici EN PLUS du trigger ». La ceinture existait, les
+bretelles non — et ni `table_definir_vendeurs` ni `session_appliquer_repartition` ne
+verifiaient quoi que ce soit.
+
+Verifie a l'ecran, sur la vraie base : les trois disparaissent de septembre, et
+PIERRE-EDOUARD LAROCHE **reste** en juin, ou il a travaille (10 RDV). La regle ne
+sur-filtre pas.
+
+### [CORRIGE] Une date d'entree pouvait effacer 29 RDV d'une campagne close, en silence
+
+**Trouve en verifiant le correctif precedent, pas cherche.**
+
+Deux vendeurs avaient recu une `date_entree` EGALE a leur `date_sortie` — 31/07 et
+31/08 — alors qu'ils avaient 13 et 16 RDV en JUIN. Le formulaire a deux champs de
+date independants ; les deux ont ete remplis.
+
+Consequence : le tableau de bord de juin affichait **1078 RDV au lieu de 1107**,
+effectif 97 au lieu de 99, Clermont 205 au lieu de 218. Sans erreur, sans
+avertissement, et sans rien qui relie la cause a l'effet — on saisit deux dates sur
+un ecran, et le total d'une campagne CLOSE bouge de 29 RDV.
+
+La donnee brute etait pourtant intacte : les 1107 RDV n'ont jamais bouge. **Seule la
+lecture mentait**, parce que `agregats.ts` ne compte que les RDV des vendeurs
+presents. C'est le defaut du classeur, reproduit par un autre chemin : un chiffre
+plausible et faux.
+
+La regle « un vendeur ne compte que dans les campagnes ou il etait la » n'est pas en
+cause — elle est juste, et elle est partout. **Ce sont les dates qui etaient
+fausses.** La reponse n'est donc pas d'assouplir la regle mais d'empecher qu'on
+puisse la mettre en contradiction avec des faits deja enregistres.
+
+Trigger `vendeur_dates_contre_rdv` : des dates qui excluraient un vendeur d'une
+campagne ou il a des RDV non archives sont refusees, avec un message qui NOMME la
+campagne et le nombre de RDV. Pour le cas legitime — un RDV attribue par erreur — il
+faut archiver le RDV d'abord : la correction porte sur le fait, pas sur la date qui
+le rend invisible.
+
+Les deux `date_entree` fautives ont ete retirees ; les dates de SORTIE, elles, sont
+voulues et restent. Juin est revenu a 1107 / 903 VN / 204 VO, verifie a l'ecran et
+par le recoupement avec les quatre series du classeur.
+
+### [CORRIGE] Trois controles de `test:garde-fous` dependaient de l'etat de la base
+
+Ils ont vire au rouge sur Supabase — pas en local — parce que la base y est
+REELLEMENT UTILISEE :
+
+- `R-A3.7` prenait « le site d'identifiant le plus bas ». MASS avait desormais un
+  chef de site : trois controles echouaient sur l'unique `(site, role)`. Pire, le
+  controle voisin — « un SECOND encadrant est refuse » — passait au VERT pour la
+  mauvaise raison, c'est le PREMIER `create` qui echouait ;
+- `R-B.5` prenait « un vendeur de la plaque encore libre ». Il est tombe sur
+  BAPTISTE DUBOIS, entre le 01/09, qu'un nouveau trigger refuse a bon droit dans une
+  table de JUIN. Le test accusait R-B.5 d'un refus venu d'ailleurs.
+
+Meme correctif que pour R-B.1 en son temps : **les fixtures sont fabriquees dans la
+transaction annulee, jamais choisies en base.** Ce qui doit etre eprouve, c'est la
+contrainte, pas l'etat de la base ce jour-la. 39/39 sur les deux bases.
+
+### [CONNU, NON CORRIGE] `test:rls` est couple aux donnees de production
+
+**La suite la plus importante du produit** — 87 controles sur la seule barriere
+d'autorisation — emprunte des comptes REELS et suppose leur configuration :
+`sbesson` « n'a aucun encadrement », `encadrant.test` encadre « CLF et MOZ ».
+
+Ces suppositions ne sont plus vraies : `sbesson` est devenue chef de site de MASS, et
+la ligne d'encadrement CLF d'`encadrant.test` a ete REPRISE par FRANCK TIXIER
+(l'unique `(site, role)` n'est pas partiel : `utilisateur_definir_encadrement` libere
+la ligne et la redonne). Deux changements parfaitement legitimes, faits depuis
+l'interface.
+
+Resultat : **82 OK, 5 ECHEC**. Les cinq s'expliquent par ces deux changements, et
+dans chaque cas **c'est le comportement observe qui est correct** :
+
+| Controle | Attendu par la suite | Observe | Qui a raison |
+|---|---|---|---|
+| perimetre de `encadrant.test` | 8 | 7 | l'observe — il n'encadre plus CLF |
+| perimetre de `sbesson` (juin) | 6 | 8 | l'observe — sa table (6) + MASS (2) |
+| `sbesson` sur l'autre campagne | 0 | 8 | l'observe — un encadrement de site est DURABLE |
+| `sbesson` ecrit hors de sa table | refuse | accepte | l'observe — le vendeur choisi est de MASS |
+| `sbesson` lit des RDV hors perimetre | 0 | 11 | l'observe — memes RDV, meme raison |
+
+**Aucune regression de securite.** La RLS fait exactement ce qu'elle doit ; ce sont
+les attentes de la suite qui sont perimees.
+
+**Aggravant, et c'est le vrai sujet : archiver les comptes `.test` DESARME la suite
+entierement.** Sa preparation leve `P2025` et pas un seul des 87 controles ne
+s'execute. Les 5 comptes ont donc ete REACTIVES apres avoir ete archives a la demande
+de l'utilisateur — un menage cosmetique ne vaut pas la mise hors service du garde-fou
+qui protege les donnees du groupe.
+
+**Correctif attendu :** `tester-rls.ts` doit fabriquer ses propres personas —
+comptes, encadrements, table, RDV — dans sa preparation, au lieu d'emprunter ceux de
+la production. C'est le meme remede que celui applique trois fois a
+`tester-garde-fous.ts` aujourd'hui. Tant que ce n'est pas fait, les comptes `.test`
+ne peuvent pas etre retires.
 
 ---
 

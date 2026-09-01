@@ -1,6 +1,30 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 01/09/2026, apres le chargement des 1107 RDV de juin.
+Mise a jour : 01/09/2026, apres le correctif des vendeurs sortis.
+
+---
+
+## 01/09/2026 — Deux triggers de plus, et la presence enfin appliquee partout
+
+**`affectation_vendeur_present`** — un vendeur absent d'une campagne ne peut plus etre
+affecte a ses tables. La regle existait dans `perimetre_saisie` et dans
+`session_reprendre` — dont le commentaire disait deja « verifie ici EN PLUS du
+trigger », alors que ce trigger n'existait pas. `table_definir_vendeurs`,
+`session_appliquer_repartition` et un INSERT direct ne verifiaient rien.
+
+**`vendeur_dates_contre_rdv`** — on ne peut plus poser des dates qui excluraient un
+vendeur d'une campagne ou il a des RDV non archives. Sans lui, deux dates saisies sur
+l'ecran Vendeurs retiraient 29 RDV des totaux de JUIN sans le moindre signal.
+
+Cote lecture, `services/tables.ts` applique desormais `etaitPresent` — a la reserve ET
+aux membres. C'etait le seul ecran a ne pas le faire, alors que `presenceVendeur.ts`
+dit lui-meme « ni dans la saisie, ni dans les tables ».
+
+`test:garde-fous` : **39 controles**, sur les deux bases.
+
+**A retenir pour la suite : une regle de perimetre doit etre appliquee AUX DEUX BOUTS**
+— la lecture qui affiche, et l'ecriture qui enregistre. Ecrite d'un seul cote, elle
+donne deux ecrans qui ne disent pas la meme chose sur la meme campagne.
 
 ---
 
@@ -218,7 +242,7 @@ backend/
     comptes-test.ts          un compte par perimetre ; compte via `perimetre_saisie`
     mot-de-passe.ts          change un mot de passe, ou liste les comptes
     comparer-bases.ts        diff local <-> Supabase, objet par objet
-    tester-garde-fous.ts     33 invariants de la base, chacun doit REFUSER
+    tester-garde-fous.ts     39 invariants de la base, chacun doit REFUSER
     tester-rls.ts            87 controles des politiques ET des RPC
     tester-invariants.ts     10 controles code <-> base (interdit n.6)
     tester-agregats.ts       27 controles des totaux, contre les 1107 RDV de juin
