@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Dashboard, Rang, Totaux } from '../services/dashboard';
+import { trierPar } from '../backend/src/utils/tri';
 
 // ============================================================================
 // PANNEAUX LIVE DU MODULE C.
@@ -8,7 +9,7 @@ import type { Dashboard, Rang, Totaux } from '../services/dashboard';
 // sont titres « CLASSEMENT LIVE ». Ces chiffres sont regardes PENDANT la session,
 // pas apres — c'est ce qui distingue cet outil d'un rapport.
 //
-// AUCUN CALCUL ICI. Tout vient de `/api/dashboard`, donc de `utils/agregats.ts`,
+// AUCUN CALCUL ICI. Tout vient de `services/dashboard.ts`, donc de `agregats.ts`,
 // verifie contre les 1107 RDV reels de juin 2026. Recalculer un total dans un
 // composant creerait un second endroit ou la regle vit : c'est exactement ce qui
 // a produit deux denominateurs de progression divergents.
@@ -125,7 +126,7 @@ function PanneauPlaque({
       return {
         titre: `Les tables de ${session?.plaqueLibelle ?? 'ma plaque'}`,
         axe: 'table' as const,
-        lignes: desMiennes.sort((a, b) => a.libelle.localeCompare(b.libelle, 'fr')),
+        lignes: trierPar(desMiennes, (t) => t.libelle),
       };
     }
 

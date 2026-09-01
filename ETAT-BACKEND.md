@@ -1,6 +1,70 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 31/08/2026, apres la bascule sans serveur.
+Mise a jour : 01/09/2026, apres la suppression du serveur mort.
+
+---
+
+## 01/09/2026 — `test:invariants`, et le code mort a ete retire
+
+**Ce qui restait d'Express a ete supprime**, la bascule ayant ete constatee en ligne :
+`src/index.ts`, `src/db.ts`, les 4 fichiers de `src/auth/` autres que `roles.ts`,
+`src/middleware/`, `src/realtime/`, les **10 routes**, et trois utilitaires devenus
+sans appelant (`json.ts`, `publicUser.ts`, `messageTrigger.ts`). Avec eux :
+`docker-compose.yml`, les deux Dockerfiles et leurs `.dockerignore`, `nginx.conf`,
+`grid.caddy`, `scripts/sauvegarde.sh`, le proxy `/api` de `vite.config.ts`, et six
+`.js`/`.js.map` compiles laisses a cote de leurs sources dans `prisma/`.
+
+**`backend/src/` ne contient plus QUE le code que le navigateur execute** — les cinq
+utilitaires partages, `auth/roles.ts`, et les deux suites de fonctions pures. C'est une
+frontiere qui se verifie d'un coup d'oeil : si un fichier de `src/` n'est pas dans le
+`include` du `tsconfig.json` du front ou dans une suite, il n'a rien a y faire.
+
+`messageTrigger.ts` a disparu parce qu'il decoupait la representation Prisma d'une
+exception. Le navigateur ne voit plus Prisma : c'est `messageLisible`
+(`services/supabase.ts`) qui retire le prefixe `RELANCE:` d'un message PostgREST. Les
+deux ne lisaient pas la meme forme — ce n'etait pas une duplication, c'est devenu un
+mort.
+
+### `test:invariants` — l'interdit n.6 avait cesse d'etre applique
+
+`verifierInvariants()` tournait **au demarrage du serveur**. Il n'y a plus de serveur :
+plus rien ne demarrait, donc plus rien ne comparait `auth/roles.ts` aux contraintes de
+la base. La regle etait redevenue une intention, ce que ce projet refuse partout ailleurs.
+
+Le controle est desormais `backend/prisma/tester-invariants.ts` — dans `prisma/` comme
+toutes les suites qui touchent la base, et non plus dans `src/utils/`. Trois familles :
+
+| Famille | Ce qu'elle compare | Compte |
+|---|---|---|
+| A | les 7 contraintes CHECK contre les 6 listes de valeurs | 7 |
+| B | `ROLES_GESTION_COMPTES` et `ROLES_ADMINISTRATION_REFERENTIELS` contre la source de `relance.peut_gerer_utilisateurs()` et `relance.peut_administrer()` | 2 |
+| C | **la couverture** : toute liste exportee par `roles.ts` doit etre citee en A ou en B | 1 |
+
+La famille B est une duplication **nee de la bascule vers la RLS** : les paliers existent
+maintenant en TypeScript ET en SQL. La famille C est ce qui empeche le controle de
+vieillir — sans elle, une septieme liste passerait inapercue et la suite serait verte en
+ne verifiant rien de la nouveaute.
+
+**Elle a trouve un ecart au premier passage.** `ROLES_ADMINISTRATION_REFERENTIELS` valait
+`['admin']` contre quatre implementations concordantes — `peutAdministrer`,
+`relance.peut_administrer()`, le calcul de `administre` dans `services/api.ts`, et le
+tableau des quatre paliers de `CLAUDE.md` — qui donnent toutes l'administration a
+`direction`. **Aucun code ne la lisait** : elle etait fausse sans consequence, donc
+invisible, et prete a egarer la personne suivante. Corrigee, et desormais lue par la
+suite a chaque passage.
+
+### Deux angles morts fermes au passage
+
+**Le typecheck du backend ne voyait pas `prisma/`.** Son `include` ne portait que sur
+`src/**` : les six suites, le seed, `comptes-auth`, `comptes-test` et `comparer-bases`
+n'etaient **jamais** typecheckes. `include` porte desormais sur `src/**` et `prisma/**`.
+
+**`comptes-test` recopiait le portail disparu.** Il comptait les vendeurs saisissables
+par `vendeursSaisissables` (`campagneScope.ts`). Il lit maintenant la vue
+`relance.perimetre_saisie`, en se faisant passer pour le compte — `request.jwt.claim.sub`,
+comme `tester-rls.ts` — **dans une transaction annulee**, parce qu'un compte de test n'a
+pas encore d'identite Supabase et qu'on lui en pose une le temps du comptage. Verifie :
+0 `auth_uid` en base apres passage.
 
 ---
 
@@ -99,40 +163,42 @@ changeant de machine, sans qu'aucune regle n'ait bouge.
 
 ## Arborescence
 
+**Etat au 01/09/2026, apres suppression du code mort.** Ce qui a disparu est liste dans
+la section du jour, en tete de fichier.
+
 ```
 backend/
   prisma/
     schema.prisma            source de verite du modele
-    migrations/              4 migrations, rejeu a blanc valide
+    migrations/              20 migrations, rejeu a blanc valide en CI
     donnees-source.ts        genere par scripts/extraire-seed.mjs — NE PAS EDITER
+    donnees-xlsx.ts          idem
+    rdv-juin-source.ts       les 1107 RDV reels de juin, pour test:agregats
     seed.ts                  seed idempotent
-    tester-garde-fous.ts     18 tests des invariants de la base
-  src/
-    index.ts                 point d'entree ; le controle d'invariants precede le listen
-    db.ts                    UNE instance de PrismaClient pour tout le processus
-    auth/
-      secret.ts              JWT_SECRET, refus de demarrer si absent ou trop court
-      roles.ts               listes de valeurs valides — PAS de referentiel metier
-      middleware.ts          authentifier(), signerJeton()
-      garde.ts               avecDroits(), exigerAdmin() — gardes de route
-      campagneScope.ts       LE PORTAIL — seule porte du cloisonnement
-    middleware/errorHandler.ts
-    realtime/index.ts        socket.io, salles par campagne, withEmitterContext
-    routes/
-      auth.ts                login, /moi
-      referentiels.ts        GET /api/referentiels — tient l'interdit n.3
-      vendeurs.ts            marques, import en deux temps, progression
-      campagnes.ts           campagnes, jours, creneaux, sessions — R-A.2
-      api.verif.ts           25 verifications de l'API (serveur en marche requis)
-      saisie.ts              perimetre de saisie d'un chef — TOUT en un appel
-      rdv.ts                 poser, corriger, archiver un RDV — R-C.2
+    comptes-auth.ts          cree les identites Supabase Auth et pose `auth_uid`
+    comptes-test.ts          un compte par perimetre ; compte via `perimetre_saisie`
+    mot-de-passe.ts          change un mot de passe, ou liste les comptes
+    comparer-bases.ts        diff local <-> Supabase, objet par objet
+    tester-garde-fous.ts     33 invariants de la base, chacun doit REFUSER
+    tester-rls.ts            87 controles des politiques ET des RPC
+    tester-invariants.ts     10 controles code <-> base (interdit n.6)
+    tester-agregats.ts       27 controles des totaux, contre les 1107 RDV de juin
+  src/                       LE SEUL CODE QUE LE NAVIGATEUR EXECUTE
+    auth/roles.ts            listes de valeurs valides — PAS de referentiel metier
     utils/
-      json.ts                patch BigInt.toJSON — a importer en PREMIER
-      publicUser.ts          projection publique, jamais de passwordHash
-      presenceVendeur.ts     presence d'un vendeur pendant une campagne — source unique
-      verifierInvariants.ts  controle code <-> base au demarrage
-      importMarques.ts       parseur du collage — fonction PURE, sans Prisma
-      importMarques.verif.ts 19 verifications du parseur
+      agregats.ts            tous les totaux — fonctions PURES
+      repartition.ts         repartition graine 42 — fonction PURE
+      repartition.verif.ts   20 verifications
+      importMarques.ts       parseur du collage — fonction PURE
+      importMarques.verif.ts 19 verifications
+      presenceVendeur.ts     presence d'un vendeur pendant une campagne
+      tri.ts                 tri et normalisation des libelles — source unique
+supabase/
+  functions/gerer-comptes/   SEUL CODE SERVEUR RESTANT (Deno, ~270 lignes)
+.github/workflows/
+  invariants.yml             interdit n.6, sur base neuve ET sur Supabase
+  keep-alive.yml             une requete tous les 3 jours (pause a 7 jours)
+  backup.yml                 dump hebdomadaire + EPREUVE DE RESTAURATION
 ```
 
 ## Routes
@@ -289,8 +355,13 @@ npm --prefix backend run test:repartition
 # Parseur d'import (19) — fonction pure, aucun prerequis
 npm --prefix backend run test:import
 
-# API (43) — exige le serveur en marche
-SEED_MOT_DE_PASSE=... npm --prefix backend run test:api
+# Politiques RLS et RPC (87) — les DEUX sens sur chaque palier
+npm --prefix backend run test:rls
+
+# Invariants code <-> base (10) — interdit n.6. Voir la section Invariants.
+npm --prefix backend run test:invariants
+
+# `test:api` (43) a ete supprimee avec l'API qu'elle testait.
 
 # Changer un mot de passe / lister les comptes
 MOT_DE_PASSE="..." npm --prefix backend run mot-de-passe -- admin
@@ -299,15 +370,14 @@ npm --prefix backend run mot-de-passe
 # Comptes de test, un par perimetre (voir ETAT-PROJET.md). Idempotent.
 MOT_DE_PASSE="..." npm run comptes-test
 
-# Serveurs. `dev` passe par tsx et non ts-node, absent du projet : nodemon
-# l'appelait par defaut et le script echouait, d'ou une API lancee a la main
-# et donc SANS rechargement automatique.
-npm --prefix backend run dev    # API sur 3001
-npm run dev                     # front sur 3000, proxifie /api et /socket.io
+# Serveur — il n'y en a plus qu'un. Le navigateur attaque Supabase en direct,
+# donc plus rien a lancer a cote et plus rien a proxifier.
+npm run dev                     # front sur 3000
                                 # strictPort : refuse de demarrer plutot que de
-                                # se rabattre silencieusement sur 3001
+                                # se rabattre silencieusement sur un autre port
 
-# Controles
+# Controles. Celui du backend couvre `src/**` ET `prisma/**` depuis le
+# 01/09/2026 : les six suites n'etaient jusque-la jamais typecheckees.
 npm --prefix backend run prisma:validate
 cd backend && npx tsc --noEmit
 npx tsc --noEmit                # front
@@ -355,24 +425,48 @@ client** n'est pas public — c'est ce que `redacterRdvs` protege.
 - **Un role ne se verifie pas sans parcourir son interface** avec un vrai compte. Des
   controles d'API exacts ont laisse passer deux fois une navigation complete.
 
-## Invariants — section citee par le message d'erreur de demarrage
+## Invariants — section citee par le message d'erreur de `test:invariants`
 
 Les listes de valeurs valides existent **deux fois** : dans `src/auth/roles.ts` et en
 contraintes CHECK dans la migration `invariants`. PostgreSQL ne peut pas importer du
 TypeScript, la duplication est inevitable.
 
-Ce qui ne l'est pas, c'est de la laisser « a synchroniser a la main ».
-**`utils/verifierInvariants.ts` compare les deux au demarrage du serveur et refuse de
-demarrer si elles divergent**, en nommant la liste en cause. Verifie : ajouter une valeur
-d'un seul cote empeche le boot.
+Depuis la bascule vers la RLS, il y en a **une troisieme** : les deux paliers hauts sont
+transcrits en SQL par `relance.peut_administrer()` et `relance.peut_gerer_utilisateurs()`.
+C'est la frontiere qui empeche `direction` de se promouvoir `admin` — elle ne doit pas
+pouvoir s'elargir d'un seul cote.
 
-Difference volontaire avec `scripts/check-plaques-sync.mjs` de GEARBOX : pas de script
-separe a penser a lancer, pas de branchement `predev`/`prebuild` a maintenir. Le controle
-est dans le chemin de demarrage, il ne peut pas etre contourne par oubli.
+Ce qui n'est pas inevitable, c'est de laisser tout cela « a synchroniser a la main ».
+
+**Le controle a change de nature le 01/09/2026, et il faut savoir pourquoi.** Il vivait
+dans `utils/verifierInvariants.ts` et s'executait **au demarrage du serveur** : ajouter
+une valeur d'un seul cote empechait le boot, dans la session ou la faute etait commise.
+C'etait le meilleur endroit possible. Il n'y a plus de serveur — donc plus de boot, donc
+plus de controle. La regle etait redevenue une note.
+
+**`npm --prefix backend run test:invariants`** reprend le role. Il perd l'immediatete du
+demarrage et gagne deux choses :
+
+- il tourne **sur les deux bases**, la ou le serveur n'en voyait qu'une. Une contrainte
+  peut diverger en production sans avoir bouge en local ;
+- il verifie **sa propre couverture** (famille C) : toute liste exportee par `roles.ts`
+  doit etre citee par un controle. Un garde-fou qui ne se met pas a jour tout seul finit
+  par ne garder que ce qui n'a pas bouge.
+
+Il est joue par `.github/workflows/invariants.yml`, en deux emplois qui ne repondent pas
+a la meme question : sur un **PostgreSQL 17 neuf** bati par `migrate deploy` (« le code
+et les migrations sont-ils d'accord ? », a chaque push, et qui prouve au passage que les
+20 migrations se rejouent depuis une base vide), et sur **Supabase** (« la base reelle
+est-elle encore d'accord ? », sur `master` et au declenchement manuel seulement — sur une
+branche, l'ecart est normal, et un rouge normal est un rouge qu'on apprend a ignorer).
 
 **Pour ajouter une valeur :** l'ajouter dans `roles.ts` ET dans une nouvelle migration qui
-remplace la contrainte CHECK. Le serveur refusera de demarrer entre les deux, ce qui est
-le comportement voulu.
+remplace la contrainte CHECK ou la fonction. `test:invariants` sera rouge entre les deux,
+ce qui est le comportement voulu.
+
+**Pour ajouter une LISTE :** l'ajouter aussi dans `CHECKS` ou `PALIERS` de
+`tester-invariants.ts`. La famille C refusera de passer tant que ce n'est pas fait — et
+c'est exactement son travail.
 
 ## Ce que Prisma ne gere pas, et pourquoi c'est sans danger
 
@@ -427,19 +521,29 @@ avec leur texte, pour que le chef de table lise la raison du refus.
 
 A ne jamais recopier ailleurs :
 
-| Fichier | Regle |
+**Etat au 01/09/2026.** Les entrees qui pointaient vers `auth/campagneScope.ts`,
+`utils/publicUser.ts`, `utils/messageTrigger.ts` et les deux routes ont suivi leurs
+fichiers : le perimetre est desormais une VUE, la projection publique est portee par les
+`GRANT` de colonnes, et la forme de la grille comme le compteur de progression vivent
+cote navigateur.
+
+| Source unique | Regle |
 |---|---|
-| `auth/campagneScope.ts` | Tout perimetre |
-| `utils/presenceVendeur.ts` | Presence d'un vendeur pendant une campagne — utilisee par le portail ET par l'effectif du dashboard |
-| `utils/publicUser.ts` | Projection d'un utilisateur, jamais de `passwordHash` |
-| `auth/roles.ts` | Listes de valeurs valides |
+| **`relance.perimetre_saisie`** (vue SQL) | **Tout perimetre.** Les politiques d'ecriture ET le front lisent celle-la, et rien d'autre |
+| `relance.rdv_agrege` (vue SQL) | Les RDV sans `client` ni `commentaire`. Le nom ne peut pas sortir puisqu'il n'est pas dans la vue |
+| Les `GRANT` de colonnes sur `utilisateur` | Ni `password_hash` ni `auth_uid` ne sont accordes a `authenticated` : la projection publique est tenue par la BASE, plus par une fonction qu'il faut penser a appeler |
+| `utils/presenceVendeur.ts` | Presence d'un vendeur pendant une campagne — utilisee par le perimetre ET par l'effectif du dashboard |
+| `auth/roles.ts` | Listes de valeurs valides. Comparees a la base par `test:invariants` |
 | `utils/agregats.ts` | **Tous les totaux, classements et moyennes du produit.** Fonctions pures, verifiees contre les 1107 RDV reels de juin |
 | `utils/repartition.ts` | La repartition automatique, graine 42. Pure |
-| `utils/messageTrigger.ts` | Le decoupage du message d'un trigger PostgreSQL. Existait en deux exemplaires qui ne decoupaient pas pareil |
-| `routes/vendeurs.ts` — `calculerProgression()` | Le compteur de progression |
-| `routes/saisie.ts` — le calcul des `sections` | La forme de la grille d'un vendeur |
-| `routes/vendeurs.ts` — `calculerProgression()` | Le compteur de progression. Deux implementations divergeaient d'un denominateur (99 contre 72) sans que rien ne le signale, parce que l'ecran n'appelait que l'une des deux |
-| `routes/saisie.ts` — le calcul des `sections` | La forme de la grille d'un vendeur |
+| `utils/tri.ts` | Tri et normalisation des libelles — `sansDiacritiques`, `cleTri`, `comparerLibelle`. Executee par le navigateur, pas recopiee |
+| `services/supabase.ts` — `messageLisible` | Le retrait du prefixe `RELANCE:` d'un message PostgREST |
+| `services/saisie.ts` — le calcul des `sections` | La forme de la grille d'un vendeur |
+
+`calculerProgression()` ne figure plus dans cette table : le compteur de « confirmes » a
+ete retire du produit (voir plus bas). Sa lecon, elle, reste — deux implementations
+divergeaient d'un denominateur, 99 contre 72, sans que rien ne le signale, parce que
+l'ecran n'appelait que l'une des deux.
 
 `presenceVendeur.ts` merite une explication : `schema.sql` comptait l'effectif d'un site
 avec `date_sortie is null`, c'est-a-dire les presents **aujourd'hui**, tout en
@@ -547,26 +651,40 @@ personne ne comprend pourquoi. Elles ne portent plus aucun statut.
 
 ## Le tri des libelles ne passe PAS par la base
 
-`backend/src/utils/tri.ts` — **source de verite unique** du tri des libelles cote backend.
+`backend/src/utils/tri.ts` — **source de verite unique** du tri des libelles, des DEUX
+cotes depuis le 01/09/2026.
 
 `order by nom asc` en SQL trie selon la collation de la base, qui n'est pas la meme en
-developpement (`French_France.1252`) et dans le conteneur de production (`en_US.utf8`) :
-sur les 101 vendeurs reels, cinq noms accentues changent de place. Les quatre routes qui
-rendent une liste de personnes trient donc **en JavaScript** :
+developpement (`French_France.1252`) et sur Supabase : sur les 101 vendeurs reels, cinq
+noms accentues changent de place. Les listes de personnes sont donc triees **en
+JavaScript**, dans le navigateur, avec la meme cle partout.
 
-| Route | Liste |
+`localeCompare('fr')` n'est PAS une reponse : il classe selon la version d'ICU du
+navigateur, donc deux postes du groupe pouvaient afficher la meme liste dans deux ordres.
+C'est le meme defaut que la collation, deplace d'un cran.
+
+**Sept sites du front recopiaient cette logique** — trois normalisations `NFD` a la main
+et quatre `localeCompare('fr')`. Ils importent desormais `tri.ts`, que le `tsconfig.json`
+du front declare : le navigateur execute CE code, pas une copie.
+
+| Fichier | Ce qu'il utilise |
 |---|---|
-| `GET /api/saisie/:campagneId` | les vendeurs du perimetre — la liste du module C |
-| `GET /api/referentiels` | les vendeurs, et les encadrants disponibles |
-| `GET /api/tables/session/:id` | la reserve, et les chefs de table possibles |
-| `GET /api/dashboard/:campagneId` | les vendeurs des agregats |
+| `pages/Saisie.tsx` | `cleTri` — la recherche du module C, insensible aux accents |
+| `pages/Vendeurs.tsx` | `cleTri` et `comparerLibelle` — le tri par colonne, dans chaque site |
+| `pages/Tables.tsx` | `comparerLibelle` — les chefs de table possibles |
+| `pages/Gestion.tsx` | `sansDiacritiques` — la proposition d'identifiant de compte |
+| `components/PanneauxLive.tsx` | `trierPar` — les tables de la plaque |
+| `hooks/useReferentiels.ts` | `comparerLibelle` — sites et vendeurs |
+| `utils/exportExcel.ts` | `sansDiacritiques` et `comparerLibelle` — nom de fichier, onglet Detail |
 
-`agregats.ts` importe la meme cle pour son departage des ex aequo. **Toute nouvelle route
-qui rend une liste de personnes doit trier avec `trierPar`** : le `orderBy` de Prisma est
-conserve comme pre-tri, il ne decide pas.
+Deux `localeCompare` subsistent volontairement dans `exportExcel.ts`, sur une date ISO et
+un code de creneau : des chaines ASCII, dont l'ordre ne depend d'aucune locale.
 
-Consequence utile : la collation de la base de production n'a plus aucun effet sur ce que
-voit l'utilisateur, et le choix d'image Postgres n'est plus une decision de produit.
+`agregats.ts` importe la meme cle pour son departage des ex aequo. **Toute nouvelle liste
+de personnes doit trier avec `trierPar` ou `comparerLibelle`.**
+
+Consequence utile : ni la collation de la base ni la version d'ICU du navigateur n'ont
+d'effet sur ce que voit l'utilisateur.
 
 ## Un seul vivier de personnes, deux selecteurs
 

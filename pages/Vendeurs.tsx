@@ -15,6 +15,10 @@ import {
   type VendeurReferentiel,
 } from '../services/referentiels';
 import type { Marque, Site, TypeVehicule } from '../types';
+// Comparaison de libelles SANS dependre de la locale : `localeCompare` peut
+// classer differemment selon la version d'ICU, et un tri qui change de machine
+// en machine n'est pas un tri. Source unique : `backend/src/utils/tri.ts`.
+import { cleTri, comparerLibelle } from '../backend/src/utils/tri';
 import {
   definirEncadrement,
   libelleRoleEncadrement,
@@ -445,20 +449,25 @@ function CarteSite({
   const visibles = useMemo(() => {
     const liste = vendeurs.filter((v) => afficherSortis || !v.dateSortie);
     const cle = (v: VendeurReferentiel): string | number => {
-      if (tri.colonne === 'nom') return sansAccent(v.nom);
+      if (tri.colonne === 'nom') return cleTri(v.nom);
       if (tri.colonne === 'metier') return v.typeVehicule;
       if (tri.colonne.startsWith('marque:')) {
         return v.marqueIds.includes(tri.colonne.slice(7)) ? 0 : 1;
       }
-      return sansAccent(v.nom);
+      return cleTri(v.nom);
     };
     return [...liste].sort((a, b) => {
       const ka = cle(a);
       const kb = cle(b);
       // Departage TOUJOURS par le nom : sans lui, deux vendeurs indiscernables
       // sur la colonne triee changeraient de place a chaque rendu.
+      //
+      // `comparerLibelle` plutot qu'une comparaison directe : il rend 0 pour deux
+      // noms VRAIMENT identiques, la ou l'ancien code rendait -1 dans ce cas et
+      // pretendait donc qu'un homonyme precede l'autre — un ordre qui s'inversait
+      // selon l'ordre d'arrivee des lignes.
       const primaire = ka < kb ? -1 : ka > kb ? 1 : 0;
-      const resultat = primaire !== 0 ? primaire : sansAccent(a.nom) < sansAccent(b.nom) ? -1 : 1;
+      const resultat = primaire !== 0 ? primaire : comparerLibelle(a.nom, b.nom);
       return tri.croissant ? resultat : -resultat;
     });
   }, [vendeurs, afficherSortis, tri]);
@@ -1131,15 +1140,6 @@ function FormulaireNouveauVendeur({
 
 const bascule = <T,>(liste: T[], v: T) =>
   liste.includes(v) ? liste.filter((x) => x !== v) : [...liste, v];
-
-/// Comparaison de libelles SANS dependre de la locale : `localeCompare` peut
-/// classer differemment selon la version d'ICU, et un tri qui change de machine
-/// en machine n'est pas un tri.
-const sansAccent = (s: string) =>
-  s
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toUpperCase();
 
 const libelleStatut = (l: LigneApercu): string => {
   switch (l.statut) {

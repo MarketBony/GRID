@@ -5,7 +5,7 @@
 « relance » — le schema PostgreSQL, le prefixe des messages de trigger, le vocabulaire
 metier — est liste dans CLAUDE.md.
 
-Mise a jour : 28/08/2026, fin de J3.
+Mise a jour : 01/09/2026, apres le nettoyage de la phase 8.
 
 Ce fichier est la memoire globale du projet : ce qui est fait, ce qui reste, et les
 decisions prises. Pour la methode de travail, lire `CLAUDE.md`. Pour l'etat detaille de
@@ -26,6 +26,57 @@ a committer mais le commit initial n'a pas ete fait.
 production, ou pousser signifie livrer. Ici seuls les commits locaux ont une utilite
 immediate : des points de retour. Le depot GitHub devient necessaire en J7, pour la deploy
 key du VPS et les workflows de sauvegarde.
+
+## 01/09/2026, soir — Le code mort est parti, l'interdit n.6 est de nouveau applique
+
+Dernier lot de la bascule. Deux choses, et la seconde a trouve un defaut.
+
+### `test:invariants` — une regle qui avait cesse d'etre appliquee
+
+`verifierInvariants()` comparait `auth/roles.ts` aux contraintes CHECK **au demarrage du
+serveur Express**. Il n'y a plus de serveur : plus rien ne demarrait, donc plus rien ne
+comparait. L'interdit n.6 etait redevenu une note — exactement ce que ce projet refuse
+partout ailleurs.
+
+C'est desormais une suite, `backend/prisma/tester-invariants.ts`, jouee comme les cinq
+autres et en CI par `.github/workflows/invariants.yml`, en deux emplois : sur un
+**PostgreSQL 17 neuf** bati par `migrate deploy` a chaque push — ce qui prouve au passage
+que les 20 migrations se rejouent depuis une base vide — et sur **Supabase** sur `master`.
+
+Elle couvre trois familles (detail dans `ETAT-BACKEND.md`), dont deux sont nouvelles :
+les **paliers** (`peut_administrer()` / `peut_gerer_utilisateurs()` contre leurs listes
+TypeScript), duplication nee de la bascule vers la RLS ; et **la couverture**, qui exige
+que toute liste exportee par `roles.ts` soit citee par un controle. Sans cette derniere,
+une septieme liste passerait inapercue et la suite serait verte en ne verifiant rien.
+
+**Elle a trouve un ecart au premier passage** — `ROLES_ADMINISTRATION_REFERENTIELS` valait
+`['admin']` contre quatre implementations qui donnent l'administration a `direction`.
+Fausse, lue par personne, donc invisible. Voir `BUGS-CONNUS.md`.
+
+### Phase 8 — 24 fichiers supprimes
+
+`src/index.ts`, `src/db.ts`, les 4 fichiers de `src/auth/` autres que `roles.ts`,
+`src/middleware/`, `src/realtime/`, les **10 routes**, trois utilitaires sans appelant,
+`docker-compose.yml`, les deux Dockerfiles et leurs `.dockerignore`, `nginx.conf`,
+`grid.caddy`, `scripts/sauvegarde.sh`, le proxy `/api` de `vite.config.ts`, et six
+`.js`/`.js.map` compiles laisses a cote de leurs sources.
+
+**`backend/src/` ne contient plus QUE le code que le navigateur execute.** La frontiere
+se verifie d'un coup d'oeil : un fichier de `src/` qui n'est ni dans l'`include` du front
+ni dans une suite n'a rien a y faire.
+
+Deux angles morts fermes au passage : le **typecheck du backend ne voyait pas `prisma/`**
+— les six suites n'etaient jamais typecheckees — et **`comptes-test` recopiait le portail
+disparu**, il lit maintenant la vue `perimetre_saisie`.
+
+### La dette de tri est soldee
+
+Sept sites du front recopiaient la normalisation ou triaient par `localeCompare('fr')`,
+qui classe selon la version d'ICU du navigateur : deux postes du groupe pouvaient
+afficher la meme liste dans deux ordres. Ils importent tous `backend/src/utils/tri.ts`,
+enrichi d'une primitive `sansDiacritiques`. Table detaillee dans `ETAT-BACKEND.md`.
+
+---
 
 ## 01/09/2026 — Le front parle a Supabase, l'API a disparu
 
@@ -134,14 +185,17 @@ navigateur.** Le backend Express disparaît. Zéro euro par mois.
    quiconque ouvre les outils de développement. C'est normal et sans risque — *à
    condition* que `test:rls` soit vert.
 3. **`test:api` (43 contrôles) a disparu** avec l'API qu'elle testait. Son rôle est repris
-   par `test:rls`, qui compte aujourd'hui **81 contrôles** et vérifie les deux sens.
+   par `test:rls`, qui compte aujourd'hui **87 contrôles** et vérifie les deux sens.
 
 ### Ce qui a survécu intact — et c'est la majorité
 
 Les 12 migrations existantes, `agregats.ts` et ses 27 contrôles contre les 1107 RDV réels,
 `repartition.ts` (graine 42) et ses 20 contrôles, `importMarques.ts` et ses 19, `tri.ts`,
-`messageTrigger.ts`, `presenceVendeur.ts`, et **tous les écrans React**. Trois des cinq
-suites n'ont pas bougé d'une ligne. C'est ce qui a rendu la bascule supportable.
+`presenceVendeur.ts`, et **tous les écrans React**. Trois des cinq suites n'ont pas bougé
+d'une ligne. C'est ce qui a rendu la bascule supportable.
+
+*(`messageTrigger.ts` figurait ici : il a été supprimé le 01/09/2026, sans appelant. Il
+découpait la représentation Prisma d'une exception, que le navigateur ne voit plus.)*
 
 ### Cinq migrations ajoutées
 
@@ -708,22 +762,28 @@ campagne sont libres**.
 | J5 | Module B — tables, glisser-deposer, repartition graine 42 | **fait** |
 | J6 | Module D — socle d'agregats, dashboard, export, panneaux live | **fait** |
 | J6+ | Passe UX, encadrants comme comptes, ecran Comptes, 4 paliers | **fait** |
-| J7 | v1 en ligne : depot GitHub, Postgres et API sur le VPS, Caddy, sauvegardes | **en cours** |
+| J7 | v1 en ligne : depot GitHub, Supabase, Cloudflare, sauvegardes | **fait** |
 
-Etat de J7 au 31/08/2026 :
+Etat de J7 au 01/09/2026. **La voie du VPS a ete abandonnee** le 31/08/2026 (« Gearbox
+reste Gearbox », et `grid.bonyauto-mobile.com` n'existe pas en DNS) : Docker, Caddy,
+nginx et `scripts/sauvegarde.sh` ont ete ecrits, valides, puis supprimes le 01/09/2026.
 
 | Etape | Etat |
 |---|---|
-| Renommage en GRID | **fait** |
-| Depot GitHub `MarketBony/GRID` cree, distant configure en HTTPS | **fait** |
-| Premier push | **en attente de l'OK** |
-| `docker-compose.yml`, Dockerfiles, `nginx.conf`, `grid.caddy` | **ecrits et valides sur le VPS** |
-| `scripts/sauvegarde.sh` — dump + **epreuve de restauration** + rotation | **ecrit**, pas encore joue |
-| `DEPLOIEMENT.md` — runbook, ecrit apres reconnaissance | **fait** |
-| Enregistrement DNS `grid.bonyauto-mobile.com` | **a creer, bloquant** |
-| Clone, `.env`, build et demarrage sur le VPS | a faire |
-| Bloc Caddy et certificat | a faire |
-| Copie de sauvegarde **hors du VPS** | a faire, et a ne pas oublier |
+| Renommage en GRID, logotype `public/grid.svg` | **fait** |
+| Depot GitHub `MarketBony/GRID` (prive), pousse | **fait** |
+| Projet Supabase `ganeczlhcprljuazldpp`, `eu-west-3` — 20 migrations, seed | **fait** |
+| RLS, 13 RPC, diffusion Realtime — `test:rls` 87/87 sur les deux bases | **fait** |
+| Front en ligne sur Cloudflare : `https://grid.bonyauto-mobile.workers.dev/` | **fait** |
+| Edge Function `gerer-comptes` — creation de comptes depuis l'interface | **fait** |
+| Les 14 comptes relies a Supabase Auth | **fait** |
+| `keep-alive.yml` — une requete tous les 3 jours (pause a 7 jours) | **fait, vert en CI** |
+| `backup.yml` — dump hebdomadaire + **epreuve de restauration** | **fait, vert en CI** |
+| `invariants.yml` — interdit n.6, base neuve ET Supabase | **fait** |
+| `DEPLOIEMENT.md` — runbook Supabase + Cloudflare | **fait** |
+| Copie de sauvegarde **hors du depot** | a faire, et a ne pas oublier |
+| Archiver les comptes `.test` sur Supabase avant la mise en service | **a faire** |
+| Rotation des trois secrets exposes en conversation | **a faire, cote utilisateur** |
 
 Hors perimetre avant la campagne : ecrans A1 (plaques) et A2 (sites), fournis par le seed
 et stables en septembre.

@@ -91,7 +91,25 @@ export const estOrigineValide = (v: unknown) => dansLaListe(ORIGINES_AFFECTATION
 // ---------------------------------------------------------------------------
 export const ROLES_GESTION_COMPTES: readonly RoleGlobal[] = ['admin'];
 
-// `lecteur` (la direction) n'apparait dans AUCUNE liste d'ecriture, et c'est ce
-// qui le rend lecture seule. Ne l'ajouter nulle part << pour faire propre >> :
-// c'est voulu, ce n'est pas un oubli.
-export const ROLES_ADMINISTRATION_REFERENTIELS: readonly RoleGlobal[] = ['admin'];
+// ADMINISTRATION des referentiels, des campagnes et des tables : `admin` ET
+// `direction`. La seule chose que `direction` ne peut pas faire, c'est gerer les
+// comptes — c'est la frontiere ci-dessus, et c'est la seule.
+//
+// CORRIGE LE 01/09/2026. Cette liste disait `['admin']`, seule contre quatre
+// implementations concordantes : `peutAdministrer` (campagneScope.ts),
+// `relance.peut_administrer()` (SQL), le calcul de `administre` dans
+// `services/api.ts`, et le tableau des quatre paliers de CLAUDE.md — qui donnent
+// tous l'administration a `direction`. Aucun code ne LISAIT cette constante :
+// elle etait fausse sans consequence, ce qui est la pire des deux situations —
+// une declaration morte qui contredit le comportement reel, et sur laquelle la
+// personne suivante se serait appuyee.
+//
+// Son ancien commentaire disait « `lecteur` (la direction) » : il confondait les
+// deux roles. `lecteur` est bien en lecture seule et n'apparait dans AUCUNE liste
+// d'ecriture — ne l'ajouter nulle part << pour faire propre >>, c'est voulu.
+// `direction`, lui, ecrit tout sauf les comptes.
+//
+// Cette liste n'est plus morte : `test:invariants` la compare a la source de
+// `relance.peut_administrer()` a chaque passage. Elles ne peuvent plus diverger
+// en silence.
+export const ROLES_ADMINISTRATION_REFERENTIELS: readonly RoleGlobal[] = ['admin', 'direction'];

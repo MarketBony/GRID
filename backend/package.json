@@ -2,11 +2,8 @@
   "name": "grid-backend",
   "version": "1.0.0",
   "private": true,
-  "main": "dist/index.js",
   "scripts": {
-    "start": "node dist/index.js",
-    "dev": "nodemon --exec tsx --watch src --ext ts,json src/index.ts",
-    "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "migrate:dev": "prisma migrate dev",
@@ -14,33 +11,23 @@
     "seed": "tsx prisma/seed.ts",
     "comptes-test": "tsx prisma/comptes-test.ts",
     "comptes-auth": "tsx prisma/comptes-auth.ts",
+    "mot-de-passe": "tsx prisma/mot-de-passe.ts",
+    "comparer": "tsx prisma/comparer-bases.ts",
     "test:garde-fous": "tsx prisma/tester-garde-fous.ts",
+    "test:rls": "tsx prisma/tester-rls.ts",
+    "test:invariants": "tsx prisma/tester-invariants.ts",
     "test:import": "tsx src/utils/importMarques.verif.ts",
     "test:agregats": "tsx prisma/tester-agregats.ts",
-    "test:repartition": "tsx src/utils/repartition.verif.ts",
-    "comparer": "tsx prisma/comparer-bases.ts",
-    "test:rls": "tsx prisma/tester-rls.ts",
-    "test:api": "tsx src/routes/api.verif.ts",
-    "mot-de-passe": "tsx prisma/mot-de-passe.ts"
+    "test:repartition": "tsx src/utils/repartition.verif.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",
     "bcryptjs": "^3.0.2",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.4",
-    "express": "^4.21.2",
-    "express-async-errors": "^3.1.1",
-    "jsonwebtoken": "^9.0.2",
     "prisma": "^6.19.1",
-    "socket.io": "^4.8.1",
     "tsx": "^4.20.6"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^4.17.23",
-    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.18.12",
-    "nodemon": "^3.1.10",
     "typescript": "~5.8.3"
   }
 }

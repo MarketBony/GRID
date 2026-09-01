@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { sansDiacritiques } from '../backend/src/utils/tri';
 import {
   chargerComptes,
   creerCompte,
@@ -359,9 +360,7 @@ function FormulaireCompte({
   /// PROPOSE sans l'imposer — deux homonymes existent, et c'est l'administrateur
   /// qui tranche.
   const proposer = (n: string) => {
-    const mots = n
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
+    const mots = sansDiacritiques(n)
       .toLowerCase()
       .split(/[^a-z0-9]+/)
       .filter(Boolean);

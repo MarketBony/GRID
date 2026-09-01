@@ -13,6 +13,7 @@ import {
 } from '../services/tables';
 import { chargerCampagnes, chargerCampagne, type CampagneResume } from '../services/campagnes';
 import { useTempsReel } from '../hooks/useTempsReel';
+import { comparerLibelle } from '../backend/src/utils/tri';
 
 // ============================================================================
 // ECRAN TABLES — module B, le constructeur.
@@ -535,7 +536,7 @@ function ColonneTable({
   // LES ENCADRANTS DE LA PLAQUE D'ABORD, puis ceux d'ailleurs, puis les comptes
   // sans rattachement. L'ordre est un confort de lecture, PAS un filtre :
   // l'exercice consiste justement a prendre un coach d'une autre concession.
-  const parNom = (a: { nom: string }, b: { nom: string }) => a.nom.localeCompare(b.nom, 'fr');
+  const parNom = (a: { nom: string }, b: { nom: string }) => comparerLibelle(a.nom, b.nom);
   const deLaPlaque = donnees.chefsPossibles.filter((u) => u.deLaPlaque).sort(parNom);
   const ailleurs = donnees.chefsPossibles
     .filter((u) => !u.deLaPlaque && u.encadrements.length > 0)

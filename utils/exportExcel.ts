@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx-js-style';
 import type { Dashboard } from '../services/dashboard';
 import type { PerimetreSaisie } from '../services/saisie';
 import { libelleJour } from './grille';
+import { comparerLibelle, sansDiacritiques } from '../backend/src/utils/tri';
 
 // ============================================================================
 // EXPORT EXCEL — F-D.7.
@@ -12,10 +13,10 @@ import { libelleJour } from './grille';
 //
 // CE QUE L'EXPORT CONTIENT, ET D'OU CA VIENT — c'est le point important :
 //
-//   - la SYNTHESE vient de `/api/dashboard`, donc des fonctions pures verifiees.
+//   - la SYNTHESE vient de `services/dashboard.ts`, donc des fonctions pures verifiees.
 //     Elle ne porte que des nombres : aucun nom de client n'y figure, par
 //     construction.
-//   - le DETAIL vient de `/api/saisie`, qui applique le portail. L'export
+//   - le DETAIL vient de `services/saisie.ts`, qui applique le portail. L'export
 //     contient donc exactement ce que ce compte voit deja a l'ecran — un chef de
 //     table exporte sa table, un administrateur exporte tout. On ne fabrique
 //     aucun acces que l'interface n'accorde pas.
@@ -63,9 +64,7 @@ function feuille(entetes: string[], lignes: Ligne[], largeurs: number[]) {
 /// Nom de fichier : la campagne, l'axe et LA DATE. Un export sans date se
 /// confond avec un autre au bout de deux jours.
 const nomFichier = (libelleCampagne: string, quand: Date) => {
-  const propre = libelleCampagne
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
+  const propre = sansDiacritiques(libelleCampagne)
     .replace(/[^A-Za-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
   const j = String(quand.getDate()).padStart(2, '0');
@@ -179,7 +178,8 @@ export function exporterDashboard(
 
   // ---------------------------------------------------------------- detail
   //
-  // Vient de `/api/saisie`, donc du portail : ce compte n'exporte que ce qu'il
+  // Vient de `services/saisie.ts`, donc de la vue `relance.perimetre_saisie` :
+  // ce compte n'exporte que ce qu'il
   // voit. Un chef de table exporte sa table.
   const vendeurParId = new Map(perimetre.vendeurs.map((v) => [v.id, v]));
   const marqueParId = new Map(marques.map((m) => [m.id, m.libelle]));
@@ -191,9 +191,13 @@ export function exporterDashboard(
       (a, b) =>
         a.jour.localeCompare(b.jour) ||
         a.creneauCode.localeCompare(b.creneauCode) ||
-        (vendeurParId.get(a.vendeurId)?.nom ?? '').localeCompare(
-          vendeurParId.get(b.vendeurId)?.nom ?? '',
-          'fr'
+        // Les deux premiers criteres sont des chaines ASCII — une date ISO et un
+        // code de creneau — dont l'ordre ne depend d'aucune locale. Le NOM, si :
+        // c'est le seul des trois qui doit passer par `comparerLibelle`, sans
+        // quoi l'onglet Detail ne serait pas classe pareil d'un poste a l'autre.
+        comparerLibelle(
+          vendeurParId.get(a.vendeurId)?.nom ?? '',
+          vendeurParId.get(b.vendeurId)?.nom ?? ''
         )
     )
     .map((r) => {

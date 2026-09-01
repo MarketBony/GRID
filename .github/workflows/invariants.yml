@@ -1,0 +1,129 @@
+# ============================================================================
+# INVARIANTS — interdit n.6, rendu a nouveau opposable.
+#
+# La regle : « aucune liste de valeurs dupliquee sans controle automatique ».
+# Elle etait tenue par `verifierInvariants()`, appele AU DEMARRAGE DU SERVEUR
+# Express : ajouter `superviseur` dans `auth/roles.ts` sans la migration
+# correspondante empechait `npm run dev` de demarrer.
+#
+# **Il n'y a plus de serveur.** Plus rien ne demarre, donc plus rien ne
+# verifiait. Ce workflow reprend le role, et le fait mieux sur un point : il
+# tourne sur DEUX bases, la ou le serveur n'en voyait qu'une.
+#
+# ---------------------------------------------------------------------------
+# DEUX EMPLOIS, ET ILS NE REPONDENT PAS A LA MEME QUESTION
+# ---------------------------------------------------------------------------
+#
+#   `migrations` — sur un PostgreSQL 17 NEUF, bati par `migrate deploy`.
+#                  Question : « le code et les MIGRATIONS sont-ils d'accord ? »
+#                  C'est ce qui est sous la main de celui qui pousse, donc il
+#                  tourne a chaque push et sur chaque branche. En prime, il
+#                  prouve que les 20 migrations se rejouent depuis une base
+#                  VIDE — ce que personne ne refait a la main.
+#
+#   `production` — sur Supabase. Question : « la base REELLE est-elle encore
+#                  d'accord avec le code ? » Une migration ecrite mais pas
+#                  deployee est invisible au premier emploi et flagrante ici.
+#                  Limite a `master` et au declenchement manuel : sur une
+#                  branche, l'ecart est normal et attendu, et un rouge normal
+#                  est un rouge qu'on apprend a ignorer.
+#
+# SECRET REQUIS pour `production` : `SUPABASE_DB_URL`, le meme que le keep-alive
+# et la sauvegarde. Le job est saute proprement s'il manque, plutot que de
+# tomber en erreur.
+# ============================================================================
+name: Invariants
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch: {}
+
+concurrency:
+  group: invariants-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -------------------------------------------------------------------------
+  migrations:
+    name: Code contre migrations (PostgreSQL neuf)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      base:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: invariants
+          POSTGRES_DB: relance
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # Les migrations creent elles-memes les roles `anon` / `authenticated` /
+      # `service_role` et la fonction `auth.uid()` SI ELLES SONT ABSENTES : c'est
+      # le prelude de `20260831201000_rls_portail`, ecrit exactement pour que le
+      # schema se rejoue sur un PostgreSQL nu. Aucun amorçage n'est donc
+      # necessaire ici — et si ce prelude se cassait un jour, ce job serait le
+      # premier a le dire.
+      DATABASE_URL: postgresql://postgres:invariants@localhost:5433/relance?schema=relance
+      DIRECT_URL: postgresql://postgres:invariants@localhost:5433/relance?schema=relance
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Installer les dependances du backend
+        run: npm --prefix backend ci
+
+      # Explicite plutot que de compter sur le postinstall de `@prisma/client` :
+      # `test:invariants` a besoin du client genere, et un postinstall silencieux
+      # qui ne trouve pas le schema donnerait une erreur d'import obscure.
+      - name: Generer le client Prisma
+        run: npm --prefix backend run prisma:generate
+
+      - name: Appliquer les migrations sur une base vide
+        run: npm --prefix backend run migrate:deploy
+
+      - name: test:invariants
+        run: npm --prefix backend run test:invariants
+
+  # -------------------------------------------------------------------------
+  production:
+    name: Code contre Supabase
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Installer les dependances du backend
+        run: npm --prefix backend ci
+
+      - name: Generer le client Prisma
+        run: npm --prefix backend run prisma:generate
+
+      - name: test:invariants sur Supabase
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::Secret SUPABASE_DB_URL absent — controle de la base reelle saute."
+            exit 0
+          fi
+          # Prisma lit `DATABASE_URL`. La chaine du secret est celle des
+          # migrations, elle porte donc deja `?schema=relance` — que Prisma
+          # comprend, contrairement a `psql`. Rien a retirer ici.
+          DATABASE_URL="$SUPABASE_DB_URL" npm --prefix backend run test:invariants

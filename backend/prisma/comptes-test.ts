@@ -1,7 +1,9 @@
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
-import { prisma } from '../src/db';
-import { chargerDroits, vendeursSaisissables } from '../src/auth/campagneScope';
+import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
+
+const prisma = new PrismaClient();
 
 // ============================================================================
 // COMPTES DE TEST — un compte par PERIMETRE, pour eprouver les vues ET la saisie.
@@ -243,29 +245,73 @@ async function main() {
   console.log(`  serveur. ${reels} sont des comptes REELS issus du seed : seul leur mot de`);
   console.log('  passe a ete aligne, leurs droits sont inchanges.');
   console.log('');
-  console.log('  Ce mot de passe est aussi celui de la suite API :');
-  console.log(`    $env:SEED_MOT_DE_PASSE = "${MDP}" ; npm run test:api`);
+  console.log('  Pour que ces comptes puissent SE CONNECTER, il faut encore leur creer une');
+  console.log('  identite Supabase Auth — la base ne porte plus que le lien :');
+  console.log(`    $env:MOT_DE_PASSE = "${MDP}" ; npm run comptes-auth -- --tous`);
   console.log('');
 }
 
 /// Le chiffre affiche passe par LE PORTAIL, pas par une clause recopiee. Deux
 /// raisons : il dit ce que le compte verra vraiment a l'ecran, et il echoue ici
 /// plutot qu'en session si le portail cesse d'accorder ce qu'on attend.
+///
+/// LE PORTAIL A CHANGE DE LANGAGE, PAS DE NATURE. Il etait `vendeursSaisissables`
+/// dans `auth/campagneScope.ts` ; c'est desormais la vue `relance.perimetre_saisie`,
+/// qui reunit les quatre memes origines de droit. Ce script lit donc la vue, et
+/// surtout PAS une transcription : le jour ou le perimetre changera, ce compte
+/// rendu changera avec lui sans que personne y touche.
+///
+/// COMMENT ON INTERROGE UNE VUE QUI DEPEND DE `auth.uid()`. La vue ne prend pas
+/// d'utilisateur en parametre : elle lit l'identite de la session, exactement
+/// comme PostgREST la lui donne. On se fait donc passer pour le compte —
+/// `request.jwt.claim.sub`, le meme levier que `tester-rls.ts`.
+///
+/// Un compte de test n'a pas encore d'identite Supabase (c'est `comptes-auth` qui
+/// les cree), donc on lui en pose une LE TEMPS D'UNE TRANSACTION ANNULEE. Rien
+/// n'est ecrit : ni l'`auth_uid` provisoire, ni le reglage, qui meurt avec la
+/// transaction comme tout `SET LOCAL`.
+const ROLLBACK = 'ROLLBACK_VOULU';
+
 const compterViaLePortail = async (utilisateurId: bigint, libelleCampagne: string) => {
   const c = await prisma.campagne.findUnique({
     where: { libelle: libelleCampagne },
     select: { id: true },
   });
   if (!c) throw new Error(`Campagne « ${libelleCampagne} » introuvable.`);
-  const droits = await chargerDroits(utilisateurId.toString());
-  const set = await vendeursSaisissables(droits, c.id.toString());
-  if (set.size === 0) {
+
+  const provisoire = randomUUID();
+  let compte = -1;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(
+        `UPDATE relance.utilisateur SET auth_uid = $1::uuid WHERE id = $2::bigint`,
+        provisoire,
+        utilisateurId.toString()
+      );
+      await tx.$executeRawUnsafe(
+        `SELECT set_config('request.jwt.claim.sub', $1, true)`,
+        provisoire
+      );
+      const [ligne] = await tx.$queryRawUnsafe<{ n: bigint }[]>(
+        `SELECT count(*)::bigint AS n FROM relance.perimetre_saisie WHERE campagne_id = $1::bigint`,
+        c.id.toString()
+      );
+      compte = Number(ligne!.n);
+      throw new Error(ROLLBACK); // rien de tout ceci ne doit subsister
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (!message.includes(ROLLBACK)) throw e;
+  }
+
+  if (compte === 0) {
     throw new Error(
       `Le compte n'a AUCUN vendeur saisissable sur « ${libelleCampagne} » apres pose de ses ` +
         'droits. Un compte de test sans perimetre afficherait un ecran vide : on refuse de le livrer.'
     );
   }
-  return set.size;
+  return compte;
 };
 
 const plaqueParLibelle = async (libelle: string) => {

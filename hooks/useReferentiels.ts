@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { chargerReferentiels, type Referentiels, type VendeurReferentiel } from '../services/referentiels';
 import type { Marque, Plaque, Site } from '../types';
+// `localeCompare('fr')` classe selon la version d'ICU du navigateur : deux
+// postes pouvaient donc afficher la meme liste dans deux ordres. Source unique
+// du tri : `backend/src/utils/tri.ts`.
+import { comparerLibelle } from '../backend/src/utils/tri';
 
 /// Charge les referentiels une fois et fournit les index dont les ecrans ont
 /// besoin. Aucun ecran ne reconstruit ces index de son cote : c'est la meme
@@ -36,14 +40,14 @@ export function useReferentiels() {
         .sort((a, b) => {
           const pa = donnees.plaques.find((p) => p.id === a.plaqueId)?.ordre ?? 0;
           const pb = donnees.plaques.find((p) => p.id === b.plaqueId)?.ordre ?? 0;
-          return pa - pb || a.libelle.localeCompare(b.libelle, 'fr');
+          return pa - pb || comparerLibelle(a.libelle, b.libelle);
         })
         .map((site) => ({
           site,
           plaque: donnees.plaques.find((p) => p.id === site.plaqueId) ?? null,
           vendeurs: donnees.vendeurs
             .filter((v) => v.siteId === site.id)
-            .sort((a, b) => a.nom.localeCompare(b.nom, 'fr')),
+            .sort((a, b) => comparerLibelle(a.nom, b.nom)),
         })),
     };
   }, [donnees]);

@@ -16,7 +16,7 @@ Trois usages du mot « relance » restent en place, et ce n'est pas un oubli :
 | Usage | Pourquoi il reste |
 |---|---|
 | Le schéma PostgreSQL `relance` | Le renommer voudrait dire une migration sur les 16 tables pour changer une chaîne que personne ne lit. Risque sans contrepartie |
-| Le préfixe `RELANCE:` des messages de trigger | Écrit dans les 19 fonctions de trigger et 13 migrations, et **retiré avant affichage** par `utils/messageTrigger.ts`. Aucun utilisateur ne le voit |
+| Le préfixe `RELANCE:` des messages de trigger | Écrit dans les 19 fonctions de trigger et 13 migrations, et **retiré avant affichage** par `messageLisible` (`services/supabase.ts`). Aucun utilisateur ne le voit |
 | Le vocabulaire métier — `relance`, `table_phoning`, `campagne` | C'est le métier, pas le produit. Une « relance » est un appel sortant : le renommer casserait le vocabulaire imposé plus bas |
 
 **Le logotype existe** depuis le 31/08/2026 : `public/grid.svg`, un G taillé dans un
@@ -70,8 +70,11 @@ arborescence, même pipeline, même discipline documentaire.
   côté front : ce serait une seconde implémentation à redémontrer
 - **Il n'y a plus d'API.** Le navigateur attaque Supabase en direct — PostgREST pour
   les lectures et les écritures simples, fonctions `security definer` pour tout ce
-  qui doit être transactionnel. `backend/` ne conserve que `prisma/` : le schéma,
-  les migrations, le seed et les suites de vérification
+  qui doit être transactionnel. `backend/` ne conserve que deux choses :
+  `prisma/` — schéma, migrations, seed, outils de comptes et les six suites — et
+  `src/`, réduit **au seul code que le navigateur exécute**. Express, les 10
+  routes, le portail `campagneScope.ts` et le serveur Realtime ont été supprimés
+  le 01/09/2026, une fois la bascule constatée en ligne
 - Le front appelle Supabase par `supabase-js`, avec `VITE_SUPABASE_URL` et
   `VITE_SUPABASE_ANON_KEY`. **Ces deux valeurs partent dans le bundle, c'est normal
   et sans risque** — à condition que `test:rls` soit vert : c'est la RLS qui protège,
@@ -284,10 +287,33 @@ l'urgence. Si une demande les enfreint, le dire et proposer l'alternative.
 5. **Pas de mise en forme conditionnelle des droits côté client seul.** Cacher un
    bouton n'est pas une sécurité. Le résumé de droits envoyé au front sert à l'affichage ;
    chaque appel est revalidé côté serveur.
-6. **Aucune liste de valeurs dupliquée sans contrôle automatique.** Les listes de rôles et
-   de modes existent dans `auth/roles.ts` et en contraintes CHECK :
-   `utils/verifierInvariants.ts` les compare **au démarrage du serveur** et refuse de
-   démarrer si elles divergent. Une note « à synchroniser » ne synchronise rien.
+6. **Aucune liste de valeurs dupliquée sans contrôle automatique.** Une note
+   « à synchroniser » ne synchronise rien.
+
+   *Reformulé le 01/09/2026.* La règle disait que `utils/verifierInvariants.ts`
+   comparait les listes **au démarrage du serveur**. C'était vrai, et c'était le
+   bon endroit : la faute se voyait dans la session où elle était commise.
+   **Il n'y a plus de serveur** — plus rien ne démarrait, donc plus rien ne
+   vérifiait, et l'interdit était redevenu une intention.
+
+   Le contrôle est désormais la suite `test:invariants`
+   (`backend/prisma/tester-invariants.ts`), jouée comme les cinq autres et en CI
+   par `.github/workflows/invariants.yml`. Il perd l'immédiateté du démarrage et
+   gagne de tourner **sur les deux bases**. Il couvre trois familles :
+
+   - les **7 contraintes CHECK** contre les 6 listes de valeurs de `auth/roles.ts` ;
+   - les **2 listes de paliers** (`ROLES_GESTION_COMPTES`,
+     `ROLES_ADMINISTRATION_REFERENTIELS`) contre `relance.peut_gerer_utilisateurs()`
+     et `relance.peut_administrer()` — duplication **née de la bascule vers la
+     RLS**, et c'est la frontière qui empêche `direction` de se promouvoir ;
+   - la **couverture** : toute liste exportée par `auth/roles.ts` doit être citée
+     par l'une des deux familles. Sans quoi une septième liste passerait
+     inaperçue, et le contrôle serait vert en ne vérifiant rien de la nouveauté.
+
+   Ce troisième contrôle a payé au premier passage : `ROLES_ADMINISTRATION_REFERENTIELS`
+   disait `['admin']` contre quatre implémentations qui donnent l'administration à
+   `direction`. Elle n'était lue par aucun code — fausse sans conséquence, donc
+   invisible, et prête à égarer la personne suivante.
 
 ## Conventions
 
@@ -335,7 +361,7 @@ dans une erreur.
 Repris de GEARBOX.
 
 1. **Modifications locales** sur une branche `fix/…`, `feat/…` ou `chore/…`.
-2. **Vérification locale avant tout commit** — les deux serveurs lancés, et un vrai test
+2. **Vérification locale avant tout commit** — le front lancé, et un vrai test
    dans le navigateur, pas seulement `tsc --noEmit`. Toute migration se joue en local
    d'abord, jamais directement en production.
 3. **Si les tests locaux passent : mettre à jour les `.md` AVANT de pousser.**
@@ -379,9 +405,10 @@ MOT_DE_PASSE="..." npm --prefix backend run comptes-auth -- --tous
 # Idempotent. Sans MOT_DE_PASSE, il en tire un au hasard et l'affiche une fois.
 MOT_DE_PASSE="..." npm run comptes-test
 
-# Les cinq suites de vérification. Aucune ne doit passer au rouge.
+# Les six suites de vérification. Aucune ne doit passer au rouge.
 npm --prefix backend run test:garde-fous    # 33 invariants, chacun doit REFUSER
-npm --prefix backend run test:rls           # 81 contrôles des politiques ET des RPC
+npm --prefix backend run test:rls           # 87 contrôles des politiques ET des RPC
+npm --prefix backend run test:invariants    # 10 contrôles code <-> base (interdit n.6)
 npm --prefix backend run test:import        # 19 tests du parseur, fonctions pures
 npm --prefix backend run test:agregats      # 27 tests des totaux, contre les 1107 RDV de juin
 npm --prefix backend run test:repartition   # 20 tests de la répartition graine 42
@@ -400,13 +427,16 @@ npm --prefix backend run comparer -- "<url de la base de référence>"
 # `test:api` (43 contrôles) a été SUPPRIMÉE avec l'API qu'elle testait. Son rôle est
 # repris par `test:rls`, qui vérifie les deux sens sur chaque palier.
 
-# Serveurs
-npm --prefix backend run dev   # API sur 3001
+# Serveur — IL N'Y EN A PLUS QU'UN. Le front attaque Supabase en direct : rien à
+# lancer à côté, et rien à proxifier (le proxy `/api` de `vite.config.ts` a été
+# retiré, il pointait vers un Express disparu).
 npm run dev                    # front sur 3000
 
-# Typecheck
+# Typecheck. Celui du backend couvre désormais `prisma/**` — les six suites et
+# les outils de comptes n'étaient JAMAIS typecheckés : `include` ne portait que
+# sur `src/**`, dont il ne reste que le code partagé avec le navigateur.
 npx tsc --noEmit                        # front
-cd backend && npx tsc --noEmit          # backend
+cd backend && npx tsc --noEmit          # backend + les suites
 npm --prefix backend run prisma:validate
 
 # Dérive Prisma — doit répondre « This is an empty migration. »

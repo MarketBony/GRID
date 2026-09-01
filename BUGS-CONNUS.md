@@ -1,9 +1,90 @@
 # BUGS-CONNUS
 
-Mise a jour : 31/08/2026, apres la bascule sans serveur.
+Mise a jour : 01/09/2026, apres le nettoyage de la phase 8.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
+
+---
+
+## Nettoyage et invariants — 01/09/2026, soir
+
+### [CORRIGE] L'interdit n.6 n'etait plus applique par rien
+
+`verifierInvariants()` comparait `auth/roles.ts` aux contraintes CHECK **au demarrage du
+serveur Express**. La bascule sans serveur a supprime le demarrage : plus rien ne
+comparait, et personne ne l'a remarque parce que **rien n'echouait**. C'est le mode de
+defaillance le plus couteux — un garde-fou qui disparait avec ce qu'il gardait.
+
+Rien n'avait diverge entre-temps sur les 7 contraintes CHECK. Mais la bascule avait cree
+**deux nouvelles duplications** que personne ne surveillait : les paliers, transcrits en
+SQL par `relance.peut_administrer()` et `relance.peut_gerer_utilisateurs()`.
+
+Remplace par la suite `test:invariants` (10 controles), jouee en CI par
+`.github/workflows/invariants.yml`. Detail dans `ETAT-BACKEND.md`.
+
+### [CORRIGE] `ROLES_ADMINISTRATION_REFERENTIELS` disait le contraire du produit
+
+**Trouve par `test:invariants` a son tout premier passage.**
+
+```
+ECHEC B  ROLES_ADMINISTRATION_REFERENTIELS = relance.peut_administrer()
+         code = [admin] mais fonction = [admin, direction]
+```
+
+La constante valait `['admin']`. Quatre implementations disaient l'inverse et
+s'accordaient entre elles : `peutAdministrer` (`campagneScope.ts`),
+`relance.peut_administrer()`, le calcul de `administre` dans `services/api.ts`, et le
+tableau des quatre paliers de `CLAUDE.md`. **`direction` administre les referentiels** —
+la seule chose qu'il ne peut pas faire, c'est gerer les comptes.
+
+Aucun code ne LISAIT cette constante. Elle etait donc fausse **sans consequence
+observable**, ce qui est la pire des deux situations : une declaration morte qui contredit
+le comportement reel, dans le fichier meme ou l'on va chercher la reponse. La personne
+suivante s'en serait servie.
+
+Son commentaire aggravait le cas : « `lecteur` (la direction) n'apparait dans aucune liste
+d'ecriture » confondait deux roles distincts.
+
+Corrigee en `['admin', 'direction']`, et elle n'est plus morte : `test:invariants` la
+compare a la source de la fonction SQL a chaque passage.
+
+**La lecon n'est pas la valeur, c'est le mecanisme.** Ce qui a trouve l'ecart, c'est le
+controle de COUVERTURE (famille C) : il exige que toute liste exportee par `roles.ts` soit
+citee par un controle, ce qui a force a en ecrire un pour celle-ci. Un garde-fou qui ne se
+met pas a jour tout seul finit par ne garder que ce qui n'a pas bouge.
+
+### [CORRIGE] Le typecheck du backend ne voyait pas les suites
+
+`backend/tsconfig.json` avait `include: ["src/**/*.ts"]`. Les six suites, le seed,
+`comptes-auth`, `comptes-test` et `comparer-bases` vivent dans `prisma/` : **ils n'ont
+jamais ete typecheckes**, alors qu'ils sont le filet de securite du projet. `include`
+porte desormais sur `src/**` et `prisma/**`. Aucune erreur n'est remontee — ce qui ne
+retire rien au fait que rien ne l'aurait signalee.
+
+### [CORRIGE] `comptes-test` recopiait un portail qui n'existait plus
+
+Il comptait les vendeurs saisissables par `vendeursSaisissables` (`campagneScope.ts`),
+supprime avec le reste d'Express. Il lit maintenant la vue `relance.perimetre_saisie` —
+le portail actuel — en se faisant passer pour le compte (`request.jwt.claim.sub`, comme
+`tester-rls.ts`), **dans une transaction annulee** : un compte de test n'a pas encore
+d'identite Supabase, on lui en pose une le temps du comptage. Verifie : 0 `auth_uid` en
+base apres passage.
+
+### [CORRIGE] Sept tris du front dependaient de la version d'ICU du navigateur
+
+`ETAT-BACKEND.md` documentait deja que `order by nom` depend de la collation de la base,
+et que `tri.ts` etait la source unique **cote backend**. Le front, lui, avait garde trois
+normalisations `NFD` recopiees a la main et quatre `localeCompare('fr')`.
+
+`localeCompare('fr')` classe selon la version d'ICU du navigateur : **deux postes du
+groupe pouvaient afficher la meme liste dans deux ordres**, et l'export Excel dans un
+troisieme. C'est le meme defaut que la collation, deplace d'un cran.
+
+Les sept sites importent desormais `backend/src/utils/tri.ts`, enrichi d'une primitive
+`sansDiacritiques`. Deux `localeCompare` restent volontairement dans `exportExcel.ts`, sur
+une date ISO et un code de creneau : des chaines ASCII, dont l'ordre ne depend d'aucune
+locale.
 
 ---
 
@@ -828,7 +909,9 @@ saut de ligne. Or tout tient sur une seule ligne : l'utilisateur lisait
 `... severity: "ERREUR", detail: None`. **Exactement la classe de defaut deja corrigee dans le
 gestionnaire d'erreurs global, reintroduite en la recopiant** — interdit n°6.
 
-Source unique : `utils/messageTrigger.ts`, consommee par les deux. Elle de-echappe aussi les
+Source unique de l'epoque : `utils/messageTrigger.ts` (supprime le 01/09/2026, sans
+appelant — le navigateur ne voit plus d'exception Prisma ; c'est `messageLisible` de
+`services/supabase.ts` qui retire le prefixe d'un message PostgREST). Elle de-echappe aussi les
 guillemets, ce qui reglait d'un coup les `la table \"Table 1\"` de tous les messages.
 
 ### [CORRIGE] Derive Prisma : un index cree en SQL sans etre declare

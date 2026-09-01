@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { GrilleVendeur } from '../components/GrilleVendeur';
 import { cleRdv } from '../utils/grille';
+import { cleTri } from '../backend/src/utils/tri';
 import { useTempsReel } from '../hooks/useTempsReel';
 import { PanneauxLive } from '../components/PanneauxLive';
 import { chargerDashboard, type Dashboard } from '../services/dashboard';
@@ -170,21 +171,16 @@ export function Saisie() {
   /// « THÉO » avec son accent dans un champ de recherche. Porte aussi sur le code
   /// site — « CLF » est une facon naturelle de filtrer.
   ///
+  /// `cleTri` est la MEME cle que celle du tri, et c'est voulu : chercher et
+  /// classer doivent considerer « AMELIE » et « AMÉLIE » comme un seul nom.
+  ///
   /// LE TOTAL AFFICHE EN PIED RESTE CELUI DU PERIMETRE ENTIER, jamais celui du
   /// filtre : un total qui change quand on cherche un nom serait un piege.
-  const sansAccent = (t: string) =>
-    t
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .toUpperCase();
-
   const vendeursAffiches = useMemo(() => {
     const tous = donnees?.vendeurs ?? [];
-    const q = sansAccent(recherche.trim());
+    const q = cleTri(recherche.trim());
     if (q === '') return tous;
-    return tous.filter(
-      (v) => sansAccent(v.nom).includes(q) || sansAccent(v.siteCode).includes(q)
-    );
+    return tous.filter((v) => cleTri(v.nom).includes(q) || cleTri(v.siteCode).includes(q));
   }, [donnees, recherche]);
 
   // ---------------------------------------------------------------- actions

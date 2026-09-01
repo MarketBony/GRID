@@ -229,35 +229,49 @@ deploiement.
 
 ---
 
-## Exploitation — deux points qui ne peuvent pas attendre
+## Exploitation — les trois workflows
+
+| Workflow | Quand | Ce qu'il fait |
+|---|---|---|
+| `keep-alive.yml` | tous les 3 jours | un `SELECT 1`. Le palier gratuit met le projet en **pause apres 7 jours d'inactivite**, et GRID ne sert que quelques jours par mois — sans lui, l'outil serait en panne un matin de session |
+| `backup.yml` | chaque lundi | `pg_dump` gzippe, **restaure dans un PostgreSQL 17 jetable**, lignes comptees, puis commite dans le depot. Retention : 8 |
+| `invariants.yml` | a chaque push, et sur `master` pour Supabase | `test:invariants` — interdit n.6. Prouve aussi que les 20 migrations se rejouent depuis une base VIDE |
 
 ### Le secret unique des workflows
 
-Les deux workflows lisent `SUPABASE_DB_URL` — la chaine du pooler en mode **SESSION**
-(port 5432), la meme que pour les migrations. A creer dans *Settings > Secrets and
-variables > Actions*.
+Les trois lisent `SUPABASE_DB_URL` — la chaine du pooler en mode **SESSION** (port 5432),
+la meme que pour les migrations. A creer dans *Settings > Secrets and variables >
+Actions*.
 
-Sans ce secret, les deux echouent AVEC UN MESSAGE EXPLICITE plutot qu'en silence : c'est
-delibere, un keep-alive qui ne fait rien sans le dire est pire que pas de keep-alive.
+Sans ce secret, `keep-alive` et `backup` echouent AVEC UN MESSAGE EXPLICITE plutot qu'en
+silence : c'est delibere, un keep-alive qui ne fait rien sans le dire est pire que pas de
+keep-alive. `invariants` est plus nuance — son emploi « base neuve » n'en a pas besoin et
+tourne quand meme ; seul l'emploi « Supabase » est saute, avec un avertissement.
 
-### Les sauvegardes sont a notre charge
+**La chaine porte `?schema=relance`, un parametre PRISMA.** `psql` et `pg_dump` le
+REFUSENT (« invalid URI query parameter: "schema" ») : `keep-alive` et `backup` le
+retirent eux-memes. `invariants`, qui passe par Prisma, le garde tel quel.
 
-**Le palier gratuit de Supabase n'en garantit aucune.** Motif eprouve sur gearbox : un
-workflow GitHub Actions fait un `pg_dump` gzippe et le commite dans le depot prive, avec
-rotation. Le depot **doit rester prive** — les dumps contiennent les donnees.
+### Les sauvegardes sont a notre charge, et elles sont EPROUVEES
 
-A reprendre de `gearbox/.github/workflows/backup.yml`, **augmente d'une epreuve de
-restauration** : un dump jamais restaure n'est pas une sauvegarde, c'est une intention —
-exactement comme une contrainte qu'on n'a jamais vue refuser quelque chose.
+**Le palier gratuit de Supabase n'en garantit aucune.** Le depot **doit rester prive** :
+les dumps contiennent les donnees, dont des noms de clients, et un dump purge reste dans
+l'historique git.
 
-### Le keep-alive, sinon l'outil sera en panne le jour de la session
+Le workflow **restaure** le dump qu'il vient de produire et compte les lignes. Un dump
+jamais restaure n'est pas une sauvegarde, c'est une intention — exactement comme une
+contrainte qu'on n'a jamais vue refuser quelque chose.
 
-Le palier gratuit met un projet en pause apres **7 jours d'inactivite**, et GRID ne sert
-que quelques jours par mois. Reprise de `gearbox/.github/workflows/keep-alive.yml` : un
-`SELECT 1` tous les trois jours.
+**Cette epreuve a justifie son existence au premier passage.** `pg_dump | gzip > fichier`
+rend le code de sortie de **gzip**, qui reussit toujours : le workflow produisait une
+archive VIDE affichee en vert. Corrige par `set -o pipefail`, plus un second filet
+independant — un dump sous 2 Ko est refuse.
 
-Secret requis pour les deux : `SUPABASE_DB_URL` (chaine du pooler **session**), dans
-*Settings > Secrets and variables > Actions*.
+**Ce que le dump ne contient PAS :** les identites Supabase Auth (`auth.users`). Elles
+appartiennent a Supabase et sont bon marche a refaire —
+`MOT_DE_PASSE="..." npm --prefix backend run comptes-auth -- --tous`. Apres une
+restauration, les `auth_uid` du dump pointent vers des identites disparues : c'est
+`comptes-auth` qui les reconstruit.
 
 ---
 
@@ -268,9 +282,11 @@ Secret requis pour les deux : `SUPABASE_DB_URL` (chaine du pooler **session**), 
 | Reecriture des 7 `services/*.ts` sur `supabase-js` | **fait** (01/09) |
 | `hooks/useTempsReel.ts` + trigger de diffusion | **fait**, diffusion prouvee dans le navigateur |
 | Edge Function `gerer-comptes` | **deployee** (version 3, `verify_jwt`). Refus verifie pour la cle publique, un encadrant et `direction` ; creation, connexion et suppression eprouvees de bout en bout |
-| Workflows keep-alive et sauvegarde | **ecrits**. Ne tournent qu'une fois le secret `SUPABASE_DB_URL` cree |
+| Workflows `keep-alive` et `backup` | **verts en CI**. Secret `SUPABASE_DB_URL` cree ; un dump de 24 Ko produit, restaure et commite |
+| Workflow `invariants` | **ecrit** — interdit n.6 sur base neuve et sur Supabase |
 | Les 14 comptes relies a Supabase Auth | **fait** — `admin` et les 7 chefs de table compris |
-| Workflows sauvegarde et keep-alive | a faire |
+| Reglage `site_url` de Supabase Auth vers l'URL Cloudflare | **fait** |
+| Suppression du code serveur mort (phase 8) | **fait** (01/09) |
+| Copie de sauvegarde **hors du depot** | a faire, et a ne pas oublier |
 | Archiver les comptes `.test` presents sur Supabase | avant mise en service |
-| Reglage `site_url` de Supabase Auth vers l'URL Cloudflare | apres branchement |
 | Revocation des secrets exposes en conversation | a faire par l'utilisateur |

@@ -20,7 +20,7 @@ import { BandeauKpi, BarresHorizontales, BarresParJour } from '../components/Gra
 // ============================================================================
 // ECRAN DASHBOARD — module D.
 //
-// AUCUN CALCUL ICI. Chaque nombre vient de `/api/dashboard`, donc de
+// AUCUN CALCUL ICI. Chaque nombre vient de `services/dashboard.ts`, donc de
 // `utils/agregats.ts`, verifie contre les 1107 RDV reels de juin 2026 par
 // `npm run test:agregats`. Recalculer quoi que ce soit dans ce fichier creerait
 // un second endroit ou la regle vit — et deux endroits finissent toujours par
@@ -121,7 +121,7 @@ export function Dashboard() {
     setErreur(null);
     setExportEnCours(true);
     try {
-      // LE DETAIL NOMINATIF VIENT DE `/api/saisie`, jamais du dashboard : les
+      // LE DETAIL NOMINATIF VIENT DE `services/saisie.ts`, jamais du dashboard : les
       // agregats ne portent aucun nom de client, et c'est voulu. La route de
       // saisie applique le portail, donc l'export contient exactement ce que ce
       // compte voit deja a l'ecran — ni plus, ni moins.
