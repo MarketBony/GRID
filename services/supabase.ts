@@ -163,17 +163,54 @@ export const txtOuNull = (v: number | string | bigint | null | undefined): strin
 ///
 /// Preferer une panne visible a un chiffre faux : c'est toute la raison d'etre de
 /// l'outil.
+///
+/// ---------------------------------------------------------------------------
+/// PAGINER SANS `ORDER BY` NE PAGINE PAS : CA TIRE AU SORT
+/// ---------------------------------------------------------------------------
+/// Corrige le 01/09/2026, et c'est le defaut le plus grave rencontre sur ce
+/// produit.
+///
+/// Cette fonction comparait deja le nombre rapatrie au `count` exact — mais elle
+/// laissait l'appelant construire une requete SANS ORDRE. Or `LIMIT/OFFSET` sur
+/// une requete non ordonnee n'a AUCUNE stabilite garantie : PostgreSQL peut
+/// rendre la page 2 dans un ordre qui repete des lignes de la page 1 et en omet
+/// d'autres. On rapatrie alors le BON NOMBRE de lignes, mais pas les BONNES.
+///
+/// Le controle de volume passe donc au vert pendant que les totaux sont faux —
+/// precisement le mode de defaillance que tout ce fichier cherche a interdire.
+/// Constate en vrai le 01/09/2026, sur les 1107 RDV de juin : le total du groupe
+/// tombait juste (1107) mais la ventilation VN/VO donnait 884/223 au lieu de
+/// 903/204, et trois sites etaient sur-comptes.
+///
+/// Le defaut etait INVISIBLE jusque-la parce qu'aucune campagne ne depassait
+/// 1000 RDV. Il est devenu reel le jour ou juin est entre en base.
+///
+/// LA CORRECTION N'EST PAS UNE NOTE << penser a ordonner >>. C'est cette
+/// fonction qui applique l'ordre, sur une colonne que l'appelant DOIT nommer :
+/// il ne peut plus l'oublier. Prendre la cle primaire, seule colonne dont
+/// l'unicite est garantie — ordonner sur `jour` ne departagerait pas deux RDV du
+/// meme jour, et le probleme reviendrait par la fenetre.
 const PAGE = 1000;
 
+/// Ce que `construire` doit rendre : de quoi lire la page, ET de quoi lui imposer
+/// un ordre. `postgrest-js` construit sa requete par accumulation, donc appeler
+/// `.order()` apres `.range()` est sans effet de bord.
+interface RequetePaginable<T> extends PromiseLike<{ data: T[] | null; error: unknown; count: number | null }> {
+  order(colonne: string, options?: { ascending?: boolean }): RequetePaginable<T>;
+}
+
 export async function toutesLesLignes<T>(
-  construire: (de: number, a: number) => PromiseLike<{ data: T[] | null; error: unknown; count: number | null }>
+  construire: (de: number, a: number) => RequetePaginable<T>,
+  /// La colonne d'ordre. **La cle primaire**, sauf raison ecrite : c'est la seule
+  /// dont l'unicite garantit que deux pages ne se recouvrent pas.
+  ordre: string
 ): Promise<T[]> {
   const lignes: T[] = [];
   let de = 0;
   let attendu: number | null = null;
 
   for (;;) {
-    const reponse = await construire(de, de + PAGE - 1);
+    const reponse = await construire(de, de + PAGE - 1).order(ordre, { ascending: true });
     if (reponse.error) throw erreurApi(reponse.error as { message?: string; code?: string });
     const page = reponse.data ?? [];
     if (attendu === null) attendu = reponse.count;

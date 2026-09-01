@@ -1,9 +1,92 @@
 # BUGS-CONNUS
 
-Mise a jour : 01/09/2026, apres le nettoyage de la phase 8.
+Mise a jour : 01/09/2026, apres le chargement des RDV de juin.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
+
+---
+
+## Chargement des RDV de juin — 01/09/2026
+
+### [CORRIGE] Paginer sans `ORDER BY`, ce n'est pas paginer : c'est tirer au sort
+
+**Le defaut le plus grave rencontre sur ce produit.**
+
+`toutesLesLignes` (`services/supabase.ts`) paginait par `.range(de, a)` et comparait
+le nombre rapatrie au `count` exact — un controle ecrit precisement pour empecher un
+total faux. **Aucun appelant n'ordonnait sa requete.** Or `LIMIT/OFFSET` sur une
+requete non ordonnee n'a aucune stabilite garantie : PostgreSQL peut rendre la page 2
+dans un ordre qui repete des lignes de la page 1 et en omet d'autres.
+
+On rapatrie alors le BON NOMBRE de lignes, mais pas les BONNES. **Le controle de
+volume passe au vert pendant que les totaux sont faux** — exactement le mode de
+defaillance que ce fichier cherchait a interdire.
+
+Constate en vrai, sur les 1107 RDV de juin :
+
+```
+OK    total de la campagne     1107 (attendu 1107)
+ECHEC ventilation VN / VO      VN 884 / VO 223 (attendu 903 / 204)
+ECHEC les 19 sites             MASSAGETTES : 22 au lieu de 20 ; MOZAC : 127 au lieu de 116
+```
+
+Le total juste, tout le reste faux.
+
+**Le defaut etait invisible depuis le debut** parce qu'aucune campagne ne depassait
+1000 RDV — la premiere page suffisait. Il est devenu reel a la seconde ou juin est
+entre en base, et il touchait les deux lectures du produit : le tableau de bord
+(`rdv_agrege`) et le module C (`rdv`).
+
+Trouve par le script d'import, dont la verification recoupe la base avec le classeur.
+Sans ce recoupement, le tableau de bord aurait affiche des chiffres plausibles et faux
+— le defaut de l'Excel qu'on remplace, reproduit a l'identique.
+
+**La correction n'est pas une note « penser a ordonner ».** `toutesLesLignes` prend
+desormais une colonne d'ordre en **parametre obligatoire** et l'applique elle-meme :
+un appelant ne peut plus l'oublier, le compilateur le refuse. On ordonne sur la cle
+primaire, seule colonne dont l'unicite garantit que deux pages ne se recouvrent pas —
+`jour` ne departagerait pas deux RDV du meme jour et le probleme reviendrait.
+
+Garde-fou permanent : `npm --prefix backend run importer-juin` (sans `--reel`, il
+n'ecrit rien) relit les 1107 RDV par la vue `rdv_agrege` et les recoupe avec quatre
+series du classeur. Si une pagination redevenait non ordonnee, il vire au rouge.
+
+### [CONNU, NON CORRIGE] Le module C ne sait pas montrer deux RDV dans la meme case
+
+Le tableau de bord de juin affiche **1107** RDV, le module C **1105**. Les deux lisent
+la meme base ; c'est l'affichage qui perd deux lignes.
+
+Cause : `pages/Saisie.tsx` indexe les RDV par `cleRdv(marqueId, creneauCode, jour)` —
+une entree par CASE de la grille. Or deux cases du classeur portent **deux
+rendez-vous** :
+
+| Vendeur | Quand | Clients |
+|---|---|---|
+| JEROME SABIN (CLF) | 15/06, 14h-15h, VO | DEVERNOIS **+** DE SOUSA |
+| REDWANE TOULOUSE (ISS) | 11/06, 08h-09h, VO | DAUBARD **+** COSTON |
+
+Un vendeur a pris deux clients dans la meme heure, et les deux noms ont ete tapes dans
+la meme cellule Excel. Ce ne sont pas des artefacts : les deux comptent dans les 1107,
+et les 1107 se recoupent a l'unite avec quatre series de totaux du classeur.
+
+Consequences, dans l'ordre de gravite :
+
+1. le compteur du module C sous-compte de 2 sur juin ;
+2. **le second client est invisible a l'ecran** — SABIN affiche `DE SOUSA`, jamais
+   `DEVERNOIS` ;
+3. saisir dans cette case ecraserait l'un des deux.
+
+**Rien n'a ete corrige, et surtout pas la donnee.** Fusionner les deux noms dans un
+seul RDV ferait concorder les compteurs en detruisant un fait : il y a eu deux
+rendez-vous. La base a raison, c'est la grille qui ne sait pas l'exprimer.
+
+Le choix appartient a l'utilisateur, et il n'est pas anodin — le modele « une case,
+un RDV » porte toute l'ergonomie clavier du module C, qui est le coeur du produit.
+Trois pistes, sans recommandation a ce stade : afficher un marqueur « 2 » sur la case
+et ouvrir un detail au clic ; empiler les valeurs dans la cellule ; ou accepter la
+limite et l'ecrire dans le mode d'emploi. **A trancher avant la session de
+septembre**, parce que le cas se reproduira.
 
 ---
 

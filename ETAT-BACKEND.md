@@ -1,6 +1,45 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 01/09/2026, apres la suppression du serveur mort.
+Mise a jour : 01/09/2026, apres le chargement des 1107 RDV de juin.
+
+---
+
+## 01/09/2026 — Juin est en base, et la pagination etait fausse
+
+Les 1107 RDV du classeur de juin sont charges dans la campagne Juin 2026 par
+`prisma/importer-rdv-juin.ts`. Trois choses a retenir de ce script.
+
+**Il ecrit par POSTGREST, pas par Prisma.** Les ports 5432 et 6543 etaient bloques par
+le reseau du bureau ce jour-la — les quatre hotes muets, alors qu'ils repondaient la
+veille. Ce n'est pas un pis-aller : ecrire par le chemin du navigateur fait passer les
+1107 lignes par la RLS et les 19 triggers. Une ecriture Prisma en direct aurait
+contourne la moitie des garde-fous et prouve moins.
+
+**Il verifie ce qu'il a ecrit, et refuse de se declarer reussi sans.** Il relit la base
+par la vue `rdv_agrege` — le chemin du tableau de bord — et recoupe avec les series du
+classeur : total 1107, ventilation 903/204, les 19 sites, la ligne 2 des onglets site
+(85 jours conformes, 10 ignores : GAILL et CARM portent un `#REF!`).
+
+**Il est idempotent et verifie meme a blanc.** Sans `--reel` il n'ecrit rien et
+controle tout : c'est devenu le garde-fou permanent de la pagination. La cle d'une
+ligne inclut le CLIENT et non la seule position dans la grille — deux cases du
+classeur portent deux rendez-vous.
+
+### `LIMIT/OFFSET` sans `ORDER BY` ne pagine pas
+
+`toutesLesLignes` (`services/supabase.ts`) comparait le nombre rapatrie au `count`
+exact, mais laissait l'appelant construire une requete **sans ordre**. Sur une requete
+non ordonnee, PostgreSQL peut rendre la page 2 dans un ordre qui repete des lignes de
+la page 1 et en omet d'autres : bon nombre de lignes, mauvaises lignes. Le controle de
+volume vert, les totaux faux.
+
+Corrige a la racine : la colonne d'ordre est un **parametre obligatoire** applique par
+la fonction. On prend la cle primaire — seule colonne dont l'unicite garantit que deux
+pages ne se recouvrent pas. `rdv_agrege` expose deja `r.id`, aucune migration n'a ete
+necessaire.
+
+A retenir pour toute nouvelle lecture paginee, ici comme ailleurs : **pagination =
+ordre stable + comparaison au compte exact.** L'un sans l'autre ne prouve rien.
 
 ---
 
@@ -183,6 +222,7 @@ backend/
     tester-rls.ts            87 controles des politiques ET des RPC
     tester-invariants.ts     10 controles code <-> base (interdit n.6)
     tester-agregats.ts       27 controles des totaux, contre les 1107 RDV de juin
+    importer-rdv-juin.ts     charge les 1107 RDV de juin, et les recoupe au classeur
   src/                       LE SEUL CODE QUE LE NAVIGATEUR EXECUTE
     auth/roles.ts            listes de valeurs valides — PAS de referentiel metier
     utils/

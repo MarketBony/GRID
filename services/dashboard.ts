@@ -191,9 +191,14 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
     };
   });
 
-  // LA LECTURE PAGINEE, ET VERIFIEE. `toutesLesLignes` compare le nombre rapatrie
+  // LA LECTURE PAGINEE, ORDONNEE ET VERIFIEE.
+  //
+  // Trois choses, et il en faut trois. `toutesLesLignes` ORDONNE sur `id` — sans
+  // ordre, deux pages d'une meme requete peuvent se recouvrir et le tableau de
+  // bord affiche des totaux faux avec le bon nombre de lignes (constate le
+  // 01/09/2026 sur les 1107 RDV de juin). Elle compare ensuite le nombre rapatrie
   // au `count` exact et LEVE en cas d'ecart : la limite de PostgREST tronque sans
-  // erreur, et un total faux affiche comme un total juste serait exactement le
+  // erreur. Un total faux affiche comme un total juste serait exactement le
   // defaut que ce produit remplace.
   const rdvs = await toutesLesLignes<{
     vendeur_id: number;
@@ -207,7 +212,8 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
       .select('vendeur_id, type_vehicule, marque_id, jour, creneau_code', { count: 'exact' })
       .eq('campagne_id', id)
       .is('archive_le', null)
-      .range(de, a)
+      .range(de, a),
+    'id'
   );
 
   return {

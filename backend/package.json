@@ -18,7 +18,8 @@
     "test:invariants": "tsx prisma/tester-invariants.ts",
     "test:import": "tsx src/utils/importMarques.verif.ts",
     "test:agregats": "tsx prisma/tester-agregats.ts",
-    "test:repartition": "tsx src/utils/repartition.verif.ts"
+    "test:repartition": "tsx src/utils/repartition.verif.ts",
+    "importer-juin": "tsx prisma/importer-rdv-juin.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",

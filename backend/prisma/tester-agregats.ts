@@ -26,10 +26,17 @@ import { AFFECTATIONS_JUIN, SITES, TABLES_JUIN, VENDEURS } from './donnees-sourc
 // Excel concordent a l'unite >>. Le seul controle qui prouve que le modele est
 // juste, et le seul qui distingue cet outil de celui qu'il remplace.
 //
-// Les 1107 RDV de juin 2026 sont donnes aux fonctions d'agregat EN MEMOIRE. Rien
-// n'est ecrit en base : c'est une decision explicite, la base ne recoit aucune
-// donnee de juin. Les fonctions etant pures, aucun serveur ni aucune base n'est
-// necessaire ici.
+// Les 1107 RDV de juin 2026 sont donnes aux fonctions d'agregat EN MEMOIRE. Les
+// fonctions etant pures, aucun serveur ni aucune base n'est necessaire ici, et
+// c'est ce qui fait la valeur de cette suite : elle est vraie partout, tout le
+// temps, sans prerequis.
+//
+// DEPUIS LE 01/09/2026, LE MEME RECOUPEMENT EXISTE SUR LA VRAIE BASE. Les 1107
+// RDV ont ete charges dans la campagne Juin 2026 ; `importer-rdv-juin.ts` les
+// relit par la vue `rdv_agrege` — le chemin du tableau de bord — et les recoupe
+// avec les memes series du classeur. Les deux controles se completent : celui-ci
+// prouve que le CALCUL est juste, l'autre que la DONNEE en base l'est aussi.
+// Aucun des deux ne remplace l'autre.
 //
 // La force du controle vient de son RECOUPEMENT. Le fichier porte les memes
 // totaux a quatre endroits independants : par vendeur et par site dans RESULTATS,

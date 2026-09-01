@@ -131,7 +131,8 @@ export async function chargerSaisie(campagneId: string): Promise<PerimetreSaisie
         .eq('campagne_id', id)
         .in('vendeur_id', ids)
         .is('archive_le', null)
-        .range(de, a)
+        .range(de, a),
+      'id'
     ),
     // Les tables auxquelles ces vendeurs appartiennent, pour intituler le
     // perimetre. Filtrees sur les tables que J'ANIME : c'est ce qui distingue

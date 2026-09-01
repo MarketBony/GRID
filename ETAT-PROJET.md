@@ -5,7 +5,7 @@
 « relance » — le schema PostgreSQL, le prefixe des messages de trigger, le vocabulaire
 metier — est liste dans CLAUDE.md.
 
-Mise a jour : 01/09/2026, apres le nettoyage de la phase 8.
+Mise a jour : 01/09/2026, apres le chargement des 1107 RDV de juin.
 
 Ce fichier est la memoire globale du projet : ce qui est fait, ce qui reste, et les
 decisions prises. Pour la methode de travail, lire `CLAUDE.md`. Pour l'etat detaille de
@@ -26,6 +26,68 @@ a committer mais le commit initial n'a pas ete fait.
 production, ou pousser signifie livrer. Ici seuls les commits locaux ont une utilite
 immediate : des points de retour. Le depot GitHub devient necessaire en J7, pour la deploy
 key du VPS et les workflows de sauvegarde.
+
+## 01/09/2026 — Les 1107 RDV de juin sont en base, et ils ont revele un defaut grave
+
+Sur demande de l'utilisateur, les 1107 RDV du classeur de juin sont charges dans la
+campagne Juin 2026. Motif : le tableau de bord de septembre porte un selecteur
+« Comparer a… » pointant sur juin ; avec une campagne vide il comparait a ZERO, donc
+chaque vendeur apparaissait en progression infinie — pire qu'une absence de
+comparaison.
+
+Cela revient sur une decision ecrite (`rdv-juin-source.ts` disait « aucune de ces
+lignes n'entre en base »). Elle etait juste tant que juin ne servait qu'a demontrer
+les agregats en memoire ; elle ne l'est plus.
+
+**Contrepartie a connaitre :** le champ `client` porte de VRAIS NOMS DE CLIENTS. Ils
+sont desormais dans une base hebergee ET dans les dumps hebdomadaires commites par
+`backup.yml`. Le depot doit rester prive, et c'est vrai pour une raison de plus.
+
+### Le critere de recette n.4 est tenu sur la vraie base
+
+`test:agregats` le demontrait en memoire, sur des fonctions pures. Le script d'import
+le rejoue sur la base : il relit les 1107 RDV **par la vue `rdv_agrege`** — le chemin
+du tableau de bord — et les recoupe avec les series du classeur.
+
+| Controle | Resultat |
+|---|---|
+| total de la campagne | 1107 |
+| ventilation VN / VO | 903 / 204 |
+| les 19 sites, total et VN/VO | tous conformes |
+| la ligne 2 des onglets site | 85 jours conformes, 10 ignores (GAILL et CARM, formule `#REF!`) |
+
+Verifie a l'ecran : le tableau de bord de juin affiche 1107 RDV, 903 VN / 204 VO,
+moyenne 11.18, Clermont-Ferrand 218 en tete, 0 concession a zero. Le planning de
+VALENTIN PARPINELLI reproduit l'onglet CLF **case pour case**.
+
+Le script est **idempotent et rejouable a blanc** : `npm --prefix backend run
+importer-juin` sans `--reel` n'ecrit rien et verifie tout. Il devient de fait le
+garde-fou permanent de la pagination.
+
+### Le defaut qu'il a trouve : paginer sans `ORDER BY`
+
+`toutesLesLignes` comparait le nombre de lignes rapatriees au `count` exact — mais
+aucun appelant n'ordonnait sa requete. `LIMIT/OFFSET` sans ordre n'a aucune stabilite
+garantie : on rapatrie le bon NOMBRE de lignes, pas les BONNES. Le controle de volume
+passe au vert pendant que les totaux sont faux.
+
+Constate : total 1107 juste, ventilation 884/223 au lieu de 903/204, trois sites
+sur-comptes. **Invisible depuis le debut** parce qu'aucune campagne ne depassait 1000
+RDV ; reel a la seconde ou juin est entre en base, sur les DEUX lectures du produit.
+
+Corrige a la racine : la colonne d'ordre est un parametre **obligatoire** de
+`toutesLesLignes`, applique par la fonction elle-meme. Un appelant ne peut plus
+l'oublier. Detail dans `BUGS-CONNUS.md`.
+
+### Un ecart assume : 1107 au tableau de bord, 1105 au module C
+
+Deux cases du classeur portent deux rendez-vous (un vendeur a pris deux clients dans
+la meme heure). Le module C indexe par CASE : le second RDV est invisible a l'ecran et
+absent du compteur. **La donnee est juste, c'est la grille qui ne sait pas
+l'exprimer.** Rien n'a ete corrige — le choix touche l'ergonomie clavier du module C,
+qui est le coeur du produit. A trancher avant septembre ; voir `BUGS-CONNUS.md`.
+
+---
 
 ## 01/09/2026, soir — Le code mort est parti, l'interdit n.6 est de nouveau applique
 

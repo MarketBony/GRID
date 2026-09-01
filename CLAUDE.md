@@ -413,6 +413,12 @@ npm --prefix backend run test:import        # 19 tests du parseur, fonctions pur
 npm --prefix backend run test:agregats      # 27 tests des totaux, contre les 1107 RDV de juin
 npm --prefix backend run test:repartition   # 20 tests de la répartition graine 42
 
+# Les 1107 RDV de juin, en base depuis le 01/09/2026. SANS `--reel`, il n'écrit
+# RIEN et vérifie tout : c'est le garde-fou permanent de la pagination.
+set -a; . ./.env.production; set +a
+MOT_DE_PASSE="..." npm --prefix backend run importer-juin            # vérifie
+MOT_DE_PASSE="..." npm --prefix backend run importer-juin -- --reel  # écrit ce qui manque
+
 # TOUTES SE JOUENT SUR LES DEUX BASES, et c'est le seul usage correct : une suite
 # verte en local ne dit rien de la production. Pour viser Supabase, charger son
 # environnement sans jamais l'afficher — le mot de passe ne doit pas finir dans
@@ -442,6 +448,16 @@ npm --prefix backend run prisma:validate
 # Dérive Prisma — doit répondre « This is an empty migration. »
 cd backend && npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script
 ```
+
+**Toute lecture paginée porte un ORDRE STABLE, et pas seulement un contrôle de
+volume.** `LIMIT/OFFSET` sur une requête non ordonnée n'a aucune stabilité garantie :
+la page 2 peut répéter des lignes de la page 1 et en omettre d'autres. On rapatrie
+alors le **bon nombre** de lignes et pas les **bonnes** — le contrôle de volume passe
+au vert pendant que les totaux sont faux. Constaté le 01/09/2026 sur les 1107 RDV de
+juin : total juste, ventilation VN/VO fausse, trois sites sur-comptés. Invisible tant
+qu'aucune campagne ne dépassait 1000 RDV. `toutesLesLignes` exige donc une colonne
+d'ordre **en paramètre** et l'applique elle-même : ce n'est pas une consigne, c'est
+une signature. Prendre la clé primaire, jamais une colonne non unique.
 
 **Les agrégats se vérifient contre le fichier réel.** `test:agregats` donne aux fonctions
 pures de `utils/agregats.ts` les 1107 RDV de juin 2026 **en mémoire** — rien n'entre en base —

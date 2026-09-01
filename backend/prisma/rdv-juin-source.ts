@@ -2,11 +2,23 @@
 // LES 1107 RDV DE JUIN 2026, extraits du classeur par `scripts/extraire-xlsx.mjs`.
 // NE PAS EDITER A LA MAIN : rejouer l'extraction.
 //
-// A QUOI CE FICHIER SERT, ET A QUOI IL NE SERT PAS
+// A QUOI CE FICHIER SERT
 //
-// Il alimente UNIQUEMENT `src/utils/agregats.verif.ts`. Ni le seed ni l'API ne le
-// lisent, et aucune de ces lignes n'entre en base : c'est une decision explicite,
-// la base ne recoit aucune donnee de juin.
+// Il alimente `tester-agregats.ts` — les 27 controles du critere de recette n.4,
+// joues sur des fonctions PURES, sans base ni serveur.
+//
+// CORRECTION DU 01/09/2026. Ce bandeau disait : « aucune de ces lignes n'entre en
+// base : c'est une decision explicite, la base ne recoit aucune donnee de juin ».
+// Ce n'est plus vrai. Les 1107 lignes ont ete chargees dans la campagne Juin 2026
+// par `importer-rdv-juin.ts`, sur demande de l'utilisateur.
+//
+// La raison est le tableau de bord : septembre porte un selecteur « Comparer a… »
+// pointant sur juin, et avec une campagne vide il comparait a zero — chaque
+// vendeur en progression infinie, ce qui est pire qu'une absence de comparaison.
+//
+// Ce fichier reste malgre tout la REFERENCE, et pas une copie de la base : c'est
+// lui qui dit ce que la base DOIT contenir, et `importer-rdv-juin.ts` recoupe les
+// deux a chaque passage.
 //
 // Sa raison d'etre est le critere de recette n.4 — << les totaux de l'outil et ceux
 // du fichier Excel concordent a l'unite >>. Le produit existe parce que les agregats
