@@ -1,9 +1,101 @@
 # BUGS-CONNUS
 
-Mise a jour : 01/09/2026, apres l'autonomie de `test:rls`.
+Mise a jour : 03/09/2026, apres l'empilement des RDV dans une case.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
+
+---
+
+## Hygiene des droits et vitesse des suites — 03/09/2026
+
+### [CORRIGE] Les 12 fonctions de trigger etaient executables par PUBLIC
+
+Et les chiffres annonces etaient faux, tous les trois. `ETAT-PROJET.md` disait
+« 10 alertes de l'analyseur Supabase sur `diffuser_rdv()` et les 11 fonctions
+`verifier_*()` » — un enonce qui se contredit lui-meme, 12 fonctions ne faisant pas
+10 alertes. Mesure du 03/09, identique sur les deux bases :
+
+| | |
+|---|---|
+| fonctions de trigger dans `relance` | **14** |
+| dont `EXECUTE` accorde a PUBLIC | **12** |
+| dont `security definer` **et** PUBLIC — les alertes reelles | **9** |
+| fonctions *appelables* `security definer` exposees | **0** |
+
+Les 3 du delta — `interdire_suppression()`, `tracer_creation()`,
+`tracer_modification_rdv()` — sont bien exposees mais `security invoker`, donc hors de
+cette alerte ; ce qui ne les rend pas plus legitimes. La dixieme alerte n'existe pas
+dans l'etat present de la base : elle a probablement disparu avec les deux migrations
+du 01/09, les seules a porter deja leur propre `REVOKE`.
+
+**Aucun chemin d'exploitation, et ce n'etait pas la raison.** Les 14 sont
+`RETURNS trigger` : PostgreSQL refuse un appel direct (`0A000`) et PostgREST ne les
+expose pas au catalogue (`404 PGRST202`). Ce qu'on ferme, c'est le BRUIT — neuf
+alertes qui ne signifient rien noient celles qui signifieraient quelque chose.
+
+`20260903065812_revoquer_execute_public` boucle sur
+`prorettype = 'trigger'::regtype` : **aucun nom n'est ecrit dans le fichier**, et une
+quinzieme fonction serait couverte le jour ou la migration passe. Elle echoue
+bruyamment si la boucle ne trouve rien — une boucle vide est indiscernable d'une
+boucle qui a travaille.
+
+Deux points declares :
+
+- **elargissement assume** — la revocation porte aussi sur `anon` et `authenticated`,
+  alors que la demande parlait de `PUBLIC` seul. Leur droit etait herite de PUBLIC
+  (verifie : les 24 RPC appelables ont garde leur `authenticated`). Ne fermer que
+  PUBLIC laisserait un futur `GRANT ... TO authenticated` faire taire l'analyseur en
+  laissant la fonction appelable par tout compte connecte ;
+- **une migration est un evenement, pas une regle.** Elle ne couvre pas la fonction
+  ecrite demain. D'ou **deux controles ajoutes a `test:rls`** : l'invariant en
+  `NOT EXISTS` structurel, et son garde-fou de non-vacuite (« >= 10 fonctions de
+  trigger »), sans lequel le premier serait vert en ne verifiant rien. La suite passe
+  de 87 a **89 controles**.
+
+Preuve que le nouveau controle n'est pas vert a vide : joue sur Supabase avant que la
+migration n'y passe, il en etait **le seul echec** (88/89).
+
+Le controle qui comptait vraiment : `test:garde-fous` reste a **39/39**. PostgreSQL
+verifie `EXECUTE` au `CREATE TRIGGER`, jamais au declenchement — mais ca ne se croit
+pas sur parole, ca se mesure. Revoquer trop large etait le seul vrai risque du lot.
+
+### [CORRIGE] `test:rls` mettait 2 min 12 sur Supabase
+
+La cause n'etait pas le volume — 25 lignes de decor — mais le NOMBRE
+D'ALLERS-RETOURS : `poserDecor` faisait **24** `INSERT` distincts, rebatis dans
+chacune des 87 transactions, soit ~2 000 latences reseau vers eu-west-3.
+
+Il en fait **2**, par CTE modifiantes.
+
+| | avant | apres |
+|---|---|---|
+| Supabase | 2 min 12 | **31 s** |
+| local | 5 s | **2 s** |
+
+**L'isolement conquis le 01/09 n'a pas bouge d'un cran** : chaque controle garde sa
+transaction et son decor neuf, et la suite ne depend d'aucune donnee de production.
+
+**Deux instructions et non une**, et ce n'est pas un manque de soin. Dans une
+instruction a CTE modifiantes, toutes les branches partagent le meme instantane : une
+branche ne voit pas les lignes qu'une branche voisine vient d'inserer. Les cles
+etrangeres s'en accommodent — elles sont verifiees par des triggers AFTER, en fin
+d'instruction — mais pas les triggers BEFORE, qui lisent pendant. Or deux tables du
+decor en portent six qui interrogent d'autres tables (mesure sur les **30 triggers non
+internes** du schema — la doc en annonce 19 ailleurs, comptage perime) :
+
+| Table | Triggers `BEFORE` qui lisent ailleurs |
+|---|---|
+| `encadrement_site` | `verifier_encadrant_actif` lit `utilisateur` |
+| `affectation` | `verifier_affectation_meme_plaque`, `..._unique`, `..._marque_table`, `..._presence` lisent `vendeur`, `site`, `plaque`, `table_phoning`, `session_plaque`, `campagne` |
+
+Les mettre dans la meme instruction que leurs dependances, c'est demander a quatre
+garde-fous de se prononcer sur un monde qu'ils ne voient pas encore. Ils
+refuseraient — ou, bien pire, accepteraient pour la mauvaise raison. D'ou la coupure.
+
+Il reste ~3 allers-retours par controle (pose de l'`auth_uid`, `set_config`,
+`SET LOCAL ROLE`). Les replier ferait gagner encore ~10 %, ce qui n'a pas paru valoir
+la perte de lisibilite du helper `sousIdentite`.
 
 ---
 
@@ -160,6 +252,9 @@ Contrepartie mesuree : 2 min 12 sur Supabase contre quelques secondes avant — 
 decor est rebati a chaque controle, soit ~25 lignes x 87 allers-retours reseau. En
 local, 5 secondes. C'est le prix de l'independance, et il est payant.
 
+**Ce prix a ete ramene a 31 s le 03/09/2026 sans rien ceder de l'independance** —
+voir la section du 03/09 plus bas.
+
 ---
 
 ## Mise en service — 01/09/2026
@@ -267,10 +362,10 @@ Garde-fou permanent : `npm --prefix backend run importer-juin` (sans `--reel`, i
 n'ecrit rien) relit les 1107 RDV par la vue `rdv_agrege` et les recoupe avec quatre
 series du classeur. Si une pagination redevenait non ordonnee, il vire au rouge.
 
-### [CONNU, NON CORRIGE] Le module C ne sait pas montrer deux RDV dans la meme case
+### [CORRIGE le 03/09/2026] Le module C ne savait pas montrer deux RDV dans la meme case
 
-Le tableau de bord de juin affiche **1107** RDV, le module C **1105**. Les deux lisent
-la meme base ; c'est l'affichage qui perd deux lignes.
+Le tableau de bord de juin affichait **1107** RDV, le module C **1105**. Les deux
+lisent la meme base ; c'etait l'affichage qui perdait deux lignes.
 
 Cause : `pages/Saisie.tsx` indexe les RDV par `cleRdv(marqueId, creneauCode, jour)` —
 une entree par CASE de la grille. Or deux cases du classeur portent **deux
@@ -292,16 +387,84 @@ Consequences, dans l'ordre de gravite :
    `DEVERNOIS` ;
 3. saisir dans cette case ecraserait l'un des deux.
 
-**Rien n'a ete corrige, et surtout pas la donnee.** Fusionner les deux noms dans un
-seul RDV ferait concorder les compteurs en detruisant un fait : il y a eu deux
-rendez-vous. La base a raison, c'est la grille qui ne sait pas l'exprimer.
+**LA DONNEE N'A PAS ETE TOUCHEE.** Fusionner les deux noms dans un seul RDV aurait
+fait concorder les compteurs en detruisant un fait : il y a eu deux rendez-vous. La
+base avait raison, c'est la grille qui ne savait pas l'exprimer.
 
-Le choix appartient a l'utilisateur, et il n'est pas anodin — le modele « une case,
-un RDV » porte toute l'ergonomie clavier du module C, qui est le coeur du produit.
-Trois pistes, sans recommandation a ce stade : afficher un marqueur « 2 » sur la case
-et ouvrir un detail au clic ; empiler les valeurs dans la cellule ; ou accepter la
-limite et l'ecrire dans le mode d'emploi. **A trancher avant la session de
-septembre**, parce que le cas se reproduira.
+**Precision sur la gravite, mesuree et non supposee :** le second client n'etait pas
+seulement cache, il etait **perdu selon l'ordre de pagination**. `Map.set` sur une
+cle deja prise garde le DERNIER lu — donc ce n'etait pas toujours le meme des deux
+qui disparaissait.
+
+#### Ce qui a ete decide, et pourquoi
+
+Arbitrage de l'utilisateur, sur recommandation chiffree : **empiler, avec un
+marqueur**. L'argument qui a emporte le choix n'est pas esthetique. L'option « accepter
+la limite » supposait de faire concorder le compteur, or celui-ci additionnait les
+ENTREES DE LA `Map`, c'est-a-dire les cases. Le corriger imposait donc de tenir la
+liste des RDV par case — exactement la structure de donnees de l'empilement. Cette
+option payait ~80 % du prix de l'autre en laissant en place les deux consequences les
+plus graves.
+
+| | |
+|---|---|
+| Structure | `Map<cle, RdvSaisie[]>`, ordonnee par **identifiant croissant** |
+| Affichage a 1 RDV | **inchange au pixel pres** — 1105 cases sur 1107 |
+| Affichage a 2 RDV | les deux noms empiles + un marqueur chiffre, dans la hauteur normale d'une case |
+| Compteur | compte les RDV, plus les cases |
+| `Entree` / frappe | reprend le PREMIER RDV. N'ecrase jamais le second |
+| `Ctrl+Entree` | AJOUTE un RDV a la case. Le champ s'ouvre vide, les noms deja poses restent visibles au-dessus |
+| `Suppr` | archive le premier |
+
+L'ordre est trie sur la cle primaire et non sur le nom du client, qui se corrige : un
+renommage ne doit pas faire permuter deux RDV sous les doigts du chef.
+
+`Ctrl+Entree` est un geste **distinct et explicite** parce que le mode d'echec compte
+plus que le confort : taper dans une case remplie doit continuer a corriger une faute
+de frappe, jamais a empiler un homonyme. Symetriquement, un champ d'ajout laisse vide
+n'ajoute rien **et ne retire rien** — sans cette branche, `Ctrl+Entree` puis `Echap`
+aurait efface le client qui etait deja la.
+
+Verifie a l'ecran sur la base de production : 1107 en tete et en pied du module C,
+marqueur « 2 » et les deux noms sur la case de JEROME SABIN du 15/06 14h-15h. Le
+geste d'ajout a ete eprouve **au clavier reel** sur la campagne de septembre, pas sur
+juin ; les deux RDV d'essai ont ete archives (voir `ETAT-PROJET.md`).
+
+### [CORRIGE le 03/09/2026] Archiver l'un des deux RDV d'une case effacait l'autre a l'ecran
+
+**Trouve en corrigeant le defaut precedent, pas cherche** — et invisible partout
+ailleurs, puisqu'il fallait une case a deux RDV pour l'observer.
+
+`archiver` (`pages/Saisie.tsx`) retirait la CASE ENTIERE de l'index :
+`pour.delete(cleRdv(...))`. Avec une seule entree par case c'etait juste. Avec une
+liste, archiver un RDV faisait disparaitre **tous** les autres de la meme case,
+jusqu'au rechargement suivant — un chiffre qui redescend puis remonte tout seul.
+
+`retirer(liste, id)` filtre desormais par identifiant, et la cle ne disparait que
+quand la case se vide vraiment. Eprouve au clavier : `Suppr` sur une case a deux RDV
+laisse le second affiche et le compteur a 1.
+
+### [CONNU, NON CORRIGE] Une ligne de la grille est 1 px plus haute des qu'elle contient un nom
+
+**Trouve en mesurant l'empilement, et il n'a rien a voir avec lui.**
+
+Mesure sur les 11 lignes du planning de JEROME SABIN : une ligne vide fait
+**38,39 px**, une ligne contenant au moins un nom fait **39,41 px**. La correlation
+est parfaite avec « la ligne contient une case remplie », y compris sur des lignes qui
+ne portent aucune case multiple.
+
+Cause : `.client` a un interligne de 2,4 rem, et une cellule de tableau traite sa
+`height` comme un total, `border-bottom` comprise. Le contenu depasse donc d'un pixel
+la hauteur annoncee.
+
+Consequence reelle mais tenue : sur 11 creneaux, le rythme vertical de la grille peut
+deriver jusqu'a ~11 px selon le remplissage. **Anterieur a l'empilement**, qui occupe
+2,3 rem, soit MOINS qu'un nom seul.
+
+Non corrige volontairement : le remede tient en une ligne
+(`.client { line-height: 2.3rem }`), mais il change le centrage vertical de **chaque
+nom du module C**, l'ecran le plus sensible du produit, et ce n'etait pas la demande.
+A trancher separement.
 
 ---
 

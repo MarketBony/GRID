@@ -363,6 +363,47 @@ const nombre = async (tx: Tx, sql: string): Promise<number> => {
 // C'est aussi ce qui rend la suite jouable sur la base de PRODUCTION sans rien y
 // laisser — indispensable, puisqu'une politique RLS ne se teste utilement que la
 // ou elle est deployee.
+//
+// ---------------------------------------------------------------------------
+// DEUX INSTRUCTIONS ET NON VINGT-QUATRE — 03/09/2026
+// ---------------------------------------------------------------------------
+// L'autonomie conquise le 01/09 coutait 2 min 12 sur Supabase contre 5 secondes
+// en local. La cause n'etait pas le volume — 25 lignes — mais le NOMBRE
+// D'ALLERS-RETOURS : 24 `INSERT` distincts, rebatis dans chacune des 87
+// transactions, soit ~2 000 latences reseau vers eu-west-3.
+//
+// Le decor est desormais pose par DEUX instructions a CTE modifiantes. Chaque
+// controle garde sa transaction et son decor neuf : l'isolement ne bouge pas
+// d'un cran, c'est le nombre de trajets qui tombe.
+//
+// POURQUOI DEUX ET NON UNE. Une seule aurait ete plus rapide encore, et elle est
+// impossible — pas par manque de soin, par semantique de PostgreSQL. Dans une
+// instruction a CTE modifiantes, toutes les branches partagent le MEME instantane :
+// une branche ne voit pas les lignes qu'une branche voisine vient d'inserer. Les
+// contraintes de cle etrangere s'en accommodent (elles sont verifiees par des
+// triggers AFTER, en fin d'instruction), mais pas les triggers BEFORE, qui lisent
+// pendant.
+//
+// Or deux tables du decor portent des triggers BEFORE qui interrogent d'autres
+// tables — mesure sur les 30 triggers du schema, pas devinee :
+//
+//   `encadrement_site`  ->  `verifier_encadrant_actif` lit `utilisateur`
+//   `affectation`       ->  `verifier_affectation_meme_plaque`,
+//                           `verifier_affectation_unique`,
+//                           `verifier_affectation_marque_table` et
+//                           `verifier_affectation_presence` lisent `vendeur`,
+//                           `site`, `plaque`, `table_phoning`, `session_plaque`
+//                           et `campagne`
+//
+// Les mettre dans la meme instruction que leurs dependances, c'est demander a
+// quatre garde-fous de se prononcer sur un monde qu'ils ne voient pas encore. Ils
+// refuseraient — ou, bien pire, accepteraient pour la mauvaise raison. D'ou la
+// coupure : tout ce qui ne declenche aucune lecture croisee d'abord, ces deux
+// tables ensuite.
+//
+// Les autres tables du decor n'ont que `interdire_suppression` (qui ne lit rien)
+// et `tracer_creation` (qui ne consulte que `utilisateur_courant()`), et
+// `campagne_jour` comme `campagne_creneau` n'en portent aucun.
 // ============================================================================
 
 interface Decor {
@@ -394,119 +435,173 @@ const DIRECTION = 'direction.rls';
 const ENCADRANT = 'encadrant.rls';
 const LECTEUR = 'lecteur.rls';
 
+/// Les jours et le creneau des deux campagnes du decor. Ecrits une seule fois :
+/// le SQL ci-dessous les pose, et `rdvDecor` les relit pour composer un RDV
+/// valide. Deux jours par campagne — le second permet a R-A.2 d'en retirer un
+/// sans vider la campagne — et un seul creneau, qui suffit a composer un RDV.
+const JOURS_1 = ['2026-03-02', '2026-03-03'];
+const JOURS_2 = ['2026-04-06', '2026-04-07'];
+const CRENEAU = '08:00-09:00';
+
+/// Ce que la premiere instruction rend. `bigint` cote base -> `BigInt` cote
+/// JavaScript, ce qui est exactement ce que `Decor` attend.
+interface LigneDecor {
+  site_a: bigint;
+  site_b: bigint;
+  a1: bigint;
+  a2: bigint;
+  a3: bigint;
+  b1: bigint;
+  campagne1: bigint;
+  campagne2: bigint;
+  table_id: bigint;
+  encadrant: bigint;
+}
+
 async function poserDecor(tx: Tx): Promise<void> {
-  const compte = async (loginId: string, nom: string) =>
-    (
-      await tx.utilisateur.create({
-        data: { loginId, nom, passwordHash: 'x', actif: true },
-        select: { id: true },
-      })
-    ).id;
+  // ------------------------------------------------------------------ 1/2
+  // TOUT CE QUI NE DECLENCHE AUCUNE LECTURE CROISEE.
+  //
+  // Les branches ne se voient pas les unes les autres, mais elles peuvent LIRE
+  // LA SORTIE d'une branche voisine (`RETURNING`), et c'est ce qui permet de
+  // chainer parent et enfant : `site` prend l'identifiant rendu par `plaque`,
+  // `vendeur` celui rendu par `site`. Les cles etrangeres sont verifiees en fin
+  // d'instruction, donc elles trouvent bien leur parent.
+  //
+  // Les vendeurs sont TOUS EN `VO`, deliberement : un vendeur VO n'a aucune
+  // marque a poser, donc aucun controle ne peut trebucher sur R-C.1 en croyant
+  // eprouver la RLS. Les regles de marque sont couvertes par `test:garde-fous`,
+  // avec ses propres fixtures.
+  //
+  // Une CTE modifiante s'execute EXACTEMENT UNE FOIS et jusqu'au bout, qu'elle
+  // soit lue ou non par la requete principale (garanti par PostgreSQL). Les
+  // branches `r`, `cj` et `cc`, que le `SELECT` final ne consulte pas, ecrivent
+  // donc bel et bien.
+  const [ligne] = await tx.$queryRawUnsafe<LigneDecor[]>(`
+    WITH u AS (
+      INSERT INTO relance.utilisateur (login_id, password_hash, nom, actif)
+      VALUES ('${ADMIN}',     'x', 'ADMIN decor RLS',          true),
+             ('${DIRECTION}', 'x', 'DIRECTION decor RLS',      true),
+             ('${ENCADRANT}', 'x', 'ENCADRANT decor RLS',      true),
+             ('${LECTEUR}',   'x', 'LECTEUR decor RLS',        true),
+             ('${CHEF}',      'x', 'CHEF DE TABLE decor RLS',  true)
+      RETURNING id, login_id
+    ),
+    r AS (
+      INSERT INTO relance.role_global (utilisateur_id, role)
+      SELECT u.id, p.role
+        FROM u
+        JOIN (VALUES ('${ADMIN}', 'admin'),
+                     ('${DIRECTION}', 'direction'),
+                     ('${LECTEUR}', 'lecteur')) AS p(login_id, role)
+          ON p.login_id = u.login_id
+      RETURNING utilisateur_id
+    ),
+    pl AS (
+      INSERT INTO relance.plaque (libelle, ordre) VALUES ('PLAQUE RLS', 990)
+      RETURNING id
+    ),
+    s AS (
+      INSERT INTO relance.site (code, libelle, plaque_id)
+      SELECT d.code, d.libelle, pl.id
+        FROM pl, (VALUES ('RLS-A', 'Site RLS A'),
+                         ('RLS-B', 'Site RLS B')) AS d(code, libelle)
+      RETURNING id, code
+    ),
+    v AS (
+      INSERT INTO relance.vendeur (nom, site_id, type_vehicule)
+      SELECT d.nom, s.id, 'VO'
+        FROM (VALUES ('DECOR A1', 'RLS-A'), ('DECOR A2', 'RLS-A'), ('DECOR A3', 'RLS-A'),
+                     ('DECOR B1', 'RLS-B'), ('DECOR B2', 'RLS-B')) AS d(nom, code)
+        JOIN s ON s.code = d.code
+      RETURNING id, nom
+    ),
+    c AS (
+      INSERT INTO relance.campagne (libelle, date_debut, date_fin, cloturee)
+      VALUES ('CAMPAGNE RLS 1', DATE '${JOURS_1[0]}', DATE '${JOURS_1[1]}', false),
+             ('CAMPAGNE RLS 2', DATE '${JOURS_2[0]}', DATE '${JOURS_2[1]}', false)
+      RETURNING id, libelle, date_debut, date_fin
+    ),
+    cj AS (
+      INSERT INTO relance.campagne_jour (campagne_id, jour, ordre)
+      SELECT c.id, j.jour, j.ordre
+        FROM c CROSS JOIN LATERAL (VALUES (c.date_debut, 1), (c.date_fin, 2)) AS j(jour, ordre)
+      RETURNING campagne_id
+    ),
+    cc AS (
+      INSERT INTO relance.campagne_creneau (campagne_id, code, libelle, ordre)
+      SELECT c.id, '${CRENEAU}', '8h-9h', 1 FROM c
+      RETURNING campagne_id
+    ),
+    sp AS (
+      INSERT INTO relance.session_plaque (campagne_id, plaque_id, mode)
+      SELECT c.id, pl.id, 'par_table'
+        FROM c, pl WHERE c.libelle = 'CAMPAGNE RLS 1'
+      RETURNING id
+    ),
+    tp AS (
+      INSERT INTO relance.table_phoning (session_plaque_id, libelle, ordre, chef_utilisateur_id)
+      SELECT sp.id, 'TABLE RLS', 1, u.id
+        FROM sp, u WHERE u.login_id = '${CHEF}'
+      RETURNING id
+    )
+    SELECT (SELECT id FROM s WHERE code = 'RLS-A')                 AS site_a,
+           (SELECT id FROM s WHERE code = 'RLS-B')                 AS site_b,
+           (SELECT id FROM v WHERE nom = 'DECOR A1')               AS a1,
+           (SELECT id FROM v WHERE nom = 'DECOR A2')               AS a2,
+           (SELECT id FROM v WHERE nom = 'DECOR A3')               AS a3,
+           (SELECT id FROM v WHERE nom = 'DECOR B1')               AS b1,
+           (SELECT id FROM c WHERE libelle = 'CAMPAGNE RLS 1')     AS campagne1,
+           (SELECT id FROM c WHERE libelle = 'CAMPAGNE RLS 2')     AS campagne2,
+           (SELECT id FROM tp)                                     AS table_id,
+           (SELECT id FROM u WHERE login_id = '${ENCADRANT}')      AS encadrant
+  `);
 
-  const idAdmin = await compte(ADMIN, 'ADMIN decor RLS');
-  const idDirection = await compte(DIRECTION, 'DIRECTION decor RLS');
-  const idEncadrant = await compte(ENCADRANT, 'ENCADRANT decor RLS');
-  const idLecteur = await compte(LECTEUR, 'LECTEUR decor RLS');
-  const idChef = await compte(CHEF, 'CHEF DE TABLE decor RLS');
+  // ECHEC BRUYANT. Une colonne nulle voudrait dire qu'une branche n'a rien
+  // insere : le decor serait incomplet et les 89 controles mesureraient un monde
+  // a trous, ce qui est pire qu'un echec — ils pourraient passer au vert.
+  const manquantes = Object.entries(ligne ?? {})
+    .filter(([, valeur]) => valeur === null || valeur === undefined)
+    .map(([nom]) => nom);
+  if (!ligne || manquantes.length > 0) {
+    throw new Error(
+      `poserDecor : la premiere instruction n'a pas rendu ${manquantes.join(', ') || 'de ligne'}. ` +
+        `Le decor est incomplet, aucun controle n'est interpretable.`
+    );
+  }
 
-  await tx.roleGlobal.createMany({
-    data: [
-      { utilisateurId: idAdmin, role: 'admin' },
-      { utilisateurId: idDirection, role: 'direction' },
-      { utilisateurId: idLecteur, role: 'lecteur' },
-    ],
-  });
-
-  const plaque = await tx.plaque.create({
-    data: { libelle: 'PLAQUE RLS', ordre: 990 },
-    select: { id: true },
-  });
-  const siteA = await tx.site.create({
-    data: { code: 'RLS-A', libelle: 'Site RLS A', plaqueId: plaque.id },
-    select: { id: true },
-  });
-  const siteB = await tx.site.create({
-    data: { code: 'RLS-B', libelle: 'Site RLS B', plaqueId: plaque.id },
-    select: { id: true },
-  });
-
-  // TOUS EN `VO`, deliberement : un vendeur VO n'a aucune marque a poser, donc
-  // aucun controle ne peut trebucher sur R-C.1 en croyant eprouver la RLS. Les
-  // regles de marque sont couvertes par `test:garde-fous`, avec ses fixtures.
-  const vendeur = (nom: string, siteId: bigint) =>
-    tx.vendeur.create({
-      data: { nom, siteId, typeVehicule: 'VO' },
-      select: { id: true, nom: true, siteId: true },
-    });
-
-  const a1 = await vendeur('DECOR A1', siteA.id);
-  const a2 = await vendeur('DECOR A2', siteA.id);
-  const a3 = await vendeur('DECOR A3', siteA.id);
-  const b1 = await vendeur('DECOR B1', siteB.id);
-  await vendeur('DECOR B2', siteB.id);
-
-  await tx.encadrementSite.create({
-    data: { siteId: siteB.id, utilisateurId: idEncadrant, role: 'chef_de_site' },
-  });
-
-  /// Une campagne du decor : DEUX jours — le second permet a R-A.2 d'en retirer un
-  /// sans vider la campagne — et un seul creneau, qui suffit a composer un RDV.
-  const campagne = async (libelle: string, premier: string, second: string) => {
-    const c = await tx.campagne.create({
-      data: {
-        libelle,
-        dateDebut: new Date(premier),
-        dateFin: new Date(second),
-        cloturee: false,
-      },
-      select: { id: true },
-    });
-    await tx.campagneJour.createMany({
-      data: [
-        { campagneId: c.id, jour: new Date(premier), ordre: 1 },
-        { campagneId: c.id, jour: new Date(second), ordre: 2 },
-      ],
-    });
-    await tx.campagneCreneau.create({
-      data: { campagneId: c.id, code: '08:00-09:00', libelle: '8h-9h', ordre: 1 },
-    });
-    return { id: c.id, jours: [premier, second], creneau: '08:00-09:00' };
-  };
-
-  const campagne1 = await campagne('CAMPAGNE RLS 1', '2026-03-02', '2026-03-03');
-  const campagne2 = await campagne('CAMPAGNE RLS 2', '2026-04-06', '2026-04-07');
-
-  const session = await tx.sessionPlaque.create({
-    data: { campagneId: campagne1.id, plaqueId: plaque.id, mode: 'par_table' },
-    select: { id: true },
-  });
-  const table = await tx.tablePhoning.create({
-    data: {
-      sessionPlaqueId: session.id,
-      libelle: 'TABLE RLS',
-      ordre: 1,
-      chefUtilisateurId: idChef,
-    },
-    select: { id: true },
-  });
-  await tx.affectation.createMany({
-    data: [
-      { tableId: table.id, vendeurId: a1.id, origine: 'manuel' },
-      { tableId: table.id, vendeurId: a3.id, origine: 'manuel' },
-    ],
-  });
+  // ------------------------------------------------------------------ 2/2
+  // LES DEUX TABLES DONT UN TRIGGER `BEFORE` LIT LE RESTE DU DECOR. Elles
+  // arrivent dans une SECONDE instruction pour que les six garde-fous qui se
+  // prononcent ici voient un monde complet — voir l'en-tete de section.
+  await tx.$executeRawUnsafe(
+    `
+    WITH e AS (
+      INSERT INTO relance.encadrement_site (site_id, role, utilisateur_id)
+      VALUES ($1, 'chef_de_site', $2)
+      RETURNING id
+    )
+    INSERT INTO relance.affectation (table_id, vendeur_id, origine)
+    VALUES ($3, $4, 'manuel'), ($3, $5, 'manuel')
+  `,
+    ligne.site_b,
+    ligne.encadrant,
+    ligne.table_id,
+    ligne.a1,
+    ligne.a3
+  );
 
   decor = {
-    siteA: siteA.id,
-    siteB: siteB.id,
-    vendeurDeSaTable: a1,
-    vendeurHorsPerimetre: a2,
-    vendeurEncadre: b1,
-    membresDeLaTable: [a1.id, a3.id],
+    siteA: ligne.site_a,
+    siteB: ligne.site_b,
+    vendeurDeSaTable: { id: ligne.a1, nom: 'DECOR A1', siteId: ligne.site_a },
+    vendeurHorsPerimetre: { id: ligne.a2, nom: 'DECOR A2', siteId: ligne.site_a },
+    vendeurEncadre: { id: ligne.b1, nom: 'DECOR B1', siteId: ligne.site_b },
+    membresDeLaTable: [ligne.a1, ligne.a3],
     vendeursEncadres: 2,
-    campagne1,
-    campagne2,
-    tableId: table.id,
+    campagne1: { id: ligne.campagne1, jours: JOURS_1, creneau: CRENEAU },
+    campagne2: { id: ligne.campagne2, jours: JOURS_2, creneau: CRENEAU },
+    tableId: ligne.table_id,
   };
 }
 
@@ -637,6 +732,46 @@ async function main() {
            WHERE p.schemaname = t.schemaname AND p.tablename = t.tablename
          )
      )`,
+    true
+  );
+
+  // AUCUNE FONCTION DE TRIGGER APPELABLE. Une fonction `RETURNS trigger` n'a
+  // aucun appelant legitime : PostgreSQL refuse un appel direct et PostgREST ne
+  // l'expose meme pas. Mais elle etait accordee a `PUBLIC` par defaut, ce qui
+  // valait neuf alertes « Public Can Execute SECURITY DEFINER Function » chez
+  // l'analyseur Supabase — du bruit qui masque les alertes qui, elles, disent
+  // quelque chose.
+  //
+  // `20260903065812_revoquer_execute_public` a revoque le droit sur les 14
+  // fonctions existantes. CE CONTROLE-CI EST L'INVARIANT, et c'est lui qui
+  // compte : une migration est un evenement, elle ne couvre pas la quinzieme
+  // fonction ecrite demain. Ecrit en `NOT EXISTS` sur un filtre STRUCTUREL
+  // (`prorettype = 'trigger'`) et non sur une liste de noms, il attrape la
+  // suivante sans que personne y pense — interdit n.6.
+  //
+  // Les trois roles, et pas seulement `PUBLIC` : un `GRANT ... TO authenticated`
+  // pose par megarde ferait taire l'analyseur en laissant la fonction appelable
+  // par tout compte connecte.
+  await doitEtreVrai(
+    'droits  aucune fonction de trigger de relance n est executable (PUBLIC, anon, authenticated)',
+    `NOT EXISTS (
+       SELECT 1
+         FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+        CROSS JOIN unnest(ARRAY['public', 'anon', 'authenticated']) AS role_teste
+        WHERE n.nspname = 'relance'
+          AND p.prorettype = 'trigger'::regtype
+          AND has_function_privilege(role_teste, p.oid, 'EXECUTE')
+     )`,
+    true
+  );
+  // ... et le meme controle a l'envers : il doit y AVOIR des fonctions de
+  // trigger. Sans ceci, un `NOT EXISTS` sur un ensemble vide serait vert en ne
+  // verifiant rien — le schema en porte 14, un jeu de triggers ne disparait pas.
+  await doitEtreVrai(
+    'droits  le controle ci-dessus porte bien sur quelque chose (>= 10 fonctions de trigger)',
+    `(SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'relance' AND p.prorettype = 'trigger'::regtype) >= 10`,
     true
   );
 

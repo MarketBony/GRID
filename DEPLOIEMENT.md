@@ -131,7 +131,7 @@ npm --prefix backend run seed
 
 # 5. Les suites, SUR SUPABASE. Une suite verte en local ne dit rien de la production.
 npm --prefix backend run test:garde-fous   # 39/39
-npm --prefix backend run test:rls          # 87/87
+npm --prefix backend run test:rls          # 89/89
 npm --prefix backend run test:invariants   # 10/10
 ```
 
@@ -236,7 +236,7 @@ deploiement.
 |---|---|---|
 | `keep-alive.yml` | tous les 3 jours | un `SELECT 1`. Le palier gratuit met le projet en **pause apres 7 jours d'inactivite**, et GRID ne sert que quelques jours par mois — sans lui, l'outil serait en panne un matin de session |
 | `backup.yml` | chaque lundi | `pg_dump` gzippe, **restaure dans un PostgreSQL 17 jetable**, lignes comptees, puis commite dans le depot. Retention : 8 |
-| `invariants.yml` | a chaque push, et sur `master` pour Supabase | `test:invariants` — interdit n.6. Prouve aussi que les 22 migrations se rejouent depuis une base VIDE |
+| `invariants.yml` | a chaque push, et sur `master` pour Supabase | `test:invariants` — interdit n.6. Prouve aussi que les 23 migrations se rejouent depuis une base VIDE |
 
 ### Le secret unique des workflows
 

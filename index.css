@@ -1190,6 +1190,80 @@ tr.sorti td {
   font-weight: 600;
 }
 
+/* ---------------------------------------------------------------- DEUX RDV
+   DANS UNE MEME CASE.
+
+   Ce n'est pas un cas theorique : deux cases du classeur de juin 2026 portent
+   deux rendez-vous, un vendeur ayant pris deux clients dans la meme heure.
+
+   Les noms sont EMPILES : deux clients tiennent dans la hauteur normale d'une
+   case, sans que la geometrie de la grille bouge — et cette geometrie compte,
+   c'est celle que le chef parcourt des yeux pendant la session. Un troisieme
+   ferait grandir la ligne, et c'est le bon arbitrage : mieux vaut une ligne plus
+   haute qu'un client invisible.
+
+   POURQUOI 1,15 REM ET NON 1,2. Une cellule de tableau traite sa `height` comme
+   un TOTAL, bordure comprise : la boite de contenu ne fait que 2,4 rem moins le
+   pixel de `border-bottom`. Deux lignes de 1,2 rem font exactement 2,4 rem et
+   depasseraient donc de ce pixel ; a 1,15 rem elles tiennent, et l'empilement
+   occupe 2,3 rem — MOINS qu'un nom seul, dont l'interligne vaut 2,4 rem.
+
+   Mesure a l'ecran, et elle a servi a autre chose : la grille porte DEJA un ecart
+   d'un pixel entre une ligne vide (38,39 px) et une ligne contenant au moins un
+   nom (39,41 px), pour cette meme raison de bordure. Il est anterieur a
+   l'empilement et vaut sur des lignes qui n'en contiennent aucun. Non corrige,
+   consigne dans `BUGS-CONNUS.md` : toucher a l'interligne d'un nom seul, c'est
+   toucher au centrage de chaque nom du module C, et ce n'etait pas la demande. */
+.tableau-grille .case .clients-empiles {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 2.3rem;
+  /* A droite, la place du marqueur. */
+  padding: 0 1.3rem 0 0.5rem;
+}
+
+.tableau-grille .case .client-empile {
+  line-height: 1.15rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Le marqueur ne CACHE pas les noms derriere un clic, il attire l'oeil sur une
+   case qui sort de l'ordinaire — et il dit combien il y en a le jour ou un
+   troisieme depasserait la hauteur. */
+.tableau-grille .case .marqueur-multi {
+  position: absolute;
+  top: 0.18rem;
+  right: 0.2rem;
+  z-index: 1;
+  min-width: 0.95rem;
+  height: 0.95rem;
+  line-height: 0.95rem;
+  padding: 0 0.15rem;
+  text-align: center;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--bony-violet);
+}
+
+/* En AJOUT (Ctrl+Entree), les clients deja poses restent au-dessus du champ. Les
+   masquer le temps de la frappe se lirait comme un effacement. */
+.tableau-grille .case .clients-empiles.conserves {
+  min-height: 0;
+  padding-right: 0.5rem;
+  opacity: 0.72;
+}
+
+.tableau-grille .case .conserves + input {
+  height: 1.5rem;
+}
+
 /* La case active doit se voir SANS ambiguite : le chef ne regarde pas l'ecran en
    permanence, il y revient. Un liseré fin ne suffit pas. */
 .tableau-grille .case.active {

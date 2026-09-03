@@ -14,12 +14,28 @@ import { cleRdv, libelleJour } from '../utils/grille';
 // c'est ce que fait le fichier, et c'est ce qui permet au chef de voir ses deux
 // compteurs se remplir en meme temps.
 //
+// UNE CASE PORTE PLUSIEURS RDV, et c'est un fait, pas une possibilite theorique :
+// deux cases du classeur de juin en portent DEUX — un vendeur a pris deux clients
+// dans la meme heure. La base l'exprime depuis toujours (rien n'impose l'unicite
+// de `(vendeur, jour, creneau, marque)`) ; c'est la grille qui ne savait pas le
+// montrer. Elle indexait un SEUL RDV par case, donc le second etait invisible, le
+// compteur sous-comptait de 2, et une saisie dans la case l'ecrasait.
+//
+// La case tient donc une LISTE, ordonnee par identifiant croissant — l'ordre doit
+// etre deterministe, sinon le nom affiche en premier change d'un chargement a
+// l'autre. Le cas normal (un seul RDV) est INCHANGE au pixel et au geste pres :
+// 1105 cases sur 1107 sont dans ce cas, et l'ergonomie clavier ne se paie pas pour
+// deux exceptions.
+//
 // CLAVIER (F-C.2 a F-C.8), la seule chose qui compte vraiment ici : le chef a un
 // casque sur les oreilles et ne doit pas lacher son clavier.
 //   - fleches et Tab : deplacent la case active
-//   - Entree : ouvre la saisie, puis valide ET DESCEND d'une case
+//   - Entree : ouvre la saisie du PREMIER RDV, puis valide ET DESCEND d'une case
+//   - Ctrl+Entree : AJOUTE un RDV a la case, sans toucher a ceux qui y sont deja.
+//     Un geste explicite et distinct : on n'ajoute jamais un second client par
+//     accident, et on n'en ecrase jamais un en tapant dans une case remplie
 //   - Echap : annule
-//   - Suppr : archive le RDV de la case
+//   - Suppr : archive le PREMIER RDV de la case
 // Aucun bouton d'enregistrement : la validation ecrit (F-C.4).
 // ============================================================================
 
@@ -48,8 +64,10 @@ export function GrilleVendeur({
   vendeur: VendeurSaisie;
   jours: { jour: string; ordre: number }[];
   creneaux: { code: string; libelle: string; ordre: number }[];
-  /// RDV du vendeur affiche, indexes par `marqueId|creneauCode|jour`.
-  rdvs: Map<string, RdvSaisie>;
+  /// RDV du vendeur affiche, groupes par case (`marqueId|creneauCode|jour`).
+  /// Une LISTE et non un RDV : voir l'en-tete du fichier. Toujours non vide quand
+  /// la cle existe, et ordonnee par identifiant croissant.
+  rdvs: Map<string, RdvSaisie[]>;
   figee: boolean;
   enregistrement: boolean;
   onPoser: (section: SectionVendeur, creneauCode: string, jour: string, client: string) => Promise<void>;
@@ -59,6 +77,9 @@ export function GrilleVendeur({
 }) {
   const [active, setActive] = useState<CelluleRef | null>(null);
   const [edition, setEdition] = useState<CelluleRef | null>(null);
+  /// L'edition en cours cree-t-elle un RDV DE PLUS dans la case, au lieu de
+  /// modifier celui qui y est ? Ouvert par `Ctrl+Entree` uniquement.
+  const [ajout, setAjout] = useState(false);
   const [brouillon, setBrouillon] = useState('');
   const champ = useRef<HTMLInputElement | null>(null);
   const conteneur = useRef<HTMLDivElement | null>(null);
@@ -73,9 +94,16 @@ export function GrilleVendeur({
   // valeur a jour. D'ou une ref, mise a jour SYNCHRONEMENT, que le `onBlur`
   // consulte pour savoir si la validation a deja eu lieu.
   const editionRef = useRef<CelluleRef | null>(null);
-  const majEdition = (c: CelluleRef | null) => {
+  // `ajout` a besoin d'une ref pour la MEME raison, et le piege est plus vicieux :
+  // `valider` est appelee depuis un gestionnaire clavier, donc elle lirait un
+  // `ajout` fige au rendu precedent — et deciderait de MODIFIER la ou il fallait
+  // AJOUTER, c'est-a-dire ecraserait un client. La ref dit toujours la verite.
+  const ajoutRef = useRef(false);
+  const majEdition = (c: CelluleRef | null, enAjout = false) => {
     editionRef.current = c;
+    ajoutRef.current = c !== null && enAjout;
     setEdition(c);
+    setAjout(ajoutRef.current);
   };
 
   // Meme raison pour la case active : lue depuis la fermeture du rendu, elle
@@ -135,14 +163,20 @@ export function GrilleVendeur({
     [creneaux.length, jours.length, sections.length]
   );
 
-  const rdvDe = (c: CelluleRef): RdvSaisie | undefined =>
-    rdvs.get(cleRdv(sections[c.sectionIndex].marqueId, creneaux[c.ligne].code, jours[c.colonne].jour));
+  const VIDE: RdvSaisie[] = [];
+  const rdvsDe = (c: CelluleRef): RdvSaisie[] =>
+    rdvs.get(
+      cleRdv(sections[c.sectionIndex].marqueId, creneaux[c.ligne].code, jours[c.colonne].jour)
+    ) ?? VIDE;
 
-  const ouvrir = (c: CelluleRef) => {
+  /// `enAjout` : ouvrir un champ VIDE pour un RDV de plus, au lieu de reprendre le
+  /// premier. Le seul chemin est `Ctrl+Entree` — taper dans une case remplie
+  /// modifie, comme avant.
+  const ouvrir = (c: CelluleRef, enAjout = false) => {
     if (figee) return;
     majActive(c);
-    majBrouillon(rdvDe(c)?.client ?? '');
-    majEdition(c);
+    majBrouillon(enAjout ? '' : (rdvsDe(c)[0]?.client ?? ''));
+    majEdition(c, enAjout);
   };
 
   /// Valide la case. `suivante` explicite la destination du curseur ; `true` sur
@@ -150,7 +184,12 @@ export function GrilleVendeur({
   /// on remonte une colonne de creneaux pour un meme jour.
   const valider = async (c: CelluleRef, puisDescendre: boolean, suivante?: CelluleRef) => {
     const texte = brouillonRef.current.trim();
-    const existant = rdvDe(c);
+    // Lues AVANT `majEdition(null)`, qui remet `ajoutRef` a faux.
+    const enAjout = ajoutRef.current;
+    // Le PREMIER RDV de la case. C'est celui qu'on modifie et celui qu'on retire :
+    // un seul est joignable au clavier, et c'est assez — le second existe pour
+    // etre LU et compte dans les totaux, ce qui etait tout le probleme.
+    const existant = rdvsDe(c)[0];
     majEdition(null);
     majBrouillon('');
 
@@ -162,7 +201,15 @@ export function GrilleVendeur({
       conteneur.current?.focus();
     }
 
-    if (texte === '') {
+    if (enAjout) {
+      // Un champ d'ajout laisse vide n'ajoute rien et ne retire rien : le geste
+      // s'annule de lui-meme. Surtout, il ne doit PAS tomber dans la branche
+      // « vider une case retire le RDV » ci-dessous — Ctrl+Entree suivi d'Echap
+      // ou d'Entree effacerait le client qui etait deja la.
+      if (texte !== '') {
+        await onPoser(sections[c.sectionIndex], creneaux[c.ligne].code, jours[c.colonne].jour, texte);
+      }
+    } else if (texte === '') {
       // Vider une case revient a retirer le RDV : c'est le geste naturel, et il
       // passe par l'archivage, jamais par une suppression.
       if (existant) await onArchiver(existant);
@@ -259,12 +306,16 @@ export function GrilleVendeur({
         break;
       case 'Enter':
         e.preventDefault();
-        ouvrir(c);
+        // Ctrl+Entree AJOUTE un RDV a la case au lieu de reprendre le premier.
+        // C'est le seul chemin vers un second client dans la meme heure, et il est
+        // volontairement distinct : taper dans une case remplie doit continuer a
+        // corriger une faute de frappe, jamais a empiler un homonyme.
+        ouvrir(c, e.ctrlKey || e.metaKey);
         break;
       case 'Delete':
       case 'Backspace': {
         e.preventDefault();
-        const r = rdvDe(c);
+        const r = rdvsDe(c)[0];
         if (r) await onArchiver(r);
         break;
       }
@@ -319,7 +370,7 @@ export function GrilleVendeur({
                 </th>
                 {jours.map((j, colonne) => {
                   const c = { sectionIndex, ligne, colonne };
-                  const rdv = rdvs.get(cleRdv(section.marqueId, cr.code, j.jour));
+                  const lesRdv = rdvs.get(cleRdv(section.marqueId, cr.code, j.jour)) ?? VIDE;
                   const estActive = memeCellule(active, c);
                   const estEdition = memeCellule(edition, c);
 
@@ -328,7 +379,7 @@ export function GrilleVendeur({
                       key={j.jour}
                       className={[
                         'case',
-                        rdv ? 'remplie' : '',
+                        lesRdv.length > 0 ? 'remplie' : '',
                         estActive ? 'active' : '',
                         figee ? 'figee' : '',
                       ]
@@ -337,6 +388,22 @@ export function GrilleVendeur({
                       onClick={() => (figee ? undefined : ouvrir(c))}
                       aria-selected={estActive}
                     >
+                      {estEdition && ajout && lesRdv.length > 0 && (
+                        // EN AJOUT, on garde les clients deja poses SOUS LES YEUX.
+                        // Les masquer pendant la frappe se lirait comme un
+                        // effacement — le chef croirait avoir perdu le premier
+                        // client alors qu'il en saisit un second.
+                        <span
+                          className="clients-empiles conserves"
+                          title={lesRdv.map((r) => r.client).join(' · ')}
+                        >
+                          {lesRdv.map((r) => (
+                            <span className="client-empile" key={r.id}>
+                              {r.client}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                       {estEdition ? (
                         // `Entree` et `Echap` sont traites ICI, explicitement.
                         //
@@ -380,10 +447,42 @@ export function GrilleVendeur({
                             }
                           }}
                           spellCheck={false}
-                          aria-label={`${cr.libelle} ${libelleJour(j.jour)}`}
+                          aria-label={
+                            ajout
+                              ? `Ajouter un rendez-vous — ${cr.libelle} ${libelleJour(j.jour)}`
+                              : `${cr.libelle} ${libelleJour(j.jour)}`
+                          }
                         />
+                      ) : lesRdv.length <= 1 ? (
+                        // LE CAS NORMAL, inchange : une seule ligne centree dans la
+                        // hauteur de la case.
+                        <span className="client">{lesRdv[0]?.client ?? ''}</span>
                       ) : (
-                        <span className="client">{rdv?.client ?? ''}</span>
+                        // DEUX RDV OU PLUS. Les noms sont EMPILES, pas caches
+                        // derriere un marqueur a cliquer : les deux clients se
+                        // lisent d'un coup d'oeil, et l'empilement occupe MOINS de
+                        // hauteur qu'un nom seul, donc la geometrie de la grille ne
+                        // bouge pas. Les chiffres exacts sont dans `index.css`, avec
+                        // ce qu'ils ont fallu mesurer pour y arriver.
+                        //
+                        // Le marqueur chiffre attire l'oeil sur une case qui sort de
+                        // l'ordinaire, et dit combien il y en a le jour ou un
+                        // troisieme depasserait la hauteur.
+                        <>
+                          <span className="marqueur-multi" aria-hidden="true">
+                            {lesRdv.length}
+                          </span>
+                          <span
+                            className="clients-empiles"
+                            title={lesRdv.map((r) => r.client).join(' · ')}
+                          >
+                            {lesRdv.map((r) => (
+                              <span className="client-empile" key={r.id}>
+                                {r.client}
+                              </span>
+                            ))}
+                          </span>
+                        </>
                       )}
                     </td>
                   );
@@ -397,7 +496,8 @@ export function GrilleVendeur({
       <p className="note aide-clavier">
         Taper directement pour saisir · <kbd>Entrée</kbd> valide et descend ·{' '}
         <kbd>Échap</kbd> annule · <kbd>flèches</kbd> et <kbd>Tab</kbd> se déplacent ·{' '}
-        <kbd>Suppr</kbd> retire · <kbd>Ctrl</kbd>+<kbd>N</kbd> vendeur suivant
+        <kbd>Suppr</kbd> retire · <kbd>Ctrl</kbd>+<kbd>Entrée</kbd> ajoute un 2ᵉ RDV dans la
+        case · <kbd>Ctrl</kbd>+<kbd>N</kbd> vendeur suivant
         {enregistrement && <span className="etat-enregistrement"> · enregistrement…</span>}
       </p>
     </div>

@@ -148,13 +148,19 @@ Corrige a la racine : la colonne d'ordre est un parametre **obligatoire** de
 `toutesLesLignes`, applique par la fonction elle-meme. Un appelant ne peut plus
 l'oublier. Detail dans `BUGS-CONNUS.md`.
 
-### Un ecart assume : 1107 au tableau de bord, 1105 au module C
+### 1107 au tableau de bord, 1105 au module C — **tranche le 03/09/2026**
 
 Deux cases du classeur portent deux rendez-vous (un vendeur a pris deux clients dans
-la meme heure). Le module C indexe par CASE : le second RDV est invisible a l'ecran et
-absent du compteur. **La donnee est juste, c'est la grille qui ne sait pas
-l'exprimer.** Rien n'a ete corrige — le choix touche l'ergonomie clavier du module C,
-qui est le coeur du produit. A trancher avant septembre ; voir `BUGS-CONNUS.md`.
+la meme heure). Le module C indexait par CASE : le second RDV etait invisible a
+l'ecran et absent du compteur. **La donnee etait juste, c'est la grille qui ne savait
+pas l'exprimer.**
+
+Arbitrage de l'utilisateur : **empiler, avec un marqueur**. Une case tient une LISTE
+de RDV ; les deux noms s'affichent, un marqueur chiffre signale la case, et le
+compteur compte les RDV et non les cases. Les deux ecrans disent desormais 1107.
+`Ctrl+Entree` ajoute un RDV a une case — geste explicite et distinct, pour qu'on
+n'empile jamais par accident et qu'on n'ecrase jamais en tapant dans une case
+remplie. Detail et mesures dans `BUGS-CONNUS.md`.
 
 ---
 
@@ -172,7 +178,7 @@ partout ailleurs.
 C'est desormais une suite, `backend/prisma/tester-invariants.ts`, jouee comme les cinq
 autres et en CI par `.github/workflows/invariants.yml`, en deux emplois : sur un
 **PostgreSQL 17 neuf** bati par `migrate deploy` a chaque push — ce qui prouve au passage
-que les 22 migrations se rejouent depuis une base vide — et sur **Supabase** sur `master`.
+que les 23 migrations se rejouent depuis une base vide — et sur **Supabase** sur `master`.
 
 Elle couvre trois familles (detail dans `ETAT-BACKEND.md`), dont deux sont nouvelles :
 les **paliers** (`peut_administrer()` / `peut_gerer_utilisateurs()` contre leurs listes
@@ -316,7 +322,7 @@ navigateur.** Le backend Express disparaît. Zéro euro par mois.
    quiconque ouvre les outils de développement. C'est normal et sans risque — *à
    condition* que `test:rls` soit vert.
 3. **`test:api` (43 contrôles) a disparu** avec l'API qu'elle testait. Son rôle est repris
-   par `test:rls`, qui compte aujourd'hui **87 contrôles** et vérifie les deux sens.
+   par `test:rls`, qui compte aujourd'hui **89 contrôles** et vérifie les deux sens.
 
 ### Ce qui a survécu intact — et c'est la majorité
 
@@ -903,8 +909,8 @@ nginx et `scripts/sauvegarde.sh` ont ete ecrits, valides, puis supprimes le 01/0
 |---|---|
 | Renommage en GRID, logotype `public/grid.svg` | **fait** |
 | Depot GitHub `MarketBony/GRID` (prive), pousse | **fait** |
-| Projet Supabase `ganeczlhcprljuazldpp`, `eu-west-3` — 22 migrations, seed | **fait** |
-| RLS, 13 RPC, diffusion Realtime — `test:rls` 87/87 sur les deux bases | **fait** |
+| Projet Supabase `ganeczlhcprljuazldpp`, `eu-west-3` — 23 migrations, seed | **fait** |
+| RLS, 13 RPC, diffusion Realtime — `test:rls` 89/89 sur les deux bases | **fait** |
 | Front en ligne sur Cloudflare : `https://grid.bonyauto-mobile.workers.dev/` | **fait** |
 | Edge Function `gerer-comptes` — creation de comptes depuis l'interface | **fait** |
 | Les 14 comptes relies a Supabase Auth | **fait** |
@@ -919,21 +925,79 @@ nginx et `scripts/sauvegarde.sh` ont ete ecrits, valides, puis supprimes le 01/0
 Hors perimetre avant la campagne : ecrans A1 (plaques) et A2 (sites), fournis par le seed
 et stables en septembre.
 
-## CE QUI RESTE, au 01/09/2026 au soir
+## 03/09/2026 — Les quatre travaux qui restaient
 
-Par ordre de ce qui bloquerait la session de septembre. Les quatre premiers points
-sont des travaux ; les trois derniers sont des gestes qui appartiennent a
-l'utilisateur.
+### Les deux cellules a deux RDV — tranche et livre
+
+Voir la section detaillee plus haut. Les deux ecrans disent 1107. **Verifie a l'ecran
+sur la base de production** : marqueur « 2 », `DEVERNOIS` et `DE SOUSA` tous deux
+visibles dans la case du lundi 15/06 14h-15h, a la meme hauteur de ligne que les
+cases voisines.
+
+Un second defaut a ete trouve en corrigeant le premier, et il ne se voyait que sur
+ces deux cases : `archiver` retirait la CASE ENTIERE de l'index, donc archiver l'un
+des deux RDV faisait disparaitre l'autre de l'ecran jusqu'au rechargement suivant.
+Eprouve au clavier, dans les deux sens.
+
+### `REVOKE EXECUTE … FROM PUBLIC` — et trois chiffres remis d'aplomb
+
+`20260903065812_revoquer_execute_public`. La demande annoncait « 10 alertes sur
+`diffuser_rdv()` et les 11 fonctions `verifier_*()` » ; les trois chiffres etaient
+faux, et l'enonce se contredisait (12 fonctions ne font pas 10 alertes). Mesure,
+identique sur les deux bases :
+
+| | |
+|---|---|
+| fonctions de trigger dans `relance` | **14** |
+| dont `EXECUTE` accorde a PUBLIC | **12** |
+| dont `security definer` **et** PUBLIC — les alertes reelles | **9** |
+| fonctions *appelables* `security definer` exposees | **0** |
+
+La migration boucle sur `prorettype = 'trigger'::regtype` — aucun nom ecrit — et
+echoue bruyamment si la boucle ne trouve rien. Elle revoque aussi a `anon` et
+`authenticated`, elargissement assume : ne fermer que `PUBLIC` laisserait un futur
+`GRANT ... TO authenticated` faire taire l'analyseur en laissant la fonction
+appelable par tout compte connecte.
+
+**Une migration est un evenement, pas une regle.** Elle ne couvre pas la quinzieme
+fonction ecrite demain, donc elle vient avec **deux controles de `test:rls`** :
+l'invariant en `NOT EXISTS` structurel, et son garde-fou de non-vacuite. La suite
+passe de 87 a **89 controles**.
+
+`test:garde-fous` reste a **39/39** : revoquer trop large aurait desarme les
+triggers, et c'est le seul vrai risque de cette migration.
+
+### `test:rls` — 2 min 12 devient 31 s
+
+`poserDecor` faisait **24** `INSERT` distincts par controle, soit ~2 000 latences
+reseau vers eu-west-3. Il en fait **2**, par CTE modifiantes.
+
+| | avant | apres |
+|---|---|---|
+| Supabase | 2 min 12 | **31 s** |
+| local | 5 s | **2 s** |
+
+**L'isolement ne bouge pas d'un cran** : chaque controle garde sa transaction et son
+decor neuf. Deux instructions et non une, parce que `encadrement_site` et
+`affectation` portent six triggers `BEFORE` qui lisent d'autres tables du decor — et
+dans une instruction a CTE, une branche ne voit pas ce qu'une branche voisine vient
+d'inserer. Le detail est dans `tester-rls.ts`.
+
+### Le mot de passe de `tlabonne`
+
+`Bony-17061969`, pose par `comptes-auth`. Le plancher a 12 caracteres n'a pas bouge,
+pour personne.
+
+## CE QUI RESTE, au 03/09/2026
+
+Il ne reste que des gestes qui appartiennent a l'utilisateur.
 
 | # | Sujet | Pourquoi maintenant |
 |---|---|---|
-| 1 | **Les deux cellules a deux RDV** — module C affiche 1105, tableau de bord 1107 | Le seul point qui touche l'ERGONOMIE de septembre. Le cas se reproduira : un vendeur peut prendre deux clients dans la meme heure. Arbitrage produit, pas technique |
-| 2 | Migration `REVOKE EXECUTE … FROM PUBLIC` sur les 12 fonctions de trigger | Efface 10 alertes de l'analyseur Supabase. Aucun chemin d'exploitation (elles sont `RETURNS trigger`, PostgREST ne les expose pas), mais le bruit masque les vraies alertes |
-| 3 | Le mot de passe de `tlabonne` | `17061969` refuse par le plancher a 12 caracteres de l'Edge Function. Compte utilisable avec un mot de passe genere en attendant |
-| 4 | `test:rls` sur Supabase : 2 min 12 | Le decor est rebati a chaque controle. Un decor pose une fois par SECTION diviserait par cinq, sans rien perdre de l'isolement |
-| 5 | « Leaked Password Protection » (Supabase, *Authentication → Policies*) | Compare les mots de passe a HaveIBeenPwned. Un interrupteur |
-| 6 | Copie de sauvegarde **hors du depot** | Le dump hebdomadaire vit dans le depot ; si le depot disparait, tout disparait |
-| 7 | Rotation des trois secrets exposes en conversation | Jeton `sbp_` (compte entier, gearbox compris), cle `sb_secret_`, mot de passe de la base |
+| 1 | « Leaked Password Protection » (Supabase, *Authentication → Policies*) | Compare les mots de passe a HaveIBeenPwned. Un interrupteur |
+| 2 | Copie de sauvegarde **hors du depot** | Le dump hebdomadaire vit dans le depot ; si le depot disparait, tout disparait |
+| 3 | Rotation des trois secrets exposes en conversation | Jeton `sbp_` (compte entier, gearbox compris), cle `sb_secret_`, mot de passe de la base |
+| 4 | Deux RDV d'essai **archives** en septembre | `ESSAI PREMIER` / `ESSAI SECOND` sur JEROME SABIN, 10/09 8h-9h. Laisses par la verification au clavier de `Ctrl+Entree` : l'interdit n.1 interdit de les supprimer, et archives ils ne comptent nulle part. A purger avec la porte de purge si leur presence gene |
 
 **Deux ecarts assumes et documentes**, a ne pas « corriger » sans lire pourquoi :
 

@@ -1,6 +1,57 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 01/09/2026, apres l'autonomie de `test:rls`.
+Mise a jour : 03/09/2026, apres la revocation des droits sur les fonctions de trigger.
+
+---
+
+## 03/09/2026 — Aucune fonction de trigger n'est plus appelable
+
+`20260903065812_revoquer_execute_public`. Les 14 fonctions `RETURNS trigger` du schema
+etaient executables par `PUBLIC` — droit accorde par defaut a la creation. Neuf
+d'entre elles etant `security definer`, l'analyseur Supabase levait neuf alertes
+« Public Can Execute SECURITY DEFINER Function ».
+
+**Il n'y avait aucun chemin d'exploitation**, et ce n'est pas la raison de la
+migration. PostgreSQL refuse un appel direct d'une fonction de trigger (`0A000`) et
+PostgREST ne l'expose meme pas au catalogue (`404 PGRST202`). Ce qu'on ferme, c'est le
+bruit : des alertes qui ne signifient rien noient celles qui signifieraient quelque
+chose.
+
+**Le filtre est structurel, pas nominatif.** La migration boucle sur
+`prorettype = 'trigger'::regtype`, ce qui est la definition meme de « fonction de
+trigger » ; aucun nom n'y est ecrit. C'est le defaut de
+`20260831210000_rpc_privilegies`, qui enumere 18 noms a la main et serait faux au
+dix-neuvieme. Elle echoue bruyamment si la boucle ne trouve rien : une boucle vide est
+indiscernable d'une boucle qui a travaille.
+
+La revocation porte sur `PUBLIC`, `anon` **et** `authenticated`. Les deux derniers
+n'avaient aucun droit propre — le leur etait herite de PUBLIC — mais ne fermer que
+PUBLIC laisserait un futur `GRANT ... TO authenticated` faire taire l'analyseur en
+laissant la fonction appelable par tout compte connecte. Les 24 fonctions
+*appelables* gardent leur `authenticated`, verifie.
+
+**Ce qui tient la regle dans le temps n'est pas la migration.** Une migration est un
+evenement : elle couvre les 14 fonctions du jour, pas la quinzieme. Deux controles ont
+donc ete ajoutes a `test:rls` (87 -> **89**) :
+
+| Controle | Ce qu'il dit |
+|---|---|
+| `aucune fonction de trigger de relance n est executable` | `NOT EXISTS` sur `pg_proc` croise avec les trois roles |
+| `le controle ci-dessus porte bien sur quelque chose (>= 10)` | sans lui, un `NOT EXISTS` sur un ensemble vide serait vert en ne verifiant rien |
+
+Le second n'est pas une precaution de style : c'est la lecon de R-B.1 et de R-B.5,
+appliquee a un controle d'etat au lieu d'un controle de refus.
+
+**`test:garde-fous` reste a 39/39 sur les deux bases.** PostgreSQL verifie `EXECUTE`
+au `CREATE TRIGGER` et jamais au declenchement, donc les triggers continuent de tirer
+— mais ca ne se croit pas sur parole, ca se mesure. Revoquer trop large etait le seul
+vrai risque de cette migration.
+
+**Deux comptages de la documentation sont perimes, mesures au passage le 03/09** et
+laisses tels quels faute d'avoir ete demandes : le schema porte **30 triggers non
+internes** sur 14 tables, et **14 fonctions de trigger**. Plusieurs fichiers — dont
+`CLAUDE.md` — parlent encore de « 19 triggers » et de « 19 fonctions de trigger ».
+Les deux etaient probablement justes a une date anterieure.
 
 ---
 
@@ -202,17 +253,25 @@ appelable avec la seule cle publique, sans aucun jeton. Les gardes internes
 
 | Suite | Contrôles | Base |
 |---|---|---|
-| `test:garde-fous` | 33 | les deux |
-| `test:rls` | **81** — politiques, colonnes, RPC, les deux portes de purge | les deux |
+| `test:garde-fous` | 39 | les deux |
+| `test:rls` | **89** — politiques, colonnes, RPC, droits des fonctions, les deux portes de purge | les deux |
 | `test:agregats` | 27 | en memoire |
 | `test:repartition` | 20 | en memoire |
 | `test:import` | 19 | en memoire |
+| `test:invariants` | 10 — code contre base, interdit n.6 | les deux |
 | `comparer` | 9 categories d'objets, entre deux bases | les deux |
 
 `test:rls` se fait passer pour un compte **exactement comme PostgREST** : `SET LOCAL ROLE
 authenticated` puis `request.jwt.claim.sub`. Les politiques sont donc evaluees dans les
 memes conditions qu'en production. Elle ne laisse **aucune trace** — chaque controle
 tourne dans sa transaction, annulee, et les `auth_uid` sont poses dedans.
+
+**Son decor est pose par 2 instructions et non 24** (03/09/2026) : 2 min 12 sur
+Supabase sont devenues 31 s, sans rien ceder de l'isolement — chaque controle garde sa
+transaction et son decor neuf. Deux instructions et non une parce que
+`encadrement_site` et `affectation` portent six triggers `BEFORE` qui lisent d'autres
+tables du decor, et qu'une branche de CTE ne voit pas ce qu'une branche voisine vient
+d'inserer. Le detail est dans `tester-rls.ts`, section « LE DECOR ».
 
 **Ce qu'elle ne couvre pas, et qu'elle imprime en fin d'execution** : la limite de lignes
 de PostgREST, les reglages du tableau de bord Supabase, et l'Edge Function.
@@ -233,7 +292,7 @@ la section du jour, en tete de fichier.
 backend/
   prisma/
     schema.prisma            source de verite du modele
-    migrations/              22 migrations, rejeu a blanc valide en CI
+    migrations/              23 migrations, rejeu a blanc valide en CI
     donnees-source.ts        genere par scripts/extraire-seed.mjs — NE PAS EDITER
     donnees-xlsx.ts          idem
     rdv-juin-source.ts       les 1107 RDV reels de juin, pour test:agregats
@@ -243,7 +302,7 @@ backend/
     mot-de-passe.ts          change un mot de passe, ou liste les comptes
     comparer-bases.ts        diff local <-> Supabase, objet par objet
     tester-garde-fous.ts     39 invariants de la base, chacun doit REFUSER
-    tester-rls.ts            87 controles des politiques ET des RPC — decor autonome
+    tester-rls.ts            89 controles des politiques ET des RPC — decor autonome
     tester-invariants.ts     10 controles code <-> base (interdit n.6)
     tester-agregats.ts       27 controles des totaux, contre les 1107 RDV de juin
     importer-rdv-juin.ts     charge les 1107 RDV de juin, et les recoupe au classeur
@@ -419,7 +478,7 @@ npm --prefix backend run test:repartition
 # Parseur d'import (19) — fonction pure, aucun prerequis
 npm --prefix backend run test:import
 
-# Politiques RLS et RPC (87) — les DEUX sens sur chaque palier
+# Politiques RLS et RPC (89) — les DEUX sens sur chaque palier
 npm --prefix backend run test:rls
 
 # Invariants code <-> base (10) — interdit n.6. Voir la section Invariants.
@@ -520,7 +579,7 @@ demarrage et gagne deux choses :
 Il est joue par `.github/workflows/invariants.yml`, en deux emplois qui ne repondent pas
 a la meme question : sur un **PostgreSQL 17 neuf** bati par `migrate deploy` (« le code
 et les migrations sont-ils d'accord ? », a chaque push, et qui prouve au passage que les
-22 migrations se rejouent depuis une base vide), et sur **Supabase** (« la base reelle
+23 migrations se rejouent depuis une base vide), et sur **Supabase** (« la base reelle
 est-elle encore d'accord ? », sur `master` et au declenchement manuel seulement — sur une
 branche, l'ecart est normal, et un rouge normal est un rouge qu'on apprend a ignorer).
 

@@ -1,9 +1,8 @@
-# Prompt de reprise — GRID, session suivante
+# Prompt de reprise — session suivante
 
-Copier tout ce qui suit la ligne de séparation dans une nouvelle session Claude Code,
-depuis `C:\Users\Operateur\Documents\RELTEL`.
+*Écrit le 03/09/2026, après le lot « deux RDV par case + hygiène des droits ».*
 
-Ce fichier est **jetable** : le supprimer une fois la session lancée.
+Copier le bloc ci-dessous tel quel au démarrage de la session suivante.
 
 ---
 
@@ -14,123 +13,84 @@ pas le reste : tout ce dont tu as besoin y est.
 Contexte en trois phrases : GRID est **en ligne et opérationnel** sur
 `https://grid.bonyauto-mobile.workers.dev/`, front statique sur Cloudflare, navigateur
 attaquant Supabase en direct, **la RLS est la seule barrière d'autorisation**. Les
-1107 RDV de juin sont en base et se recoupent à l'unité avec le classeur Excel. Les
-six suites sont vertes sur les deux bases (39/39 · 87/87 · 10/10 · 27/27 · 20/20 ·
-19/19), `comparer` ne rend aucun écart.
+1107 RDV de juin sont en base et se recoupent à l'unité avec le classeur Excel, et le
+module C affiche désormais le même chiffre. Les six suites sont vertes sur les deux
+bases (39/39 · 89/89 · 10/10 · 27/27 · 20/20 · 19/19), `comparer` ne rend aucun écart.
 
-Enchaîne les cinq travaux ci-dessous **dans cet ordre**, en respectant le pipeline de
-`CLAUDE.md` : vérification locale réelle, mise à jour des `.md` **avant** de pousser,
-commit, **stop avant le push** pour montrer le diff.
+**Il ne reste aucun travail bloquant pour la session de septembre.** Ce qui suit est
+donc à trancher, pas à exécuter tête baissée : commence par me dire ce que tu ferais
+en premier et pourquoi, avec les chiffres.
 
 ---
 
-## 1. Les deux cellules à deux RDV — le seul point qui touche septembre
+## Ce qui appartient à l'utilisateur, et que personne d'autre ne peut faire
 
-**C'est un arbitrage produit, pas une tâche technique. Commence par me poser la
-question, avec ta recommandation.**
+Ces trois points ne sont pas du code. Ils étaient déjà en attente le 01/09 et le
+03/09 ; les rappeler en fin de session ne suffit visiblement pas.
 
-Le tableau de bord de juin affiche **1107** RDV, le module C **1105**. Les deux lisent
-la même base : c'est l'affichage qui en perd deux.
+1. **Leaked Password Protection** — Supabase → *Authentication* → *Policies*. Un
+   interrupteur. Compare les mots de passe à HaveIBeenPwned.
+2. **Une copie de sauvegarde hors du dépôt.** Le dump hebdomadaire de `backup.yml`
+   vit *dans* le dépôt : si le dépôt disparaît, la sauvegarde disparaît avec lui.
+   C'est le seul point de la liste qui puisse coûter les données.
+3. **Rotation des trois secrets exposés en conversation** : jeton `sbp_` (il ouvre le
+   compte entier, gearbox compris), clé `sb_secret_`, mot de passe de la base.
 
-`pages/Saisie.tsx` indexe les RDV par `cleRdv(marqueId, creneauCode, jour)` — une
-entrée par **case** de la grille. Or deux cases du classeur portent **deux
-rendez-vous** :
+## Les candidats, par ordre de valeur décroissante à mon sens
 
-| Vendeur | Quand | Clients |
-|---|---|---|
-| JEROME SABIN (CLF) | 15/06, 14h-15h, VO | DEVERNOIS **+** DE SOUSA |
-| REDWANE TOULOUSE (ISS) | 11/06, 08h-09h, VO | DAUBARD **+** COSTON |
+### a. L'Edge Function `gerer-comptes` — le seul trou fonctionnel connu
 
-Un vendeur a pris deux clients dans la même heure, les deux noms ont été tapés dans la
-même cellule. **Ce ne sont pas des artefacts** : les deux comptent dans les 1107, qui
-se recoupent avec quatre séries de totaux indépendantes du classeur.
+`services/utilisateurs.ts` l'appelle déjà pour **créer un compte**, **réinitialiser un
+mot de passe** et **supprimer une identité**. Les trois échouent tant qu'elle n'est
+pas écrite et déployée. Le reste de l'écran Comptes fonctionne (PostgREST + RPC).
 
-Conséquences, par gravité décroissante :
+En attendant, `npm --prefix backend run comptes-auth` fait le travail en ligne de
+commande — donc ce n'est pas bloquant, mais c'est la dernière chose qui oblige à
+ouvrir un terminal pour administrer le produit.
 
-1. **le second client est invisible à l'écran** — SABIN affiche `DE SOUSA`, jamais
-   `DEVERNOIS` ;
-2. saisir dans cette case écraserait l'un des deux ;
-3. le compteur du module C sous-compte de 2 sur juin.
+### b. Les marques des vendeurs VN sont encore un placeholder
 
-**Ne touche pas à la donnée.** Fusionner les deux noms ferait concorder les compteurs
-en détruisant un fait : il y a eu deux rendez-vous. La base a raison, c'est la grille
-qui ne sait pas l'exprimer.
+Conséquence exacte, et elle est chiffrée : **R-C.1 ne protège pas les VN.** Le trigger
+`rdv_marque_autorisee` fonctionne et il est testé, mais il autorise tout, puisque les
+72 vendeurs VN sont tous déclarés bi-marque par le seed. N'importe quel RDV Dacia
+passera sur un vendeur exclusivement Renault.
 
-Le modèle « une case, un RDV » porte toute l'ergonomie clavier du module C, qui est le
-cœur du produit (`CLAUDE.md` : « en cas d'arbitrage, la saisie gagne toujours »). Trois
-pistes, sans préférence de ma part :
+L'outil de correction existe (écran Vendeurs, import par collage, grille de cochage).
+Ce n'est pas du code à écrire, c'est une donnée à fournir — vendeur par vendeur, et
+elle ne se devine pas depuis le classeur : celui-ci donne une **activité**
+(`REN 0 / DAC 20`), pas une **autorisation**.
 
-- un marqueur « 2 » sur la case, ouvrant un détail au clic ;
-- empiler les valeurs dans la cellule ;
-- accepter la limite et l'écrire dans le mode d'emploi — mais alors **faire concorder
-  le compteur**, parce que 1105 contre 1107 sur le même écran est un défaut en soi.
+### c. Les dates de la campagne de septembre 2026
 
-## 2. Migration `REVOKE EXECUTE … FROM PUBLIC`
+Le seed pose du jeudi 10 au lundi 14 septembre, **par analogie avec juin, donc
+inventées**. À confirmer ou corriger dans l'écran Campagnes — ce qui est aussi le
+critère de recette n°2 : changer les jours d'une campagne doit prendre moins de
+30 secondes et les 99 plannings doivent suivre. Aujourd'hui, 03/09, la session est
+dans une semaine.
 
-L'analyseur Supabase lève **10 alertes** « Public Can Execute SECURITY DEFINER
-Function » sur `relance.diffuser_rdv()` et les 11 fonctions `relance.verifier_*()`.
+### d. Le pixel de la grille
 
-**Aucun chemin d'exploitation** — mesuré : les 12 sont `RETURNS trigger`, PostgreSQL
-refuse un appel direct, et PostgREST ne les expose même pas (`404 PGRST202`). Mais le
-bruit masque les vraies alertes.
+Une ligne du planning fait 38,39 px si elle est vide et 39,41 px dès qu'elle contient
+un nom (`.client` a un interligne de 2,4 rem, et une cellule de tableau compte sa
+bordure dans sa `height`). Sur 11 créneaux, le rythme vertical peut donc dériver d'une
+dizaine de pixels selon le remplissage.
 
-Écris une migration (`node scripts/nouvelle-migration.mjs revoquer_execute_public`) qui
-révoque `EXECUTE` à `PUBLIC` sur ces 12 fonctions. **Boucle sur `pg_proc` filtré par
-`prorettype = 'trigger'::regtype`**, pas une liste de noms écrite à la main : une
-treizième fonction de trigger ajoutée demain doit être couverte sans que personne y
-pense (interdit n°6, esprit).
+Le remède tient en une ligne — `.client { line-height: 2.3rem }` — mais il change le
+centrage vertical de **chaque nom du module C**, l'écran le plus sensible du produit.
+C'est pour ça qu'il n'a pas été appliqué sans demander. Détail dans `BUGS-CONNUS.md`.
 
-Vérifie ensuite : `test:garde-fous` doit rester à 39/39 sur les deux bases — les
-triggers doivent continuer à se déclencher. C'est le contrôle qui compte : révoquer
-trop large les désarmerait.
+### e. Deux RDV d'essai archivés en septembre
 
-## 3. Le mot de passe de `tlabonne`
-
-Compte créé (id 92, palier `admin`), connexion et palier vérifiés en base. Il tourne
-avec un mot de passe généré : `Usb6HgnUu4hnbZ7vCC`.
-
-Le mot de passe demandé, `17061969`, est **refusé par le plancher à 12 caractères** de
-`supabase/functions/gerer-comptes/index.ts`. Demande-moi lequel des deux je veux :
-
-- `Bony-17061969` — 13 caractères, mon nombre dedans, mémorisable. Tu le poses en une
-  commande ;
-- descendre le plancher à 8 — mon produit, mon choix, mais redis-moi une fois que 8
-  chiffres formant une date de naissance sur un compte administrateur d'une
-  application exposée sur Internet est la première chose qu'on essaie.
-
-## 4. Accélérer `test:rls` sur Supabase
-
-2 min 12 sur Supabase contre 5 secondes en local. `poserDecor` reconstruit le décor
-complet — ~25 lignes — dans **chacune** des 87 transactions, soit autant d'allers-
-retours réseau.
-
-**Ne casse pas l'isolement pour aller plus vite.** L'autonomie vient d'être conquise
-(commit `abad81a`) et elle vaut plus que la vitesse : la suite ne doit dépendre
-d'aucune donnée de production. Deux pistes qui la préservent :
-
-- construire le décor en **une seule instruction SQL** avec des CTE modifiantes
-  (`WITH … INSERT … RETURNING`), ce qui ramène 25 allers-retours à 1 ;
-- ou grouper les contrôles par section dans une transaction commune — plus rapide,
-  mais un contrôle pourrait alors voir les effets du précédent : à n'envisager que si
-  la première piste ne suffit pas.
-
-Critère de sortie : **87/87 sur Supabase ET en local**, comptes `.test` archivés.
-
-## 5. Les gestes qui m'appartiennent
-
-Rappelle-les moi en fin de session, sans les faire toi-même :
-
-- activer **Leaked Password Protection** (Supabase → *Authentication* → *Policies*) ;
-- une **copie de sauvegarde hors du dépôt** — le dump hebdomadaire vit dans le dépôt,
-  si le dépôt disparaît tout disparaît ;
-- **rotation des trois secrets** exposés en conversation : jeton `sbp_` (compte entier,
-  gearbox compris), clé `sb_secret_`, mot de passe de la base.
+`ESSAI PREMIER` / `ESSAI SECOND`, sur JEROME SABIN, 10/09 8h-9h. Laissés par la
+vérification au clavier de `Ctrl+Entrée` le 03/09. **Archivés, donc comptés nulle
+part** ; l'interdit n°1 empêche de les supprimer autrement que par la porte de purge.
+À traiter seulement si leur présence gêne.
 
 ---
 
 ## Ce qu'il ne faut PAS « corriger »
 
-Deux écarts sont **assumés et documentés**. Lis le pourquoi avant d'y toucher :
+Trois écarts sont **assumés et documentés**. Lis le pourquoi avant d'y toucher.
 
 1. **Les vues `perimetre_saisie` et `rdv_agrege` contournent la RLS**
    (`SECURITY DEFINER`), signalées **CRITICAL** par Supabase. C'est délibéré :
@@ -140,12 +100,18 @@ Deux écarts sont **assumés et documentés**. Lis le pourquoi avant d'y toucher
    Les deux portent leur propre filtre `utilisateur_courant() IS NOT NULL`, et
    `test:rls` a trois contrôles dédiés à ce scénario. Détail dans `ETAT-BACKEND.md`.
 
-2. **Les ports 5432/6543 sont bloqués par intermittence** depuis le poste du bureau :
-   ils répondaient le 31/08, plus le 01/09, puis de nouveau. **Mesure avant de conclure
-   à une panne.** Le 443 passe toujours — `importer-rdv-juin.ts` montre comment écrire
-   par PostgREST quand Prisma ne peut pas se connecter.
+2. **Les ports 5432/6543 sont bloqués par intermittence** depuis le poste du bureau.
+   **Mesure avant de conclure à une panne** — ils répondaient le 31/08, plus le 01/09,
+   puis de nouveau le 03/09. Le 443 passe toujours : `importer-rdv-juin.ts` montre
+   comment écrire par PostgREST quand Prisma ne peut pas se connecter.
 
-## Trois leçons de la session précédente, à ne pas réapprendre
+3. **Le décor de `test:rls` est posé par 2 instructions et non 1.** Ce n'est pas une
+   optimisation laissée en chemin : `encadrement_site` et `affectation` portent six
+   triggers `BEFORE` qui lisent d'autres tables du décor, et dans une instruction à
+   CTE modifiantes une branche ne voit pas ce qu'une branche voisine vient d'insérer.
+   Les réunir ferait juger quatre garde-fous sur un monde qu'ils ne voient pas.
+
+## Quatre leçons à ne pas réapprendre
 
 - **Une lecture paginée porte un ordre stable.** `LIMIT/OFFSET` sans `ORDER BY` rend le
   bon *nombre* de lignes et pas les *bonnes* : le contrôle de volume passe au vert
@@ -155,3 +121,9 @@ Deux écarts sont **assumés et documentés**. Lis le pourquoi avant d'y toucher
   déclaration TypeScript fausse est un mensonge que le compilateur valide.
 - **Une suite de sécurité ne dépend pas des données de production.** Les fixtures se
   **créent**, elles ne se **choisissent** pas.
+- **Un pilote de navigateur n'est pas un utilisateur.** Vérifié une fois de plus le
+  03/09 : le pilote n'envoie ni `Return` ni `Up` comme le clavier envoie `Enter` et
+  `ArrowUp`. Deux fausses pistes en découlent immédiatement — on croit que
+  l'application n'enregistre pas, alors que la touche n'est jamais arrivée. Avant de
+  poursuivre un défaut d'ergonomie clavier trouvé par automatisation, le faire
+  confirmer à la main.

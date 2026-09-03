@@ -36,6 +36,29 @@ import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneConte
 // fichier faisait la meme chose avec des `COUNTA`.
 // ============================================================================
 
+/// Pose ou remplace un RDV dans la liste d'une case, en gardant un ordre
+/// DETERMINISTE : identifiant croissant.
+///
+/// L'ordre n'est pas cosmetique — c'est lui qui decide quel client s'affiche en
+/// premier et lequel `Entree` reprend. On trie sur la CLE PRIMAIRE et non sur le
+/// nom du client, qui se corrige : un renommage ne doit pas faire permuter deux RDV
+/// sous les doigts du chef. Comparaison NUMERIQUE, parce que les identifiants sont
+/// transportes en chaines et que « 10 » vient avant « 9 » en ordre lexical.
+function inserer(liste: RdvSaisie[] | undefined, rdv: RdvSaisie): RdvSaisie[] {
+  return [...(liste ?? []).filter((r) => r.id !== rdv.id), rdv].sort(
+    (a, b) => Number(a.id) - Number(b.id)
+  );
+}
+
+/// Retire UN RDV de la liste d'une case, par identifiant.
+///
+/// L'ancienne version supprimait la CASE entiere (`pour.delete(cle)`) : archiver
+/// l'un des deux RDV d'une case faisait disparaitre l'autre de l'ecran jusqu'au
+/// rechargement suivant.
+function retirer(liste: RdvSaisie[] | undefined, id: string): RdvSaisie[] {
+  return (liste ?? []).filter((r) => r.id !== id);
+}
+
 export function Saisie() {
   const [campagnes, setCampagnes] = useState<CampagneResume[]>([]);
   // Partagee avec les autres ecrans — voir `contexts/CampagneContext.tsx`.
@@ -53,7 +76,12 @@ export function Saisie() {
 
   /// Les RDV en memoire, indexes par vendeur puis par case. Une Map par vendeur
   /// evite de re-filtrer 2 000 RDV a chaque frappe.
-  const [rdvsParVendeur, setRdvs] = useState<Map<string, Map<string, RdvSaisie>>>(new Map());
+  ///
+  /// UNE CASE PORTE UNE LISTE, jamais un RDV. Deux cases de juin en portent deux —
+  /// un vendeur a pris deux clients dans la meme heure. Avec un seul RDV par cle,
+  /// `Map.set` gardait le DERNIER lu : le premier client n'etait pas seulement
+  /// cache, il etait perdu selon l'ordre de pagination, donc pas toujours le meme.
+  const [rdvsParVendeur, setRdvs] = useState<Map<string, Map<string, RdvSaisie[]>>>(new Map());
 
   /// La vue d'ensemble — les autres tables de la plaque et le classement des
   /// concessions. Chargee A PART du perimetre de saisie, et volontairement :
@@ -63,11 +91,11 @@ export function Saisie() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
 
   const indexer = useCallback((rdvs: RdvSaisie[]) => {
-    const index = new Map<string, Map<string, RdvSaisie>>();
+    const index = new Map<string, Map<string, RdvSaisie[]>>();
     for (const r of rdvs) {
       const cle = cleRdv(r.marqueId, r.creneauCode, r.jour);
-      const pour = index.get(r.vendeurId) ?? new Map<string, RdvSaisie>();
-      pour.set(cle, r);
+      const pour = index.get(r.vendeurId) ?? new Map<string, RdvSaisie[]>();
+      pour.set(cle, inserer(pour.get(cle), r));
       index.set(r.vendeurId, pour);
     }
     setRdvs(index);
@@ -158,10 +186,15 @@ export function Saisie() {
       const parSection: Record<string, number> = {};
       let total = 0;
       for (const s of v.sections) parSection[s.marqueId ?? 'sansMarque'] = 0;
-      for (const r of cases?.values() ?? []) {
-        const cle = r.marqueId ?? 'sansMarque';
-        parSection[cle] = (parSection[cle] ?? 0) + 1;
-        total++;
+      // ON COMPTE LES RDV, PAS LES CASES. C'est exactement l'ecart qui faisait dire
+      // 1105 au module C et 1107 au tableau de bord, sur la meme base : deux cases
+      // de juin portent deux rendez-vous, et une case ne comptait que pour un.
+      for (const liste of cases?.values() ?? []) {
+        for (const r of liste) {
+          const cle = r.marqueId ?? 'sansMarque';
+          parSection[cle] = (parSection[cle] ?? 0) + 1;
+          total++;
+        }
       }
       parVendeur.set(v.id, { total, parSection });
     }
@@ -234,7 +267,12 @@ export function Saisie() {
       setRdvs((index) => {
         const suivant = new Map(index);
         const pour = new Map(suivant.get(r.vendeurId) ?? []);
-        pour.delete(cleRdv(r.marqueId, r.creneauCode, r.jour));
+        const cle = cleRdv(r.marqueId, r.creneauCode, r.jour);
+        const reste = retirer(pour.get(cle), r.id);
+        // La cle disparait quand la case se vide : `GrilleVendeur` compte sur une
+        // liste jamais vide quand la cle existe, et `remplie` en depend.
+        if (reste.length === 0) pour.delete(cle);
+        else pour.set(cle, reste);
         suivant.set(r.vendeurId, pour);
         return suivant;
       });
@@ -252,7 +290,8 @@ export function Saisie() {
     setRdvs((index) => {
       const suivant = new Map(index);
       const pour = new Map(suivant.get(rdv.vendeurId) ?? []);
-      pour.set(cleRdv(rdv.marqueId, rdv.creneauCode, rdv.jour), rdv);
+      const cle = cleRdv(rdv.marqueId, rdv.creneauCode, rdv.jour);
+      pour.set(cle, inserer(pour.get(cle), rdv));
       suivant.set(rdv.vendeurId, pour);
       return suivant;
     });
