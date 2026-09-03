@@ -53,11 +53,25 @@ Pages -> Workers, ou commande de deploiement modifiee. Sans acces au tableau de 
 peut pas le trancher, et ca ne change rien au correctif : la configuration est requise
 dans les deux cas.
 
+**Verifie en ligne apres correctif.** Le deploiement suivant est passe, et son journal
+tranche le seul point qui restait deduit — le nom du Worker :
+
+```
+✨ Read 5 files from the assets directory /opt/buildhome/repo/dist
+✨ Success! Uploaded 3 files (1 already uploaded) (1.20 sec)
+Uploaded grid (2.94 sec)
+Success: Deploy command completed
+```
+
+`Uploaded grid` : le `name` designe bien le Worker existant, aucun second Worker n'a ete
+cree.
+
 **La lecon, et elle vaut pour la suite : un build vert ne prouve rien sur le
 deploiement.** C'est le pendant exact de « un typecheck vert ne prouve rien sur le contrat
 de l'API », d'un cran plus haut. Les deux commandes de deploiement se verifient en dry-run,
 localement, avant de croire qu'un lot est en ligne — la marche a suivre est dans
-`DEPLOIEMENT.md`.
+`DEPLOIEMENT.md`, avec l'URL d'apercu de branche qui permet d'eprouver le lot deploye sans
+toucher a la production.
 
 ---
 

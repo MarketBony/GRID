@@ -239,6 +239,42 @@ ne bougerait plus.
 meme quand le deploiement reussit — `versions upload` ne deploie pas. Il faut atteindre
 `master`.
 
+### Verifier un lot AVANT de le mettre en ligne — l'URL d'apercu de branche
+
+Le journal du deploiement reussi donne deux URL, et la seconde est la plus utile :
+
+```
+Uploaded grid (2.94 sec)
+Version Preview URL:       https://<id-court>-grid.bonyauto-mobile.workers.dev
+Version Preview Alias URL: https://<nom-de-branche>-grid.bonyauto-mobile.workers.dev
+```
+
+**C'est ce qui permet d'eprouver le lot REELLEMENT DEPLOYE, sur le vrai Supabase, sans
+toucher a la production.** Mesure du 03/09/2026, les deux cotes en meme temps :
+
+| | bundle servi | `overflow-x` de la racine |
+|---|---|---|
+| `feat-deux-rdv-par-case-grid…` | `index-kKDBZhWj.js` — le lot | `clip` |
+| `grid.bonyauto-mobile.workers.dev` | `index-BMYtM9_z.js` — l'ancien | `hidden` |
+
+Le repli SPA se controle sur cette meme URL : `/une/route/inexistante`, `/saisie` et `/`
+doivent tous rendre `200 text/html` portant `index.html`.
+
+`Uploaded grid` confirme au passage que le `name` du fichier designe bien le Worker
+existant. Si le nom etait faux, cette ligne nommerait un autre Worker — c'est la
+verification a lire en premier.
+
+### Mettre une version en ligne
+
+`versions upload` televerse sans deployer ; la production continue de servir la version
+precedente. Deux chemins :
+
+- **atteindre `master`** — Workers Builds utilise `wrangler deploy` sur la branche de
+  production. **A confirmer une fois** : le tableau de bord n'affiche qu'une commande de
+  deploiement, et celle qu'on y lit est celle du build courant ;
+- **promouvoir la version deja televersee** : `wrangler versions deploy`, ce que le
+  journal indique lui-meme.
+
 ### Les variables sont VERSIONNEES — il n'y a rien a regler cote Cloudflare
 
 `.env.production`, a la racine, porte les deux valeurs et **est committe**. Le build est

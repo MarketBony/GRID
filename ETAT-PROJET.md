@@ -1050,7 +1050,7 @@ Il ne reste que des gestes qui appartiennent a l'utilisateur.
 | 1 | « Leaked Password Protection » (Supabase, *Authentication → Policies*) | Compare les mots de passe a HaveIBeenPwned. Un interrupteur |
 | 2 | Copie de sauvegarde **hors du depot** | Le dump hebdomadaire vit dans le depot ; si le depot disparait, tout disparait |
 | 3 | Rotation des trois secrets exposes en conversation | Jeton `sbp_` (compte entier, gearbox compris), cle `sb_secret_`, mot de passe de la base |
-| 4 | Deux RDV d'essai **archives** en septembre | `ESSAI PREMIER` / `ESSAI SECOND` sur JEROME SABIN, 10/09 8h-9h. Laisses par la verification au clavier de `Ctrl+Entree` : l'interdit n.1 interdit de les supprimer, et archives ils ne comptent nulle part. A purger avec la porte de purge si leur presence gene |
+| 4 | **Sept** RDV d'essai archives en septembre | Compte mesure le 03/09, et non deux comme annonce d'abord : cinq datent des sessions du 31/08 et du 02/09 (`CONTROLE NAVIGATEUR`, `CLIENT DEPUIS LA GRILLE`, `DEPUIS LE TERMINAL`, `TEST`, `TEST 2`), deux du 03/09 (`ESSAI PREMIER`, `ESSAI SECOND`). Tous **archives**, donc comptes nulle part : juin reste a 1107 et septembre a 0. L'interdit n.1 interdit de les supprimer autrement que par la porte de purge. A traiter seulement si leur presence gene |
 | 5 | L'ecran Vendeurs fait 8 990 px sans filtre | Les 19 cartes restent depliees. Les filtres et la barre collante retirent la douleur immediate ; des cartes repliables demanderaient un etat par site. A trancher |
 | 6 | Une ligne de la grille est 1 px plus haute des qu'elle contient un nom | Anterieur a l'empilement, mesure a 38,39 / 39,41 px. Le remede tient en une ligne mais deplace le centrage de chaque nom du module C |
 
