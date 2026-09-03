@@ -89,10 +89,8 @@ export function Gestion() {
         <div>
           <h2>Gestion des comptes</h2>
           <p className="note">
-            Créer les accès des chefs de site et de vente. Une fois le compte créé, il devient
-            attribuable comme <strong>encadrant d’un site</strong> dans l’onglet Vendeurs et comme{' '}
-            <strong>chef de table</strong> dans l’onglet Tables — y compris sur une concession
-            différente de la sienne.
+            Un compte créé devient attribuable comme encadrant d’un site (onglet Vendeurs) et comme
+            chef de table (onglet Tables), y compris sur une autre concession que la sienne.
           </p>
         </div>
         <div className="progression">

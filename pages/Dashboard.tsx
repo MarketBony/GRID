@@ -16,6 +16,15 @@ import { useTempsReel } from '../hooks/useTempsReel';
 import { exporterDashboard } from '../utils/exportExcel';
 import { libelleJour } from '../utils/grille';
 import { BandeauKpi, BarresHorizontales, BarresParJour } from '../components/Graphiques';
+import {
+  basculer,
+  comparerSelon,
+  EnTeteTriable,
+  type SensNaturel,
+  type Tri,
+} from '../components/EnTeteTriable';
+// Tri des libelles SANS dependre de la locale du navigateur. Source unique.
+import { cleTri, comparerLibelle } from '../backend/src/utils/tri';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 
 // ============================================================================
@@ -43,6 +52,15 @@ const LIBELLES_AXE: Record<Axe, string> = {
   table: 'Tables',
   groupe: 'Groupe',
 };
+
+type Critere = 'global' | 'vn' | 'vo';
+
+/// La valeur d'une ligne selon le critere affiche. Trois lignes, mais elles
+/// etaient ecrites en double — une fois dans le graphique, une fois dans le
+/// classement, et la seconde portait en plus un `axe === 'site'` qui faisait
+/// afficher le TOTAL a la place du VN des qu'on regardait un autre axe.
+const valeurCritere = (l: { total: number; vn: number; vo: number }, critere: Critere) =>
+  critere === 'global' ? l.total : critere === 'vn' ? l.vn : l.vo;
 
 export function Dashboard() {
   const [campagnes, setCampagnes] = useState<CampagneResume[]>([]);
@@ -143,15 +161,12 @@ export function Dashboard() {
   if (!donnees) return <div className="attente">Aucune campagne.</div>;
 
   const lignes = donnees.totaux[axe];
-  const rangs: Rang[] =
-    axe === 'vendeur'
-      ? donnees.classementVendeurs
-      : axe === 'table'
-        ? donnees.classementTables
-        : donnees.classementsSites[critere];
+  // UNE INDEXATION, plus un `if` par axe. Les cinq axes et les trois criteres ont
+  // desormais la meme forme cote service — voir `services/dashboard.ts`.
+  const rangs: Rang[] = donnees.classements[axe][critere];
 
   const groupe = donnees.totaux.groupe[0];
-  const meilleure = donnees.classementsSites.global[0] ?? null;
+  const meilleure = donnees.classements.site.global[0] ?? null;
   const aZero = donnees.totaux.site.filter((t) => t.total === 0).length;
 
   return (
@@ -159,11 +174,6 @@ export function Dashboard() {
       <header className="ecran-entete">
         <div>
           <h2>Tableau de bord</h2>
-          <p className="note">
-            Remplace trois onglets du fichier : les totaux, le suivi comparé à une campagne
-            antérieure, et les classements. <strong>Rien n’est stocké</strong> — chaque nombre est
-            recalculé à la lecture, et l’effectif est calculé, jamais saisi.
-          </p>
         </div>
         <div className="selecteurs">
           <select
@@ -204,12 +214,12 @@ export function Dashboard() {
           {
             libelle: 'Effectif',
             valeur: groupe?.effectif ?? 0,
-            detail: 'calculé, jamais saisi',
+            detail: 'vendeurs présents',
           },
           {
             libelle: 'Moyenne / vendeur',
             valeur: groupe?.moyenne ?? 0,
-            detail: 'sur le périmètre entier',
+            detail: 'RDV par vendeur',
           },
           {
             libelle: 'Meilleure concession',
@@ -234,6 +244,23 @@ export function Dashboard() {
               onClick={() => setAxe(a)}
             >
               {LIBELLES_AXE[a]}
+            </button>
+          ))}
+        </div>
+
+        {/* LE CRITERE EST ICI, plus dans le titre du classement en bas de page.
+            Il gouverne le graphique ET le classement, donc il appartient a la
+            barre d'outils avec l'axe. Enfoui dans un `h3`, il commandait deux
+            blocs sans etre visible depuis l'un des deux. */}
+        <div className="segments">
+          {(['global', 'vn', 'vo'] as const).map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={critere === c ? 'segment actif' : 'segment'}
+              onClick={() => setCritere(c)}
+            >
+              {c === 'global' ? 'Général' : c.toUpperCase()}
             </button>
           ))}
         </div>
@@ -263,11 +290,6 @@ export function Dashboard() {
             Par jour
             <span className="etiquette">{donnees.parJour.length} jours</span>
           </h3>
-          <p className="note">
-            La ligne 2 des onglets site du fichier. Sur deux onglets — Gaillac et Carmaux — sa
-            formule portait un <code>#REF!</code> et affichait un chiffre figé, faux de 10 et 25
-            RDV. Ici il est recalculé.
-          </p>
           <BarresParJour
             barres={donnees.parJour.map((j) => ({
               cle: j.jour,
@@ -282,19 +304,21 @@ export function Dashboard() {
         <div className="carte">
           <h3>
             Tête du classement
+            <span className="etiquette">{LIBELLES_AXE[axe]}</span>
             <span className="etiquette">
               {critere === 'global' ? 'général' : critere.toUpperCase()}
             </span>
           </h3>
-          <p className="note">
-            Les concessions, sur le critère choisi dans le classement plus bas. Départage
-            déterministe — jamais l’astuce <code>valeur − ROW()/1000000</code> du fichier.
-          </p>
+          {/* IL SUIT L'AXE CHOISI. Il ne montrait que les concessions, quel que
+              soit le segment selectionne : choisir « Vendeurs » changeait le
+              tableau et le classement du bas, mais pas ce graphique — d'ou
+              l'impression, legitime, qu'il n'y avait pas de classement des
+              vendeurs. */}
           <BarresHorizontales
-            barres={donnees.classementsSites[critere].map((r) => ({
+            barres={rangs.map((r) => ({
               cle: r.cle,
               libelle: r.libelle,
-              valeur: critere === 'global' ? r.total : critere === 'vn' ? r.vn : r.vo,
+              valeur: valeurCritere(r, critere),
             }))}
           />
         </div>
@@ -306,37 +330,27 @@ export function Dashboard() {
           {LIBELLES_AXE[axe]}
           <span className="etiquette">{lignes.length}</span>
         </h3>
-        <TableauTotaux lignes={lignes} marques={marques} comparaison={comparaison} />
+        <TableauTotaux
+          lignes={lignes}
+          marques={marques}
+          comparaison={comparaison}
+          critere={critere}
+        />
       </div>
 
       {/* -------------------------------------------------- classement */}
       <div className="carte">
         <h3>
           Classement — {LIBELLES_AXE[axe]}
-          {(axe === 'site' || axe === 'plaque') && (
-            <span className="segments">
-              {(['global', 'vn', 'vo'] as const).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={critere === c ? 'segment actif' : 'segment'}
-                  onClick={() => setCritere(c)}
-                >
-                  {c === 'global' ? 'Général' : c.toUpperCase()}
-                </button>
-              ))}
-            </span>
-          )}
+          <span className="etiquette">{rangs.length}</span>
         </h3>
-        <p className="note">
-          Départage des ex æquo : <strong>total décroissant, puis VN décroissant, puis le libellé</strong>.
-          Déterministe et documenté — jamais l’astuce <code>valeur − ROW()/1000000</code> du fichier,
-          qui dépendait de la position de la ligne.
-        </p>
-        {axe === 'plaque' ? (
-          <p className="note">Le classement porte sur les concessions et les vendeurs.</p>
+        {rangs.length === 0 ? (
+          <p className="note">Rien à classer sur cette campagne.</p>
         ) : (
-          <ol className="classement-complet">
+          // DEFILEMENT PROPRE, et non la page entiere : sur l'axe « Vendeurs »
+          // cette liste fait 104 lignes, et elle poussait le classement hors de
+          // l'ecran pour tout le monde.
+          <ol className="classement-complet defilant">
             {rangs.map((r) => (
               <li key={r.cle}>
                 <span className="rang">{r.rang}</span>
@@ -347,13 +361,7 @@ export function Dashboard() {
                 <span className="detail">
                   {r.effectif} vend. · {r.moyenne} / vend.
                 </span>
-                <strong>
-                  {axe === 'site' && critere === 'vn'
-                    ? r.vn
-                    : axe === 'site' && critere === 'vo'
-                      ? r.vo
-                      : r.total}
-                </strong>
+                <strong>{valeurCritere(r, critere)}</strong>
               </li>
             ))}
           </ol>
@@ -369,15 +377,59 @@ function TableauTotaux({
   lignes,
   marques,
   comparaison,
+  critere,
 }: {
   lignes: Totaux[];
   marques: { id: string; libelle: string }[];
   comparaison: Comparaison | null;
+  critere: Critere;
 }) {
   const ecarts = useMemo(
     () => new Map((comparaison?.ecarts ?? []).map((e) => [e.cle, e])),
     [comparaison]
   );
+
+  // Le tri part du critere affiche : arriver sur « VO » et voir le tableau classe
+  // par total general obligerait a recliquer a chaque fois.
+  const [tri, setTri] = useState<Tri>({ colonne: critere, croissant: false });
+  useEffect(() => setTri({ colonne: critere, croissant: false }), [critere]);
+
+  /// La valeur d'une ligne pour une colonne. UN SEUL ENDROIT decide ce que
+  /// « trier par Dacia » veut dire, et c'est celui-la : l'en-tete ne connait que
+  /// le nom de la colonne.
+  const valeurColonne = (l: Totaux, colonne: string): number | string => {
+    if (colonne === 'libelle') return cleTri(l.libelle);
+    if (colonne === 'global') return l.total;
+    if (colonne === 'vn') return l.vn;
+    if (colonne === 'vo') return l.vo;
+    if (colonne === 'effectif') return l.effectif;
+    if (colonne === 'moyenne') return l.moyenne;
+    if (colonne === 'anterieur') return ecarts.get(l.cle)?.totalAnterieur ?? 0;
+    if (colonne === 'ecart') return ecarts.get(l.cle)?.ecart ?? 0;
+    if (colonne.startsWith('marque:')) return l.parMarque[colonne.slice(7)] ?? 0;
+    return 0;
+  };
+
+  /// LE TRI EST TOTAL, et ce n'est pas un detail de confort. Sur dix-neuf
+  /// concessions dont dix-sept a zero, un tri par RDV laisse dix-sept lignes a
+  /// egalite : sans second critere leur ordre relatif n'est pas garanti d'un
+  /// rendu a l'autre, et une liste qui se reordonne toute seule sous les yeux est
+  /// exactement ce que ce produit reproche au fichier. Le departage est le
+  /// LIBELLE, toujours croissant — le meme que `classer` prend en dernier
+  /// recours, et il est unique par axe.
+  const triees = useMemo(() => {
+    const copie = [...lignes];
+    copie.sort((a, b) => {
+      const va = valeurColonne(a, tri.colonne);
+      const vb = valeurColonne(b, tri.colonne);
+      const primaire = comparerSelon(va, vb, tri.croissant);
+      return primaire !== 0 ? primaire : comparerLibelle(a.libelle, b.libelle);
+    });
+    return copie;
+  }, [lignes, tri, ecarts]);
+
+  const trier = (colonne: string, naturel: SensNaturel) =>
+    setTri((t) => basculer(t, colonne, naturel));
 
   if (lignes.length === 0) {
     return <p className="note">Aucune ligne sur cet axe pour cette campagne.</p>;
@@ -393,27 +445,82 @@ function TableauTotaux({
       <table className="tableau">
         <thead>
           <tr>
-            <th>Libellé</th>
-            <th className="nombre">RDV</th>
-            <th className="nombre">VN</th>
-            <th className="nombre">VO</th>
+            <EnTeteTriable colonne="libelle" libelle="Libellé" tri={tri} onTrier={trier} />
+            <EnTeteTriable
+              colonne="global"
+              libelle="RDV"
+              tri={tri}
+              onTrier={trier}
+              classe="nombre"
+              naturel="nombre"
+            />
+            <EnTeteTriable
+              colonne="vn"
+              libelle="VN"
+              tri={tri}
+              onTrier={trier}
+              classe="nombre"
+              naturel="nombre"
+            />
+            <EnTeteTriable
+              colonne="vo"
+              libelle="VO"
+              tri={tri}
+              onTrier={trier}
+              classe="nombre"
+              naturel="nombre"
+            />
             {marques.map((m) => (
-              <th key={m.id} className="nombre">
-                {m.libelle}
-              </th>
+              <EnTeteTriable
+                key={m.id}
+                colonne={`marque:${m.id}`}
+                libelle={m.libelle}
+                tri={tri}
+                onTrier={trier}
+                classe="nombre"
+                naturel="nombre"
+              />
             ))}
-            <th className="nombre debut-groupe">Effectif</th>
-            <th className="nombre">Moy.</th>
+            <EnTeteTriable
+              colonne="effectif"
+              libelle="Effectif"
+              tri={tri}
+              onTrier={trier}
+              classe="nombre debut-groupe"
+              naturel="nombre"
+            />
+            <EnTeteTriable
+              colonne="moyenne"
+              libelle="Moy."
+              tri={tri}
+              onTrier={trier}
+              classe="nombre"
+              naturel="nombre"
+            />
             {comparaison && (
               <>
-                <th className="nombre debut-groupe">{comparaison.anterieure.libelle}</th>
-                <th className="nombre">Écart</th>
+                <EnTeteTriable
+                  colonne="anterieur"
+                  libelle={comparaison.anterieure.libelle}
+                  tri={tri}
+                  onTrier={trier}
+                  classe="nombre debut-groupe"
+                  naturel="nombre"
+                />
+                <EnTeteTriable
+                  colonne="ecart"
+                  libelle="Écart"
+                  tri={tri}
+                  onTrier={trier}
+                  classe="nombre"
+                  naturel="nombre"
+                />
               </>
             )}
           </tr>
         </thead>
         <tbody>
-          {lignes.map((l) => {
+          {triees.map((l) => {
             const e = ecarts.get(l.cle);
             return (
               <tr key={l.cle}>

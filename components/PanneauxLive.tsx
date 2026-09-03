@@ -195,7 +195,7 @@ const CRITERES = [
 /// n'existe pas — et ce panneau finit projete sur un ecran collectif.
 function PanneauClassement({ dashboard }: { dashboard: Dashboard }) {
   const [critere, setCritere] = useState<'global' | 'vn' | 'vo'>('global');
-  const rangs: Rang[] = dashboard.classementsSites[critere];
+  const rangs: Rang[] = dashboard.classements.site[critere];
   const valeur = (r: Rang) => (critere === 'global' ? r.total : critere === 'vn' ? r.vn : r.vo);
 
   return (

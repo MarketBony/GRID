@@ -797,6 +797,7 @@ du front declare : le navigateur execute CE code, pas une copie.
 | `pages/Tables.tsx` | `comparerLibelle` — les chefs de table possibles |
 | `pages/Gestion.tsx` | `sansDiacritiques` — la proposition d'identifiant de compte |
 | `components/PanneauxLive.tsx` | `trierPar` — les tables de la plaque |
+| `pages/Dashboard.tsx` | `cleTri` et `comparerLibelle` — le tri des colonnes du tableau |
 | `hooks/useReferentiels.ts` | `comparerLibelle` — sites et vendeurs |
 | `utils/exportExcel.ts` | `sansDiacritiques` et `comparerLibelle` — nom de fichier, onglet Detail |
 
@@ -808,6 +809,23 @@ de personnes doit trier avec `trierPar` ou `comparerLibelle`.**
 
 Consequence utile : ni la collation de la base ni la version d'ICU du navigateur n'ont
 d'effet sur ce que voit l'utilisateur.
+
+## Deux sources uniques cote INTERFACE
+
+Ajoutees le 03/09/2026, apres l'audit d'ergonomie. Meme motif que `tri.ts` : une
+regle qui vit a un seul endroit, appelee par les ecrans.
+
+| Source | Ce qu'elle porte | Qui l'appelle |
+|---|---|---|
+| `components/EnTeteTriable.tsx` | L'en-tete de colonne triable, sa fleche, ET la regle de bascule : premier clic dans le sens NATUREL de la colonne (croissant pour un libelle, decroissant pour un nombre), reclic pour inverser | `pages/Vendeurs.tsx`, `pages/Dashboard.tsx` |
+| `services/dashboard.ts` -> `classements[axe][critere]` | Les classements des 5 axes x 3 criteres, tous de la meme forme. Remplace `classementsSites` / `classementVendeurs` / `classementTables`, qui n'avaient pas la meme | `pages/Dashboard.tsx`, `components/PanneauxLive.tsx`, `utils/exportExcel.ts` |
+
+**Le tri d'affichage doit etre TOTAL, comme la pagination doit etre ordonnee.** Sur
+19 concessions dont 17 a zero, un tri par RDV laisse 17 lignes a egalite : sans
+second critere leur ordre relatif n'est pas garanti d'un rendu a l'autre. Le
+departage est le libelle, croissant — le meme que `classer` prend en dernier
+recours. C'est le meme raisonnement que `LIMIT/OFFSET` sans `ORDER BY`, a l'echelle
+d'un tableau.
 
 ## Un seul vivier de personnes, deux selecteurs
 

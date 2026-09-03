@@ -144,11 +144,14 @@ export function exporterDashboard(
   // ---------------------------------------------------------------- classements
   const lignesClassement: Ligne[] = [];
   for (const [nom, rangs] of [
-    ['Concessions — général', dashboard.classementsSites.global],
-    ['Concessions — VN', dashboard.classementsSites.vn],
-    ['Concessions — VO', dashboard.classementsSites.vo],
-    ['Vendeurs', dashboard.classementVendeurs],
-    ['Tables', dashboard.classementTables],
+    ['Concessions — général', dashboard.classements.site.global],
+    ['Concessions — VN', dashboard.classements.site.vn],
+    ['Concessions — VO', dashboard.classements.site.vo],
+    ['Plaques — général', dashboard.classements.plaque.global],
+    ['Vendeurs — général', dashboard.classements.vendeur.global],
+    ['Vendeurs — VN', dashboard.classements.vendeur.vn],
+    ['Vendeurs — VO', dashboard.classements.vendeur.vo],
+    ['Tables', dashboard.classements.table.global],
   ] as const) {
     for (const r of rangs) {
       lignesClassement.push([

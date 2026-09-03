@@ -20,6 +20,12 @@ import type { Marque, Site, TypeVehicule } from '../types';
 // en machine n'est pas un tri. Source unique : `backend/src/utils/tri.ts`.
 import { cleTri, comparerLibelle } from '../backend/src/utils/tri';
 import {
+  basculer,
+  EnTeteTriable,
+  type SensNaturel,
+  type Tri,
+} from '../components/EnTeteTriable';
+import {
   definirEncadrement,
   libelleRoleEncadrement,
   libelleRoleGlobal,
@@ -60,9 +66,10 @@ import {
 //     Derriere une seconde porte, sur une liste ou l'on voit ce qu'on detruit.
 // ============================================================================
 
-/// Colonnes triables. Le tri s'applique DANS chaque site : c'est la question
-/// qu'on se pose devant un site (« qui vend du Dacia ici ? »), pas devant les 99.
-type Tri = { colonne: string; croissant: boolean };
+/// Le tri s'applique DANS chaque site : c'est la question qu'on se pose devant un
+/// site (« qui vend du Dacia ici ? »), pas devant les 102. L'en-tete triable et
+/// sa regle de bascule vivent dans `components/EnTeteTriable.tsx`, partages avec
+/// le tableau de bord.
 
 export function Vendeurs() {
   const { donnees, index, chargement, erreur, recharger, majVendeur } = useReferentiels();
@@ -79,6 +86,17 @@ export function Vendeurs() {
   const [zoneArchives, setZoneArchives] = useState(false);
   const [siteEnAjout, setSiteEnAjout] = useState<string | null>(null);
   const [editionId, setEditionId] = useState<string | null>(null);
+
+  /// Le formulaire ouvert depuis la barre d'outils, avec choix du site. Distinct
+  /// de `siteEnAjout` : les deux ne doivent jamais etre ouverts ensemble, sans
+  /// quoi deux formulaires de creation coexistent a 8 000 px d'ecart.
+  const [ajoutGlobal, setAjoutGlobal] = useState(false);
+
+  /// Filtres de la liste des 19 cartes. Ils ne touchent PAS aux compteurs des
+  /// cartes : un effectif qui change quand on cherche un nom serait un piege —
+  /// c'est la meme regle que le total du perimetre dans le module C.
+  const [recherche, setRecherche] = useState('');
+  const [plaqueFiltre, setPlaqueFiltre] = useState('');
 
   /// Incremente a chaque archivage. Le volet Archivage s'en sert comme signal de
   /// relecture : sans lui, archiver un vendeur pendant que le volet est ouvert le
@@ -173,6 +191,31 @@ export function Vendeurs() {
     }
   };
 
+  /// Les cartes a afficher. Deux filtres qui se composent : la plaque, et une
+  /// recherche qui porte sur le SITE (libelle ou code) comme sur les NOMS de ses
+  /// vendeurs — chercher « ROUSSET » doit faire apparaitre la carte de son site,
+  /// chercher « CLF » doit faire apparaitre Clermont en entier.
+  ///
+  /// `cleTri` et non `toLowerCase` : c'est la meme cle que le tri, donc
+  /// « AMELIE » et « AMÉLIE » sont le meme nom ici comme ailleurs.
+  const q = cleTri(recherche.trim());
+  const cartesVisibles = index.vendeursParSite.filter(({ site, vendeurs }) => {
+    if (plaqueFiltre !== '' && site.plaqueId !== plaqueFiltre) return false;
+    if (q === '') return true;
+    return (
+      cleTri(site.libelle).includes(q) ||
+      cleTri(site.code).includes(q) ||
+      vendeurs.some((v) => cleTri(v.nom).includes(q))
+    );
+  });
+
+  /// La recherche ne filtre les LIGNES d'une carte que si elle a designe des
+  /// vendeurs. Sur « CLF », on veut la carte de Clermont AVEC ses 19 vendeurs, pas
+  /// une carte vide parce qu'aucun nom ne contient « CLF ».
+  const filtreNomActif =
+    q !== '' &&
+    index.vendeursParSite.some(({ vendeurs }) => vendeurs.some((v) => cleTri(v.nom).includes(q)));
+
   const changements = apercu?.resume.changements ?? 0;
   const bloquantes = apercu
     ? apercu.resume.introuvables +
@@ -188,12 +231,6 @@ export function Vendeurs() {
       <header className="ecran-entete">
         <div>
           <h2>Vendeurs</h2>
-          <p className="note">
-            La liste, l’encadrement de chaque site, et les capacités. Le métier VN/VO vient du
-            fichier source ; les <strong>marques</strong>, elles, n’y existent pas — le seed a posé
-            celles du site, et les restreindre vendeur par vendeur est ce qui donne du mordant à
-            R-C.1.
-          </p>
         </div>
         <div className="progression">
           <strong>{actifs.length}</strong>
@@ -204,22 +241,91 @@ export function Vendeurs() {
         </div>
       </header>
 
-      <div className="barre-outils">
+      {/* BARRE COLLANTE. Elle porte le seul chemin court vers « ajouter un
+          vendeur » et le filtre qui reduit les 19 cartes : les deux ne servent a
+          rien s'il faut remonter 8 900 px pour les atteindre. */}
+      <div className="barre-outils collante">
+        <div className="recherche-vendeur en-barre">
+          <input
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            placeholder="Chercher un vendeur, un site…"
+            aria-label="Chercher un vendeur ou un site"
+            spellCheck={false}
+          />
+          {recherche !== '' && (
+            <button
+              type="button"
+              className="effacer"
+              onClick={() => setRecherche('')}
+              aria-label="Effacer la recherche"
+              title="Effacer"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        {/* Les plaques viennent du referentiel — aucune n'est ecrite ici
+            (interdit n.3). */}
+        <select
+          value={plaqueFiltre}
+          onChange={(e) => setPlaqueFiltre(e.target.value)}
+          aria-label="Filtrer par plaque"
+        >
+          <option value="">Toutes les plaques</option>
+          {donnees.plaques.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.libelle}
+            </option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          className="principal"
+          onClick={() => {
+            setAjoutGlobal((o) => !o);
+            setSiteEnAjout(null);
+          }}
+        >
+          {ajoutGlobal ? 'Fermer' : '+ Ajouter un vendeur'}
+        </button>
+
         <label className="interrupteur">
           <input
             type="checkbox"
             checked={afficherSortis}
             onChange={(e) => setAfficherSortis(e.target.checked)}
           />
-          Afficher les vendeurs sortis
+          Vendeurs sortis
         </label>
         <button type="button" className="secondaire" onClick={() => setZoneCollage((o) => !o)}>
-          {zoneCollage ? 'Fermer l’import' : 'Importer les marques depuis Excel'}
+          {zoneCollage ? 'Fermer l’import' : 'Importer les marques'}
         </button>
         <button type="button" className="lien" onClick={() => setZoneArchives((o) => !o)}>
           {zoneArchives ? 'Fermer l’archivage' : 'Archivage'}
         </button>
       </div>
+
+      {ajoutGlobal && (
+        <FormulaireNouveauVendeur
+          site={null}
+          sitesAuChoix={donnees.sites}
+          marques={donnees.marques}
+          types={donnees.typesVehicule}
+          onAnnuler={() => setAjoutGlobal(false)}
+          onCreer={(champs) =>
+            void agir('nouveau-global', async () => {
+              await creerVendeur(champs);
+              await recharger();
+              setAjoutGlobal(false);
+              const site = donnees.sites.find((s) => s.id === champs.siteId);
+              return `${champs.nom} ajouté à ${site?.libelle ?? 'son site'}.`;
+            })
+          }
+        />
+      )}
 
       {messageErreur && <div className="erreur-bloc">{messageErreur}</div>}
       {succes && <div className="succes-bloc">{succes}</div>}
@@ -239,12 +345,14 @@ export function Vendeurs() {
       {zoneCollage && (
         <div className="carte">
           <h3>Import des marques par collage</h3>
+          {/* CELLE-CI RESTE : elle dit ce qu'on peut coller, et sans elle le champ
+              est un textarea vide. C'est de l'aide a l'action, pas de la
+              presentation de produit. */}
           <p className="note">
-            Deux formats acceptés : une colonne contenant les marques
-            («&nbsp;RENAULT DACIA&nbsp;»), ou une colonne par marque avec un x — ce second format
-            demande une ligne d’en-tête nommant les marques. Une colonne de code site lève les
-            homonymies. <strong>Rien n’est enregistré avant votre validation</strong>, et le métier
-            VN/VO n’est pas touché.
+            Deux formats : une colonne contenant les marques («&nbsp;RENAULT DACIA&nbsp;»), ou une
+            colonne par marque avec un x — celui-ci demande une ligne d’en-tête nommant les
+            marques. Une colonne de code site lève les homonymies. Rien n’est enregistré avant
+            validation, et le métier VN/VO n’est pas touché.
           </p>
           <textarea
             value={collage}
@@ -320,25 +428,34 @@ export function Vendeurs() {
         </div>
       )}
 
-      {index.vendeursParSite.map(({ site, plaque, vendeurs }) => (
+      {cartesVisibles.length === 0 && (
+        <p className="note">
+          Aucun site ni vendeur ne correspond{recherche !== '' ? ` à « ${recherche} »` : ''}.
+        </p>
+      )}
+
+      {cartesVisibles.map(({ site, plaque, vendeurs }) => (
         <CarteSite
           key={site.id}
           site={site}
           plaqueLibelle={plaque?.libelle ?? null}
           vendeurs={vendeurs}
+          filtreNom={filtreNomActif ? recherche : ''}
           marques={donnees.marques}
           sites={donnees.sites}
           types={donnees.typesVehicule}
           afficherSortis={afficherSortis}
           tri={tri}
-          onTrier={(colonne) =>
-            setTri((t) => ({ colonne, croissant: t.colonne === colonne ? !t.croissant : true }))
+          onTrier={(colonne, naturel) => setTri((t) => basculer(t, colonne, naturel))
           }
           enCours={enCours}
           editionId={editionId}
           enAjout={siteEnAjout === site.id}
           onEditer={(id) => setEditionId(editionId === id ? null : id)}
-          onOuvrirAjout={() => setSiteEnAjout(site.id)}
+          onOuvrirAjout={() => {
+            setSiteEnAjout(site.id);
+            setAjoutGlobal(false);
+          }}
           onFermerAjout={() => setSiteEnAjout(null)}
           onBasculerMarque={basculerMarque}
           encadrements={donnees.encadrements.filter((e) => e.siteId === site.id)}
@@ -370,7 +487,7 @@ export function Vendeurs() {
           }}
           onCreer={(champs) =>
             void agir(`nouveau-${site.id}`, async () => {
-              await creerVendeur({ ...champs, siteId: site.id });
+              await creerVendeur(champs);
               await recharger();
               setSiteEnAjout(null);
               return `${champs.nom} ajouté à ${site.libelle}.`;
@@ -388,6 +505,7 @@ function CarteSite({
   site,
   plaqueLibelle,
   vendeurs,
+  filtreNom,
   marques,
   sites,
   types,
@@ -412,12 +530,15 @@ function CarteSite({
   site: Site;
   plaqueLibelle: string | null;
   vendeurs: VendeurReferentiel[];
+  /// Filtre de nom venu de la barre d'outils. Vide = tout afficher. Il ne touche
+  /// PAS aux compteurs du titre, qui restent ceux du site entier.
+  filtreNom: string;
   marques: Marque[];
   sites: Site[];
   types: TypeVehicule[];
   afficherSortis: boolean;
   tri: Tri;
-  onTrier: (colonne: string) => void;
+  onTrier: (colonne: string, naturel: SensNaturel) => void;
   enCours: string | null;
   editionId: string | null;
   enAjout: boolean;
@@ -439,6 +560,7 @@ function CarteSite({
   onArchiver: (v: VendeurReferentiel) => void;
   onCreer: (champs: {
     nom: string;
+    siteId: string;
     marqueIds: string[];
     typeVehicule: TypeVehicule;
     dateEntree: string | null;
@@ -447,7 +569,10 @@ function CarteSite({
   const enPoste = vendeurs.filter((v) => !v.dateSortie);
 
   const visibles = useMemo(() => {
-    const liste = vendeurs.filter((v) => afficherSortis || !v.dateSortie);
+    const q = cleTri(filtreNom.trim());
+    const liste = vendeurs
+      .filter((v) => afficherSortis || !v.dateSortie)
+      .filter((v) => q === '' || cleTri(v.nom).includes(q));
     const cle = (v: VendeurReferentiel): string | number => {
       if (tri.colonne === 'nom') return cleTri(v.nom);
       if (tri.colonne === 'metier') return v.typeVehicule;
@@ -470,7 +595,7 @@ function CarteSite({
       const resultat = primaire !== 0 ? primaire : comparerLibelle(a.nom, b.nom);
       return tri.croissant ? resultat : -resultat;
     });
-  }, [vendeurs, afficherSortis, tri]);
+  }, [vendeurs, afficherSortis, tri, filtreNom]);
 
   return (
     <div className="carte">
@@ -496,8 +621,10 @@ function CarteSite({
       {visibles.length === 0 ? (
         <p className="note">
           {vendeurs.length === 0
-            ? "Aucun vendeur sur ce site. C'est un cas prévu : l'onglet MDP du fichier source était dans ce cas."
-            : 'Tous les vendeurs de ce site sont sortis. Cocher « Afficher les vendeurs sortis » pour les voir.'}
+            ? 'Aucun vendeur sur ce site.'
+            : filtreNom !== ''
+              ? `Aucun vendeur de ce site ne correspond à « ${filtreNom} ».`
+              : 'Tous les vendeurs de ce site sont sortis. Cocher « Vendeurs sortis » pour les voir.'}
         </p>
       ) : (
         <table className="tableau grille-marques">
@@ -623,32 +750,6 @@ function BlocEncadrement({
         );
       })}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------- en-tete
-
-function EnTeteTriable({
-  colonne,
-  libelle,
-  tri,
-  onTrier,
-  classe,
-}: {
-  colonne: string;
-  libelle: string;
-  tri: Tri;
-  onTrier: (colonne: string) => void;
-  classe?: string;
-}) {
-  const actif = tri.colonne === colonne;
-  return (
-    <th className={`${classe ?? ''} triable ${actif ? 'trie' : ''}`}>
-      <button type="button" onClick={() => onTrier(colonne)}>
-        {libelle}
-        <span className="fleche">{actif ? (tri.croissant ? '▲' : '▼') : '↕'}</span>
-      </button>
-    </th>
   );
 }
 
@@ -1022,18 +1123,32 @@ function ZoneArchivage({
 
 // ---------------------------------------------------------------- creation
 
+/// Le formulaire de creation, en DEUX emplois pour un seul code.
+///
+///   - `site` fourni  : la carte d'un site l'ouvre en bas de sa liste. Le site
+///     est fixe, il n'y a rien a choisir.
+///   - `sitesAuChoix` : le bouton de la barre d'outils l'ouvre EN HAUT DE PAGE
+///     avec un selecteur de site.
+///
+/// Le second existe pour une raison mesuree : la page fait 8 900 px, et le seul
+/// chemin vers « ajouter un vendeur » etait le bas de la carte du site — soit
+/// 8 557 px de defilement pour Villefranche. Le recopier en deux formulaires
+/// aurait donne deux jeux de regles de validation a maintenir.
 function FormulaireNouveauVendeur({
   site,
+  sitesAuChoix,
   marques,
   types,
   onCreer,
   onAnnuler,
 }: {
-  site: { id: string; libelle: string; code: string };
+  site: { id: string; libelle: string; code: string } | null;
+  sitesAuChoix?: Site[];
   marques: { id: string; libelle: string }[];
   types: TypeVehicule[];
   onCreer: (champs: {
     nom: string;
+    siteId: string;
     marqueIds: string[];
     typeVehicule: TypeVehicule;
     dateEntree: string | null;
@@ -1041,17 +1156,21 @@ function FormulaireNouveauVendeur({
   onAnnuler: () => void;
 }) {
   const [nom, setNom] = useState('');
+  const [siteId, setSiteId] = useState(site?.id ?? '');
   // Rien de preselectionne : c'est ce qui force a renseigner la donnee.
   const [marqueIds, setMarqueIds] = useState<string[]>([]);
   const [typeVehicule, setType] = useState<TypeVehicule | ''>('');
   const [dateEntree, setDateEntree] = useState('');
 
   const complet =
-    nom.trim() !== '' && typeVehicule !== '' && (typeVehicule === 'VO' || marqueIds.length > 0);
+    nom.trim() !== '' &&
+    siteId !== '' &&
+    typeVehicule !== '' &&
+    (typeVehicule === 'VO' || marqueIds.length > 0);
 
   return (
     <div className="apercu">
-      <h3>Nouveau vendeur — {site.libelle}</h3>
+      <h3>{site ? `Nouveau vendeur — ${site.libelle}` : 'Nouveau vendeur'}</h3>
       <div className="champs">
         <label>
           Nom
@@ -1062,6 +1181,19 @@ function FormulaireNouveauVendeur({
             placeholder="PRÉNOM NOM"
           />
         </label>
+        {sitesAuChoix && (
+          <label>
+            Site
+            <select value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+              <option value="">à choisir</option>
+              {sitesAuChoix.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.libelle} ({s.code})
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           Métier
           <select
@@ -1107,9 +1239,7 @@ function FormulaireNouveauVendeur({
           ? 'Le métier est requis : VN ou VO. Il détermine la forme de la grille de saisie.'
           : typeVehicule === 'VO'
             ? 'Un vendeur VO n’a pas de marque à renseigner.'
-            : 'Au moins une marque est requise : sans elle, un vendeur VN ne pourrait recevoir aucun RDV.'}{' '}
-        L’encadrement — chef de site, chef de vente — se règle en haut de la carte du site, une fois
-        le vendeur créé.
+            : 'Au moins une marque est requise : sans elle, un vendeur VN ne pourrait recevoir aucun RDV.'}
       </p>
 
       <div className="actions">
@@ -1120,6 +1250,7 @@ function FormulaireNouveauVendeur({
           onClick={() =>
             onCreer({
               nom: nom.trim(),
+              siteId,
               marqueIds: typeVehicule === 'VO' ? [] : marqueIds,
               typeVehicule: typeVehicule as TypeVehicule,
               dateEntree: dateEntree === '' ? null : dateEntree,

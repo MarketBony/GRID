@@ -63,9 +63,17 @@ export interface Dashboard {
     tableVersPlaque: Record<string, string>;
   };
   totaux: Record<Axe, Totaux[]>;
-  classementsSites: { global: Rang[]; vn: Rang[]; vo: Rang[] };
-  classementVendeurs: Rang[];
-  classementTables: Rang[];
+  /// Les classements, pour CHAQUE axe et CHAQUE critere.
+  ///
+  /// Il y en avait trois, de trois formes differentes : `classementsSites`
+  /// ventile en general/VN/VO, `classementVendeurs` et `classementTables` en
+  /// general seulement. Consequence : « le classement des vendeurs sur le VO »
+  /// etait inexprimable, alors que `classer` sait le faire depuis toujours — et
+  /// l'ecran devait porter un `if` par axe pour aller chercher le bon champ.
+  ///
+  /// Une seule forme, donc, et l'ecran n'a plus qu'a indexer. `classer` reste la
+  /// source unique du departage des ex aequo.
+  classements: Record<Axe, { global: Rang[]; vn: Rang[]; vo: Rang[] }>;
   parJour: TotalJour[];
 }
 
@@ -260,16 +268,22 @@ export async function chargerDashboard(campagneId: string): Promise<Dashboard> {
     sessions: charge.sessions,
     rattachements: charge.rattachements,
     totaux,
-    // Les trois classements de l'onglet RANK. Le departage des ex aequo est
-    // documente et deterministe dans `agregats.ts` — jamais l'astuce Excel
-    // `valeur - ROW()/1000000`.
-    classementsSites: {
-      global: classer(totaux.site, 'global'),
-      vn: classer(totaux.site, 'vn'),
-      vo: classer(totaux.site, 'vo'),
-    },
-    classementVendeurs: classer(totaux.vendeur, 'global'),
-    classementTables: classer(totaux.table, 'global'),
+    // Les classements de l'onglet RANK, pour les cinq axes et les trois
+    // criteres. Le departage des ex aequo est documente et deterministe dans
+    // `agregats.ts` — jamais l'astuce Excel `valeur - ROW()/1000000`.
+    //
+    // 15 appels a `classer` au lieu de 5 : sur 104 lignes au plus, c'est
+    // gratuit, et ca supprime le `if` par axe que l'ecran portait.
+    classements: Object.fromEntries(
+      AXES.map((axe) => [
+        axe,
+        {
+          global: classer(totaux[axe], 'global'),
+          vn: classer(totaux[axe], 'vn'),
+          vo: classer(totaux[axe], 'vo'),
+        },
+      ])
+    ) as Dashboard['classements'],
     parJour: totauxParJour(rdvs, charge.jours, vendeurs),
   };
 }

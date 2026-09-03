@@ -152,6 +152,43 @@ Firefox) : les barres système traversaient l'interface en gris clair.
 **Les données prennent la largeur, la prose non.** `main` plafonne à 120 rem — sans borne, une
 ligne de texte traverse un écran 4K. Les paragraphes gardent leur propre limite en `ch`.
 
+**Aucune constante ne devine la hauteur d'un élément variable.** L'en-tête de l'application
+est `sticky` ET en `flex-wrap` : sa hauteur vaut 57 px et elle change dès que les onglets
+passent à la ligne. Trois endroits du CSS s'alignaient dessus avec trois nombres
+différents — `4.5rem`, `6rem`, `9rem` — et l'écran de saisie débordait de 167 px à
+1600×900, donc une barre de défilement pendant une session. `App.tsx` mesure l'en-tête par
+`ResizeObserver` et pose `--h-entete` ; tout ce qui s'y aligne lit la variable. Le
+commentaire de la section « grille » d'`index.css` prédisait ce défaut, deux fois, avant
+qu'il n'arrive.
+
+**`overflow-x: clip`, jamais `hidden`, sur `html`/`body`.** Un `overflow` autre que
+`visible` sur la racine en fait un conteneur de défilement, ce qui **désarme tout
+`position: sticky` relatif à la fenêtre**. Mesuré le 03/09/2026 : la barre de navigation
+déclarait `sticky; top: 0` et partait à −1200 px au défilement — sur l'écran Vendeurs, qui
+fait 8 900 px, on perdait la navigation entière. `clip` découpe pareil sans créer de
+scrollport. Un en-tête qui ne colle pas ne produit aucune erreur : il se lit comme un choix
+de conception, et c'est pour ça qu'il a survécu si longtemps.
+
+**Un sélecteur d'élément attrape ce qu'on n'a pas prévu.** `header { position: sticky }`
+visait la coquille et attrapait les six `.ecran-entete` plus les quatre en-têtes de
+panneau : dix éléments collants à la même hauteur et au même `z-index`. Ce qui relève de la
+coquille se scope à la coquille — `.application > header`. C'est la même leçon que la règle
+fourre-tout qui donnait le dégradé à tout `button`.
+
+**Une règle déclarée deux fois dans `index.css` défait la media query qui est entre les
+deux.** Le repli en une colonne de la saisie était écrit, puis annulé 1 700 lignes plus bas
+par un second `.saisie-corps` de même spécificité : **le mode tablette n'a jamais
+fonctionné**, alors que F-C.9 le vise explicitement. Une valeur ne se déclare qu'une fois,
+et un « correctif » ajouté en fin de fichier se fond dans la règle d'origine. C'est le
+troisième cas dans ce fichier après `main { max-width }`.
+
+**Pas de prose de présentation dans l'interface.** Les écrans portaient des paragraphes qui
+expliquaient le produit à lui-même — « remplace trois onglets du fichier », « rien n'est
+stocké », « jamais l'astuce `valeur − ROW()/1000000` ». Ce sont des arguments de conception,
+ils appartiennent aux `.md`. La règle : **on garde ce qui dit à l'utilisateur ce qui va se
+passer s'il clique** (clôturer fige la campagne, archiver conserve les RDV, les deux formats
+de collage acceptés), on retire le reste.
+
 **Écart assumé : pas de Tailwind.** GEARBOX le charge depuis un CDN ; ici tout est en CSS
 simple, dans `index.css`. Deux raisons — la grille du module C impose ses propres
 contraintes de mise en page et ne gagnerait rien à des classes utilitaires, et Tailwind

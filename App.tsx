@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Rempart } from './components/Rempart';
 import { useSession } from './contexts/SessionContext';
 import { useTheme } from './contexts/ThemeContext';
@@ -53,6 +53,41 @@ export default function App() {
   // parmi d'autres. Un chef de table qui se connecte pendant une session doit y
   // etre deja.
   const [onglet, setOnglet] = useState<Onglet>('saisie');
+  const entete = useRef<HTMLElement | null>(null);
+
+  // ------------------------------------------------------------------------
+  // LA HAUTEUR DE L'EN-TETE EST MESUREE, PAS DEVINEE.
+  //
+  // Trois endroits du CSS en avaient besoin — le `top` collant de la liste des
+  // vendeurs et les deux `max-height` de l'ecran de saisie — et les trois
+  // portaient une constante differente : `4.5rem`, `6rem`, `9rem`. La vraie
+  // valeur est 57 px, et elle CHANGE : l'en-tete est en `flex-wrap`, donc sa
+  // barre d'onglets passe a la ligne sur un ecran etroit et il grandit.
+  //
+  // Le commentaire de la section « grille » du CSS le disait deja, deux fois :
+  // « une constante qui doit egaler la hauteur d'un element variable est un bug
+  // qui attend ». Il attendait, et il se voyait — la page de saisie debordait de
+  // 167 px a 1600x900, donc une barre de defilement pendant une session.
+  //
+  // Une mesure, une variable, trois usages. `ResizeObserver` et non un calcul au
+  // montage : le theme, la longueur du nom du compte et le passage a la ligne des
+  // onglets la font varier apres coup.
+  // ------------------------------------------------------------------------
+  useEffect(() => {
+    const cible = entete.current;
+    if (!cible) return;
+    const poser = () =>
+      document.documentElement.style.setProperty(
+        '--h-entete',
+        `${Math.round(cible.getBoundingClientRect().height)}px`
+      );
+    poser();
+    const observateur = new ResizeObserver(poser);
+    observateur.observe(cible);
+    return () => observateur.disconnect();
+    // `session` en dependance : l'en-tete n'existe pas avant la connexion, donc
+    // la ref est nulle au premier rendu.
+  }, [session]);
 
   if (chargement) return <div className="attente">Chargement...</div>;
   if (!session) return <Connexion />;
@@ -61,7 +96,7 @@ export default function App() {
 
   return (
     <div className="application">
-      <header>
+      <header ref={entete}>
         <span className="logotype">
           <img className="logotype-marque" src="/grid.svg" alt="" aria-hidden="true" />
           <span className="logotype-mot">GRID</span>

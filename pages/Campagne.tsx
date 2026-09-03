@@ -197,10 +197,6 @@ export function Campagne() {
       <header className="ecran-entete">
         <div>
           <h2>Campagnes</h2>
-          <p className="note">
-            Les jours ne sont ni consecutifs ni au nombre de cinq par nature : ils s'ajoutent un
-            par un. Les creneaux sont une liste ordonnee de longueur libre.
-          </p>
         </div>
         <select value={idCourant ?? ''} onChange={(e) => setIdCourant(e.target.value)}>
           {liste.map((c) => (
@@ -356,9 +352,8 @@ export function Campagne() {
       <div className="carte">
         <h3>Mode d'organisation par plaque</h3>
         <p className="note">
-          Le mode appartient a la session, pas a la plaque : CENTRE et SUD ont utilise des tables
-          en juin, NORD et SUD-OUEST non, et rien n'oblige septembre a faire pareil. Basculer en
-          « par site » ne supprime aucune table — la composition reste et se retrouve au retour.
+          Basculer en « par site » ne supprime aucune table : la composition reste et se retrouve
+          au retour.
         </p>
         <table className="tableau">
           <thead>

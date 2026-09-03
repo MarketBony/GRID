@@ -1,9 +1,249 @@
 # BUGS-CONNUS
 
-Mise a jour : 03/09/2026, apres l'empilement des RDV dans une case.
+Mise a jour : 03/09/2026, apres l'audit d'ergonomie du front.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
+
+---
+
+## Audit d'ergonomie du front — 03/09/2026
+
+Parti d'une demande d'utilisateur en quatre points. Les mesures ont deplace trois
+des quatre diagnostics.
+
+### [CORRIGE] Trois constantes devinaient la hauteur de l'en-tete, et aucune n'etait juste
+
+**Signale comme « les tableaux Renault/Dacia prennent trop de place, ce qui force
+une scrollbar ». La grille etait bien en cause, mais pas seule, et pas d'abord.**
+
+Mesure a 1600x900 sur l'ecran de saisie : **1 067 px de contenu pour 900 px de
+fenetre**, alors que les deux colonnes savent defiler dans leur cadre depuis
+toujours. Le debordement ne venait pas du volume mais de trois valeurs qui
+s'alignaient sur l'en-tete de l'application :
+
+| Endroit | Valeur ecrite | Valeur reelle |
+|---|---|---|
+| `top` collant de `.liste-vendeurs` | `4.5rem` (72 px) | 57 px |
+| `max-height` de `.liste-vendeurs` | `100vh - 6rem` (96 px) | 57 px |
+| `max-height` de `.zone-grille` | `100vh - 9rem` (144 px) | 57 px |
+
+Trois nombres differents pour une meme hauteur, et **aucun ne pouvait etre juste** :
+l'en-tete est en `flex-wrap`, donc sa barre d'onglets passe a la ligne sur un ecran
+etroit et il grandit.
+
+Le plus notable est que le fichier le savait. Le commentaire de la section
+« defilement de la grille » d'`index.css` disait deja, mot pour mot : « une
+constante qui doit egaler la hauteur d'un element variable est un bug qui attend ».
+Il l'ecrivait pour justifier d'avoir retire UNE de ces constantes, et en laissait
+trois.
+
+`App.tsx` mesure desormais l'en-tete par `ResizeObserver` et pose `--h-entete` sur
+`:root`. Une mesure, une variable, quatre usages — la barre d'outils collante de
+l'ecran Vendeurs s'y aligne aussi. **Debordement de page : 0.**
+
+### [CORRIGE] Le mode tablette n'avait jamais fonctionne
+
+**Trouve en verifiant le correctif precedent a 900 px de large.**
+
+`index.css` declarait `.saisie-corps` avec sa media query « une colonne » a la
+ligne 989 — puis **une seconde fois a la ligne 2 670**, sans media query et de meme
+specificite. La seconde gagnait. A 900 px de large, l'ecran restait donc en deux
+colonnes de 320 et 506 px : la grille debordait horizontalement de 96 px et
+verticalement de 517.
+
+C'est la **troisieme fois** que ce fichier porte une propriete declaree deux fois
+(apres `main { max-width }`, deja fondue par une session precedente). La valeur de
+la ligne 2 670 a ete remontee dans la regle d'origine.
+
+Aggravant, et decouvert dans la foulee : le remede d'origine du mode une colonne
+etait pire que le mal. Il rendait la liste des vendeurs au flux normal pour qu'elle
+ne capture plus la molette, ce qui la faisait mesurer **5 304 px** — la grille de
+saisie se retrouvait a **5 523 px du haut de page**. Il fallait faire defiler 104
+vendeurs pour atteindre l'ecran de saisie, sur le format meme que F-C.9 vise. Un
+plafond a 38 % de la fenetre resout les deux : page a 1 181 px, grille a 523 px.
+
+### [CORRIGE] Les deux sections d'un vendeur VN ne tenaient pas dans un ecran
+
+La demande initiale, et elle etait fondee : deux sections de 11 creneaux empilees
+font **988 px**. Il fallait defiler pour voir Dacia — alors que tout l'interet des
+sections empilees, ecrit dans `GrilleVendeur.tsx`, est de voir les deux compteurs
+se remplir ENSEMBLE.
+
+Elles passent cote a cote des que la largeur le permet (`auto-fit`, seuil 35 rem) :
+le meme planning fait **531 px** et tient en entier, sans aucun defilement. En
+dessous du seuil elles se rempilent d'elles-memes — rien a basculer, rien a regler.
+
+Ce qui a rendu la chose possible : `min-width` d'une case ramene de 7 rem a
+5,5 rem. Ce n'est pas une reduction de la cible tactile — `width: 100%` sur la
+table fait etirer les colonnes des qu'il y a de la place, un vendeur VO seul dans sa
+section a des cases de 200 px. C'est un plancher, pas une taille. A 7 rem, il
+fallait 42 rem par section et elles restaient empilees sur tout ecran de moins de
+21 pouces.
+
+**L'ordre DOM ne change pas, donc le clavier ne change pas** : franchir le bas de
+Renault mene toujours au haut de Dacia. Le deplacement se lit de gauche a droite au
+lieu de haut en bas.
+
+### [CORRIGE] Le classement des vendeurs existait, mais rien ne le montrait
+
+**Signale comme « il manque un classement des vendeurs ». Il ne manquait pas —
+`classementVendeurs` etait calcule, servi, et affiche par le segment « Vendeurs ».**
+
+Trois choses le rendaient introuvable :
+
+1. le graphique « Tete du classement » lisait `classementsSites` **en dur**. Changer
+   d'axe changeait le tableau et le classement du bas, mais pas lui : on voyait donc
+   toujours des concessions, quel que soit le segment actif ;
+2. le classement complet est en bas de page, **sous un tableau de 104 lignes** ;
+3. le segment general/VN/VO etait enfoui dans le `h3` du classement, alors qu'il
+   gouverne AUSSI le graphique — un controle invisible depuis l'un des deux blocs
+   qu'il commande.
+
+Cause de fond, cote service : **trois champs de classement de trois formes
+differentes**. `classementsSites` etait ventile en general/VN/VO,
+`classementVendeurs` et `classementTables` en general seulement. « Le classement des
+vendeurs sur le VO » etait donc inexprimable, alors que `classer` sait le faire
+depuis toujours — et l'ecran portait un `if` par axe pour aller chercher le bon
+champ.
+
+Un seul champ desormais, `classements[axe][critere]`, pour les cinq axes et les
+trois criteres. 15 appels a `classer` au lieu de 5 : sur 104 lignes au plus, c'est
+gratuit. `classer` reste la source unique du departage des ex aequo. L'axe
+« Plaques » gagne au passage un vrai classement — il affichait « le classement porte
+sur les concessions et les vendeurs », c'est-a-dire rien.
+
+L'export Excel passe de 5 a 8 series de classement : plaques, et vendeurs ventiles
+VN/VO.
+
+### [CORRIGE] Les colonnes du tableau de bord ne se triaient pas
+
+Demande de l'utilisateur, et `EnTeteTriable` existait deja — dans
+`pages/Vendeurs.tsx`. Le recopier aurait donne deux fleches, deux regles de bascule
+et deux etats « non trie » a maintenir : l'esprit de l'interdit n.6 vaut aussi pour
+l'interface. Il vit maintenant dans `components/EnTeteTriable.tsx`, avec sa regle de
+bascule, et les deux ecrans l'appellent.
+
+Deux points de conception qui ne sont pas du confort :
+
+- **le premier clic trie dans le sens NATUREL de la colonne** — croissant pour un
+  libelle, decroissant pour un nombre. D'un classement on veut la tete, pas la
+  queue ;
+- **le tri est TOTAL.** Sur 19 concessions dont 17 a zero, un tri par RDV laisse 17
+  lignes a egalite : sans second critere leur ordre relatif n'est pas garanti d'un
+  rendu a l'autre. Le departage est le libelle, toujours croissant — le meme que
+  `classer` prend en dernier recours. Une liste qui se reordonne toute seule sous
+  les yeux est exactement ce que ce produit reproche au fichier.
+
+### [CORRIGE] Aucun chemin vers « ajouter un vendeur » sans defiler 8 500 px
+
+Signale par l'utilisateur : « obligé de scroll pendant 2 min pour aller en bas de
+page et saisir des vendeurs ». Mesure : la page fait **8 933 px** — 19 cartes de
+site depliees — et le seul bouton d'ajout etait en bas de la carte du site, soit
+**8 557 px** de defilement pour Villefranche.
+
+Trois ajouts, tous dans une barre d'outils **collante** — une barre qui porte la
+recherche et l'ajout ne sert a rien si elle est a 8 900 px au-dessus du regard :
+
+| | |
+|---|---|
+| `+ Ajouter un vendeur` | ouvre le formulaire EN HAUT DE PAGE, avec un selecteur de site |
+| Recherche | porte sur le nom du vendeur ET sur le site (libelle ou code) |
+| Filtre par plaque | 19 cartes -> 3 pour NORD, page de 8 933 a 1 833 px |
+
+Le formulaire de creation n'a **pas** ete duplique : il prend un `site` fixe (emploi
+de la carte) ou un `sitesAuChoix` (emploi de la barre). Deux jeux de regles de
+validation auraient diverge.
+
+La recherche ne filtre les LIGNES d'une carte que si elle a designe des vendeurs :
+sur « CLF » on veut la carte de Clermont AVEC ses 19 vendeurs, pas une carte vide
+parce qu'aucun nom ne contient « CLF ». Verifie au clavier : « ROUSSET » rend 1 carte
+et 1 ligne, page a 900 px ; « MOZ » rend la carte de Mozac et ses 7 vendeurs.
+
+**Les compteurs des cartes ne bougent pas quand on filtre.** C'est la meme regle que
+le total du perimetre dans le module C : un effectif qui change quand on cherche un
+nom serait un piege.
+
+### [CORRIGE] Des paragraphes qui expliquaient le produit a lui-meme
+
+Demande de l'utilisateur, et elle est juste. Exemple retire :
+
+> Remplace trois onglets du fichier : les totaux, le suivi comparé à une campagne
+> antérieure, et les classements. **Rien n'est stocké** — chaque nombre est
+> recalculé à la lecture, et l'effectif est calculé, jamais saisi.
+
+Ce sont des arguments de CONCEPTION. Ils ont leur place dans les `.md`, pas sur
+l'ecran d'un chef de table. Sept blocs retires ou raccourcis, sur cinq ecrans, plus
+deux libelles de KPI (« calculé, jamais saisi » -> « vendeurs présents »).
+
+La regle appliquee, et elle est declaree telle quelle dans `CLAUDE.md` : **on garde
+ce qui dit a l'utilisateur ce qui va se passer s'il clique** — cloturer fige la
+campagne, archiver conserve les RDV, les deux formats de collage acceptes — on
+retire le reste.
+
+### [CORRIGE] La barre de navigation n'avait JAMAIS ete collante
+
+**Le defaut le plus ancien de ce lot, et il dormait depuis le premier jour.**
+
+Trouve en verifiant que la nouvelle barre d'outils de l'ecran Vendeurs collait
+bien : elle ne collait pas. Mesure sur l'en-tete de l'application, qui declare
+`position: sticky; top: 0` depuis toujours :
+
+```
+scrollTo(0, 1200)  ->  header.getBoundingClientRect().top = -1200
+```
+
+Cause : `html, body { overflow-x: hidden }`. **Un `overflow` autre que `visible`
+sur la racine en fait un conteneur de defilement**, ce qui desarme tout
+`position: sticky` relatif a la fenetre. La regle est juste dans son intention —
+« la page ne defile jamais horizontalement » — et c'est son effet de bord qui la
+defait.
+
+Consequence reelle : sur l'ecran Vendeurs, qui fait 8 900 px, **on perdait la
+navigation entiere** des qu'on descendait. Personne ne l'avait remarque parce
+qu'un en-tete qui ne colle pas ne produit aucune erreur : il se lit comme un choix
+de conception.
+
+Corrige par `overflow-x: clip`. `clip` decoupe exactement pareil **sans** creer de
+scrollport, donc les `sticky` fonctionnent. Le seul ecart est qu'on ne peut plus
+defiler par programme sur l'axe decoupe, ce qu'on ne veut precisement pas ici.
+
+### [CORRIGE] Dix elements etaient collants a la meme hauteur, et le dernier gagnait
+
+**Revele par le correctif precedent** — un defaut qui dormait tant que rien ne
+collait, et qui s'est vu a la seconde ou les `sticky` ont repris.
+
+Le titre de l'ecran s'est mis a **recouvrir la barre de navigation**.
+`elementFromPoint(700, 20)`, en plein dans l'en-tete de l'application, rendait le
+`h2` de l'ecran.
+
+Cause : `header { position: sticky; top: 0; z-index: 20; ... }` est un **selecteur
+d'ELEMENT**. Il visait la coquille et attrapait les six `.ecran-entete`, les deux
+en-tetes de panneau live et les deux du module B — dix elements `sticky; top: 0`
+au meme `z-index`, dont le dernier du DOM l'emporte.
+
+Corrige en scopant la seule partie nuisible a `.application > header` :
+`position`, `top`, `z-index`. Le reste de la regle — fond de verre, flou, liseré —
+**reste sur `header`** : c'est lui qui donne aux six en-tetes d'ecran leur cadre,
+et le retirer aurait restyle six ecrans sans que ce soit demande.
+
+`.application > header` et non `header:first-of-type` : la relation « en-tete de la
+coquille » est structurelle, pas positionnelle.
+
+**La lecon, et c'est la troisieme fois dans ce fichier CSS : un selecteur
+d'element attrape ce qu'on n'a pas prevu.** Meme classe de defaut que la regle
+fourre-tout qui donnait le degrade Bony a tout `button`, corrigee en son temps par
+l'inversion `.principal`.
+
+### [CONNU, NON CORRIGE] L'ecran Vendeurs fait toujours 8 990 px sans filtre
+
+Les 19 cartes restent depliees en permanence. Les filtres et la barre collante
+retirent la douleur immediate — on atteint l'ajout et un site donne en un geste —
+mais parcourir la liste entiere demande toujours de defiler.
+
+Le remede serait des cartes repliables, avec un etat par site a memoriser. Non fait :
+c'est un changement d'interaction, pas un reglage, et la demande portait sur l'acces
+a la saisie de vendeurs, qui est reglee. A trancher separement.
 
 ---
 

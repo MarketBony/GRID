@@ -20,6 +20,17 @@
    ============================================================================ */
 
 :root {
+  /* ---- Mesures de la coquille ----
+
+     `--h-entete` est POSEE PAR `App.tsx` a partir de la hauteur reelle de
+     l'en-tete, mesuree par un `ResizeObserver`. La valeur ci-dessous n'est qu'un
+     repli pour le premier rendu : tout ce qui doit s'aligner sur l'en-tete lit
+     la variable et jamais un nombre. Trois constantes divergentes vivaient ici
+     (4,5 rem, 6 rem, 9 rem) pour une hauteur qui vaut 57 px et qui change quand
+     les onglets passent a la ligne. */
+  --h-entete: 3.6rem;
+  --padding-main: 1.5rem;
+
   /* ---- Marque Bony ---- */
   --bony-orange: #f75632;
   --bony-violet: #8f12ab;
@@ -119,8 +130,20 @@ html,
 body {
   max-width: 100%;
   /* La page ne défile JAMAIS horizontalement : c'est le contenu large — grille
-     de marques, planning de saisie — qui défile dans son propre cadre. */
-  overflow-x: hidden;
+     de marques, planning de saisie — qui défile dans son propre cadre.
+
+     `clip` ET NON `hidden`, et la différence n'est pas cosmétique. `overflow`
+     autre que `visible` sur la racine en fait un CONTENEUR DE DÉFILEMENT, ce qui
+     désactive tout `position: sticky` relatif à la fenêtre. Mesuré le
+     03/09/2026 : l'en-tête de navigation déclarait `sticky; top: 0` et partait à
+     −1 200 px au défilement. Sur l'écran Vendeurs, qui fait 8 900 px, on perdait
+     donc la navigation entière — et personne ne l'avait remarqué parce que la
+     règle est juste, c'est son effet de bord qui la défait.
+
+     `clip` découpe exactement pareil, sans créer de scrollport : les `sticky`
+     fonctionnent. Le seul écart est qu'on ne peut plus défiler par programme sur
+     l'axe découpé, ce qu'on ne veut précisément pas ici. */
+  overflow-x: clip;
 }
 
 body {
@@ -547,13 +570,29 @@ header {
   flex-wrap: wrap;
   row-gap: 0.6rem;
   padding: 0.8rem 1.5rem;
-  position: sticky;
-  top: 0;
-  z-index: 20;
   background: var(--glass-bg-strong);
   backdrop-filter: blur(var(--glass-blur)) saturate(200%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(200%);
   border-bottom: 1px solid var(--glass-border);
+}
+
+/* SEUL L'EN-TETE DE L'APPLICATION COLLE, et il faut le dire explicitement.
+   `header` est un selecteur d'ELEMENT : il attrape les six `.ecran-entete`, les
+   deux en-tetes de panneau live et les deux du module B. Tous etaient donc
+   `sticky; top: 0; z-index: 20` — dix elements collants a la meme hauteur et au
+   meme niveau, dont le dernier du DOM gagne.
+
+   Personne ne l'avait vu parce que `overflow-x: hidden` sur la racine desarmait
+   TOUS les `sticky` de la fenetre (voir le commentaire de `html, body`). En le
+   reparant, le titre de l'ecran s'est mis a recouvrir la barre de navigation :
+   un defaut qui dormait depuis le premier jour et que la correction a reveille.
+
+   `.application > header` et non `header:first-of-type` : la relation « en-tete
+   de la coquille » est structurelle, pas positionnelle. */
+.application > header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 
 nav {
@@ -627,7 +666,10 @@ nav {
 }
 
 main {
-  padding: 1.5rem;
+  /* Le padding est un TOKEN : l'ecran de saisie doit le retrancher de la hauteur
+     de fenetre pour tenir exactement, et le recopier en dur ferait une
+     quatrieme constante a maintenir. */
+  padding: var(--padding-main);
   /* 120rem et non 76rem : la grille de saisie et le tableau de bord ont besoin de
      la largeur reelle de l'ecran. Cette valeur etait declaree DEUX FOIS dans ce
      fichier, la seconde ecrasant la premiere — les deux sont fondues ici. */
@@ -706,6 +748,42 @@ main {
   align-items: center;
   gap: 1.25rem;
   flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------- collante
+
+   L'ecran Vendeurs fait 8 900 px : 19 cartes de site depliees. Une barre
+   d'outils qui porte la recherche et le bouton « ajouter un vendeur » ne sert a
+   rien si elle est a 8 900 px au-dessus du regard.
+
+   `top: var(--h-entete)` et non une constante : elle se pose sous l'en-tete de
+   l'application, dont la hauteur est MESUREE (voir `App.tsx`). Le fond est
+   opaque au flou pres, sinon les lignes de tableau defilent visiblement a
+   travers. */
+.barre-outils.collante {
+  position: sticky;
+  top: var(--h-entete);
+  z-index: 10;
+  margin: 0 calc(-1 * var(--padding-main));
+  padding: 0.6rem var(--padding-main);
+  gap: 0.9rem;
+  background: var(--glass-menu-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* La recherche dans une barre d'outils, et non en tete d'une colonne : elle perd
+   son padding de colonne et prend une largeur propre. */
+.recherche-vendeur.en-barre {
+  flex: 1 1 16rem;
+  max-width: 24rem;
+  padding: 0;
+}
+
+.recherche-vendeur.en-barre .effacer {
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .interrupteur {
@@ -980,9 +1058,18 @@ tr.sorti td {
 
 .saisie-corps {
   display: grid;
-  grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr);
+  /* 15-20 rem et non 13-17 : la liste porte un nom, une etiquette de metier, un
+     code site et deux compteurs de marque. Cette valeur etait declaree une
+     SECONDE fois 1 700 lignes plus bas, ce qui ecrasait aussi le repli en une
+     colonne de la media query juste dessous — le mode tablette n'a donc jamais
+     fonctionne, alors que F-C.9 le vise explicitement. Fondues ici. */
+  grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr);
   gap: 1rem;
-  align-items: start;
+  /* `stretch` et non `start` : les deux colonnes doivent recevoir la hauteur de
+     la ligne, sinon la liste des vendeurs reprend sa hauteur de contenu — 5 304 px
+     pour 104 vendeurs — et deborde son cadre au lieu d'y defiler. `start` etait
+     juste tant que la ligne n'avait pas de hauteur definie. */
+  align-items: stretch;
 }
 
 @media (max-width: 60rem) {
@@ -1003,9 +1090,11 @@ tr.sorti td {
   border: 1px solid var(--panel-glass-border);
   border-radius: var(--rayon);
   padding: 0.5rem;
-  position: sticky;
-  top: 4.5rem;
-  max-height: calc(100vh - 6rem);
+  /* Elle remplit la hauteur que `.saisie-corps` lui donne — voir la section
+     « L'ECRAN DE SAISIE TIENT DANS LA FENETRE » plus bas. Plus de `sticky` ni de
+     `max-height` calculee : c'est la colonne qui a la bonne hauteur, pas la liste
+     qui la devine. */
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1085,17 +1174,63 @@ tr.sorti td {
   color: transparent;
 }
 
+/* ---------------------------------------------------------------- correctif
+   L'ECRAN DE SAISIE TIENT DANS LA FENETRE.
+
+   CE QUI ETAIT MESURE : 1067 px de contenu pour 900 px de fenetre, soit une
+   barre de defilement de page permanente pendant une session — alors que les
+   deux colonnes savaient DEJA defiler toutes seules. La cause n'etait pas le
+   volume mais trois constantes qui devinaient la hauteur du chrome
+   (`4.5rem`, `6rem`, `9rem`) pour une valeur reelle de 57 px.
+
+   L'ecran a donc EXACTEMENT la hauteur de ce qui reste sous l'en-tete, et c'est
+   `.saisie-corps` qui absorbe le reste. Les deux colonnes defilent dans leur
+   cadre ; la page, elle, ne defile plus.
+
+   `min-height` en garde-fou : le jour ou les panneaux live sont deplies sur une
+   petite fenetre, mieux vaut rendre la page defilante que reduire la grille a
+   deux creneaux. */
+
+.ecran.saisie {
+  height: calc(100dvh - var(--h-entete) - 2 * var(--padding-main));
+  min-height: 28rem;
+}
+
+.saisie-corps {
+  flex: 1;
+  min-height: 0;
+}
+
 /* ---------------------------------------------------------------- grille */
 
 .zone-grille {
   min-width: 0;
 }
 
+/* LES SECTIONS PASSENT COTE A COTE DES QUE LA LARGEUR LE PERMET.
+
+   Un vendeur VN a deux sections — Renault et Dacia — de 11 creneaux chacune.
+   Empilees, elles font 988 px : la grille ne tenait pas dans son cadre et il
+   fallait defiler pour voir Dacia, alors que tout l'interet des sections
+   empilees est justement de voir les deux compteurs se remplir ENSEMBLE.
+
+   Cote a cote, le meme planning fait ~500 px et tient en entier. En dessous du
+   seuil, `auto-fit` les rempile de lui-meme : rien a basculer, rien a regler.
+   Un vendeur VO, qui n'a qu'une section, la recoit sur toute la largeur.
+
+   L'ORDRE DOM NE CHANGE PAS, donc le clavier ne change pas : franchir le bas de
+   Renault mene toujours au haut de Dacia. Le deplacement se lit de gauche a
+   droite au lieu de haut en bas, et la case active se voit a son liseré. */
 .grille {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(31.5rem, 1fr));
+  align-items: start;
   gap: 1rem;
   outline: none;
+}
+
+.grille .aide-clavier {
+  grid-column: 1 / -1;
 }
 
 .grille:focus-visible {
@@ -1136,7 +1271,11 @@ tr.sorti td {
 
 .tableau-grille .entete-section {
   text-align: left;
-  min-width: 7rem;
+  /* 5 rem et non 7 : cette colonne ne porte qu'un libelle de marque en
+     0,68 rem (« Renault ») et des codes de creneau (« 14h-15h »). Les 2 rem
+     economises sont ce qui fait tenir DEUX sections cote a cote sur un portable
+     de 1440 px — voir le seuil de `.grille`. */
+  min-width: 5rem;
 }
 
 .tableau-grille .creneau {
@@ -1356,7 +1495,9 @@ kbd {
    F-C.9 demande sur tablette. */
 
 .zone-grille {
-  max-height: calc(100vh - 9rem);
+  /* La hauteur vient de la colonne, plus d'une constante — voir la section
+     « L'ECRAN DE SAISIE TIENT DANS LA FENETRE ». */
+  min-height: 0;
   overflow: auto;
   border-radius: var(--rayon);
 }
@@ -1394,19 +1535,36 @@ kbd {
 /* ---------------------------------------------------------------- correctif
    AFFICHAGE UNE COLONNE (tablette, volet etroit).
 
-   La liste des vendeurs est collante avec son propre defilement, ce qui est juste
-   en deux colonnes — elle reste sous les yeux pendant qu'on parcourt les creneaux.
-   En UNE colonne, elle occupe toute la largeur, et son defilement interne capturait
-   la molette : la page ne bougeait plus.
+   La liste des vendeurs defile dans son cadre, ce qui est juste en deux colonnes —
+   elle reste sous les yeux pendant qu'on parcourt les creneaux. En UNE colonne,
+   elle occupe toute la largeur, et son defilement interne capturait la molette :
+   la page ne bougeait plus.
 
-   En une colonne elle reprend donc le flux normal, et c'est la grille qui garde son
-   cadre defilant. */
+   En une colonne, l'ecran REPREND donc le flux normal — hauteur libre, page
+   defilante — et c'est la grille qui garde un cadre borne. Un ecran a hauteur de
+   fenetre n'a aucun sens ici : les deux blocs sont l'un SOUS l'autre, il n'y a
+   plus de hauteur a partager.
+
+   MAIS LA LISTE RESTE BORNEE, et le remede d'origine — « elle reprend le flux
+   normal » — etait pire que le mal : mesure a 900 px de large, elle poussait la
+   grille a 5 523 px du haut de page. Il fallait faire defiler 104 vendeurs pour
+   atteindre l'ecran de saisie, sur le format meme que F-C.9 vise. Un plafond a
+   38 % de la fenetre resout les deux : elle ne capture plus la molette — la page
+   a de la place pour bouger — et la grille reste a une hauteur d'ecran. */
 
 @media (max-width: 60rem) {
+  .ecran.saisie {
+    height: auto;
+    min-height: 0;
+  }
+
+  .saisie-corps {
+    flex: none;
+    align-items: start;
+  }
+
   .liste-vendeurs {
-    position: static;
-    max-height: none;
-    overflow: visible;
+    max-height: 38vh;
   }
 
   .zone-grille {
@@ -1834,6 +1992,14 @@ kbd {
   gap: 0 1.2rem;
 }
 
+/* Sur l'axe « Vendeurs » cette liste fait 104 lignes. Sans borne, elle poussait
+   tout le bas de l'ecran hors de vue pour les quatre autres axes aussi. */
+.classement-complet.defilant {
+  max-height: 26rem;
+  overflow-y: auto;
+  padding-right: 0.3rem;
+}
+
 .classement-complet li {
   display: grid;
   grid-template-columns: 2rem 1fr auto;
@@ -1943,6 +2109,13 @@ kbd {
 
 .tableau th.triable button:hover {
   color: var(--bony-orange);
+}
+
+/* `justify-content: inherit` ne recupere PAS `text-align` : sur une colonne de
+   nombres, le libelle et sa fleche restaient collés a gauche au-dessus de
+   chiffres alignes a droite. */
+.tableau th.triable.nombre button {
+  justify-content: flex-end;
 }
 
 /* La fleche est DISCRETE tant que la colonne n'est pas celle du tri : afficher
@@ -2666,13 +2839,21 @@ html.dark .kpi {
 }
 
 /* La grille de saisie prend toute la largeur disponible : les colonnes de jour
-   s'étirent, les cases deviennent confortables au doigt (F-C.9). */
-.saisie-corps {
-  grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr);
-}
+   s'étirent, les cases deviennent confortables au doigt (F-C.9). La largeur de
+   la colonne de gauche est remontee dans la regle `.saisie-corps` d'origine —
+   ici, elle defaisait la media query « une colonne ». */
 
+/* 5,5 rem et non 7 : c'est ce qui decide si DEUX sections tiennent cote a cote.
+   Une section demande la colonne des creneaux (7 rem) plus cinq jours, soit
+   34,5 rem — juste sous le seuil de 35 rem du `auto-fit` ci-dessus. A 7 rem par
+   case il en fallait 42, et les sections restaient empilees sur tout ecran de
+   moins de 21 pouces.
+
+   Ce n'est pas une reduction de la cible tactile : `width: 100%` sur la table
+   fait ETIRER les colonnes des qu'il y a de la place — un vendeur VO, seul dans
+   sa section, a des cases de 200 px. C'est un plancher, pas une taille. */
 .tableau-grille .case {
-  min-width: 7rem;
+  min-width: 5.25rem;
 }
 
 /* ==========================================================================

@@ -182,10 +182,8 @@ export function Tables() {
         <div>
           <h2>Tables</h2>
           <p className="note">
-            Composer les tables d’une plaque. Les tables sont un <strong>supplément</strong> : le
-            périmètre de saisie par défaut est le site, et deux plaques sur quatre n’avaient aucune
-            table en juin 2026. Aucune suppression — archiver une table rend ses membres à la
-            réserve, où ils restent saisissables par leur chef de site.
+            Archiver une table rend ses membres à la réserve, où ils restent saisissables par leur
+            chef de site.
           </p>
         </div>
         <div className="selecteurs">

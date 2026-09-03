@@ -988,6 +988,59 @@ d'inserer. Le detail est dans `tester-rls.ts`.
 `Bony-17061969`, pose par `comptes-auth`. Le plancher a 12 caracteres n'a pas bouge,
 pour personne.
 
+## 03/09/2026 — Audit d'ergonomie du front
+
+Parti de quatre points signales par l'utilisateur. Trois des quatre diagnostics ont
+bouge a la mesure, et deux defauts ont ete trouves en chemin. Detail complet et
+chiffres dans `BUGS-CONNUS.md`.
+
+| Ce qui etait signale | Ce que la mesure a dit |
+|---|---|
+| « les tableaux Renault/Dacia forcent une scrollbar » | Vrai (988 px empiles), mais le debordement de page venait d'abord de **trois constantes** qui devinaient la hauteur de l'en-tete (4,5 / 6 / 9 rem pour 57 px reels) |
+| « il manque un classement des vendeurs » | Il existait. Le graphique « Tete du classement » lisait les concessions **en dur**, quel que soit l'axe |
+| « obligé de scroll 2 min pour saisir des vendeurs » | Exact : page de 8 933 px, bouton d'ajout a 8 557 px du haut |
+| « des phrases qui font très IA » | Sept blocs de prose de presentation, sur cinq ecrans |
+
+**Trois defauts dormants trouves en verifiant, non cherches**, et le dernier est le
+plus ancien du produit :
+
+- le **mode tablette n'avait jamais fonctionne** — une regle `.saisie-corps`
+  declaree une seconde fois 1 700 lignes plus bas defaisait sa media query — et son
+  repli poussait la grille de saisie a 5 523 px du haut de page ;
+- la **barre de navigation n'avait jamais ete collante.**
+  `html, body { overflow-x: hidden }` fait de la racine un conteneur de defilement,
+  ce qui desarme tout `sticky` relatif a la fenetre. Sur l'ecran Vendeurs et ses
+  8 900 px, on perdait la navigation entiere en descendant. `clip` decoupe pareil
+  sans creer de scrollport ;
+- **dix elements etaient collants a la meme hauteur** — `header` est un selecteur
+  d'ELEMENT, il attrapait les six `.ecran-entete` et les quatre en-tetes de panneau.
+  Invisible tant que rien ne collait ; le titre de l'ecran a recouvert la navigation
+  a la seconde ou les `sticky` ont repris.
+
+Ce que ca donne, mesure a 1600x900 :
+
+| | avant | apres |
+|---|---|---|
+| Saisie — debordement de page | 167 px | **0** |
+| Saisie — grille d'un vendeur VN | 988 px, defilement interne | **531 px, tout visible** |
+| Vendeurs — page filtree sur une plaque | 8 933 px | **1 833 px** |
+| Vendeurs — acces a « ajouter un vendeur » | 8 557 px de defilement | **barre collante** |
+| Tableau de bord — colonnes triables | 0 | **9, tri total** |
+| Saisie a 900 px de large (tablette) | deux colonnes cassees, grille a 5 523 px | **une colonne, grille a 523 px** |
+
+Deux mutualisations au passage, contre la duplication :
+
+- `components/EnTeteTriable.tsx` — l'en-tete triable vivait dans `Vendeurs.tsx` ; le
+  tableau de bord en avait besoin. Il porte aussi la regle de bascule, pour qu'il
+  n'y ait qu'un sens de tri au premier clic dans tout le produit ;
+- `dashboard.classements[axe][critere]` remplace trois champs de trois formes
+  differentes. « Le classement des vendeurs sur le VO » etait inexprimable, alors que
+  `classer` sait le faire depuis toujours. L'export Excel passe de 5 a 8 series.
+
+Une seule mesure nouvelle dans la coquille : `--h-entete`, posee par `App.tsx` a
+partir de la hauteur reelle de l'en-tete (`ResizeObserver`). Quatre endroits du CSS
+la lisent, aucun ne porte plus de nombre.
+
 ## CE QUI RESTE, au 03/09/2026
 
 Il ne reste que des gestes qui appartiennent a l'utilisateur.
@@ -998,6 +1051,8 @@ Il ne reste que des gestes qui appartiennent a l'utilisateur.
 | 2 | Copie de sauvegarde **hors du depot** | Le dump hebdomadaire vit dans le depot ; si le depot disparait, tout disparait |
 | 3 | Rotation des trois secrets exposes en conversation | Jeton `sbp_` (compte entier, gearbox compris), cle `sb_secret_`, mot de passe de la base |
 | 4 | Deux RDV d'essai **archives** en septembre | `ESSAI PREMIER` / `ESSAI SECOND` sur JEROME SABIN, 10/09 8h-9h. Laisses par la verification au clavier de `Ctrl+Entree` : l'interdit n.1 interdit de les supprimer, et archives ils ne comptent nulle part. A purger avec la porte de purge si leur presence gene |
+| 5 | L'ecran Vendeurs fait 8 990 px sans filtre | Les 19 cartes restent depliees. Les filtres et la barre collante retirent la douleur immediate ; des cartes repliables demanderaient un etat par site. A trancher |
+| 6 | Une ligne de la grille est 1 px plus haute des qu'elle contient un nom | Anterieur a l'empilement, mesure a 38,39 / 39,41 px. Le remede tient en une ligne mais deplace le centrage de chaque nom du module C |
 
 **Deux ecarts assumes et documentes**, a ne pas « corriger » sans lire pourquoi :
 

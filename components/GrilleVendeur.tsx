@@ -455,8 +455,12 @@ export function GrilleVendeur({
                         />
                       ) : lesRdv.length <= 1 ? (
                         // LE CAS NORMAL, inchange : une seule ligne centree dans la
-                        // hauteur de la case.
-                        <span className="client">{lesRdv[0]?.client ?? ''}</span>
+                        // hauteur de la case. Le `title` rattrape la troncature —
+                        // une case fait 5,5 rem au plus etroit, et un nom coupe
+                        // sans moyen de le lire est une donnee perdue a l'ecran.
+                        <span className="client" title={lesRdv[0]?.client || undefined}>
+                          {lesRdv[0]?.client ?? ''}
+                        </span>
                       ) : (
                         // DEUX RDV OU PLUS. Les noms sont EMPILES, pas caches
                         // derriere un marqueur a cliquer : les deux clients se
