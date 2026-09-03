@@ -53,6 +53,20 @@ Pages -> Workers, ou commande de deploiement modifiee. Sans acces au tableau de 
 peut pas le trancher, et ca ne change rien au correctif : la configuration est requise
 dans les deux cas.
 
+**Mis en ligne et verifie le 03/09/2026.** Le lot est passe sur `master`, et la production
+sert desormais `index-kKDBZhWj.js` la ou elle servait `index-BMYtM9_z.js`. Trois controles
+sur l'URL de production :
+
+| | |
+|---|---|
+| bundle | `index-kKDBZhWj.js` + `index-gW5DNGf0.css` |
+| `overflow-x` de la racine | `clip` — le correctif du `sticky` est en ligne |
+| repli SPA | `/une/route/inexistante` et `/saisie` rendent `200 text/html` avec `index.html` |
+
+Cela tranche l'inconnue qui restait : **un push sur `master` declenche un vrai
+deploiement**, et non un `versions upload`. La lecture du tableau de bord ne permettait pas
+de le savoir — il n'affiche qu'une commande, celle du build courant.
+
 **Verifie en ligne apres correctif.** Le deploiement suivant est passe, et son journal
 tranche le seul point qui restait deduit — le nom du Worker :
 

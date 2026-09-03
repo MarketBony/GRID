@@ -1043,6 +1043,10 @@ la lisent, aucun ne porte plus de nombre.
 
 ## CE QUI RESTE, au 03/09/2026
 
+**Tout est en ligne depuis le 03/09/2026.** Le lot est sur `master`, la production sert
+le bundle du jour, la migration est appliquee sur Supabase et les six suites y sont
+vertes : 39/39 · 89/89 · 10/10 · 27/27 · 20/20 · 19/19. `comparer` ne rend aucun ecart.
+
 Il ne reste que des gestes qui appartiennent a l'utilisateur.
 
 | # | Sujet | Pourquoi maintenant |

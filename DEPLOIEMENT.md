@@ -269,11 +269,23 @@ verification a lire en premier.
 `versions upload` televerse sans deployer ; la production continue de servir la version
 precedente. Deux chemins :
 
-- **atteindre `master`** — Workers Builds utilise `wrangler deploy` sur la branche de
-  production. **A confirmer une fois** : le tableau de bord n'affiche qu'une commande de
-  deploiement, et celle qu'on y lit est celle du build courant ;
+- **atteindre `master`** — **confirme le 03/09/2026** : Workers Builds y execute un vrai
+  deploiement, et non `versions upload`. Le tableau de bord n'affiche qu'une commande de
+  deploiement, celle du build courant, donc la lecture seule ne permettait pas de le
+  savoir ; un push sur `master` l'a tranche. La production servait `index-BMYtM9_z.js`
+  avant, `index-kKDBZhWj.js` au premier controle apres ;
 - **promouvoir la version deja televersee** : `wrangler versions deploy`, ce que le
-  journal indique lui-meme.
+  journal indique lui-meme. Utile pour mettre en ligne un lot deja eprouve sur son URL
+  d'apercu sans passer par `master` — donc a eviter, puisque la production serait alors
+  en avance sur `master` et que la session suivante partirait sur de fausses bases.
+
+**Ce qu'un push sur `master` declenche, en tout :**
+
+| | |
+|---|---|
+| Cloudflare | build, puis deploiement — la production est a jour en moins de deux minutes |
+| `invariants.yml`, job `migrations` | sur un PostgreSQL 17 neuf. Tourne sur toutes les branches |
+| `invariants.yml`, job `production` | **sur Supabase, et sur `master` uniquement.** Sur une branche il est `skipped`, ce qui est voulu et ecrit dans le workflow : « sur une branche, l'ecart est normal et attendu, et un rouge normal est un rouge qu'on apprend a ignorer ». Un job saute ne fait pas echouer un run |
 
 ### Les variables sont VERSIONNEES — il n'y a rien a regler cote Cloudflare
 
