@@ -233,7 +233,7 @@ la section du jour, en tete de fichier.
 backend/
   prisma/
     schema.prisma            source de verite du modele
-    migrations/              20 migrations, rejeu a blanc valide en CI
+    migrations/              22 migrations, rejeu a blanc valide en CI
     donnees-source.ts        genere par scripts/extraire-seed.mjs — NE PAS EDITER
     donnees-xlsx.ts          idem
     rdv-juin-source.ts       les 1107 RDV reels de juin, pour test:agregats
@@ -520,7 +520,7 @@ demarrage et gagne deux choses :
 Il est joue par `.github/workflows/invariants.yml`, en deux emplois qui ne repondent pas
 a la meme question : sur un **PostgreSQL 17 neuf** bati par `migrate deploy` (« le code
 et les migrations sont-ils d'accord ? », a chaque push, et qui prouve au passage que les
-20 migrations se rejouent depuis une base vide), et sur **Supabase** (« la base reelle
+22 migrations se rejouent depuis une base vide), et sur **Supabase** (« la base reelle
 est-elle encore d'accord ? », sur `master` et au declenchement manuel seulement — sur une
 branche, l'ecart est normal, et un rouge normal est un rouge qu'on apprend a ignorer).
 

@@ -79,7 +79,7 @@ npx tsc --noEmit && cd backend && npx tsc --noEmit
 
 ## État
 
-**En ligne et vérifié de bout en bout** (01/09/2026) : 20 migrations, 16 tables,
+**En ligne et vérifié de bout en bout** (01/09/2026) : 22 migrations, 16 tables,
 11 contraintes CHECK, 19 triggers, 48 politiques RLS, 13 RPC, diffusion temps réel
 prouvée dans deux onglets. Sauvegardes hebdomadaires **avec épreuve de restauration**,
 keep-alive tous les 3 jours (le palier gratuit met le projet en pause après 7 jours).

@@ -18,7 +18,7 @@
 #                  Question : « le code et les MIGRATIONS sont-ils d'accord ? »
 #                  C'est ce qui est sous la main de celui qui pousse, donc il
 #                  tourne a chaque push et sur chaque branche. En prime, il
-#                  prouve que les 20 migrations se rejouent depuis une base
+#                  prouve que les 22 migrations se rejouent depuis une base
 #                  VIDE — ce que personne ne refait a la main.
 #
 #   `production` — sur Supabase. Question : « la base REELLE est-elle encore

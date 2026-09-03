@@ -172,7 +172,7 @@ partout ailleurs.
 C'est desormais une suite, `backend/prisma/tester-invariants.ts`, jouee comme les cinq
 autres et en CI par `.github/workflows/invariants.yml`, en deux emplois : sur un
 **PostgreSQL 17 neuf** bati par `migrate deploy` a chaque push — ce qui prouve au passage
-que les 20 migrations se rejouent depuis une base vide — et sur **Supabase** sur `master`.
+que les 22 migrations se rejouent depuis une base vide — et sur **Supabase** sur `master`.
 
 Elle couvre trois familles (detail dans `ETAT-BACKEND.md`), dont deux sont nouvelles :
 les **paliers** (`peut_administrer()` / `peut_gerer_utilisateurs()` contre leurs listes
@@ -903,7 +903,7 @@ nginx et `scripts/sauvegarde.sh` ont ete ecrits, valides, puis supprimes le 01/0
 |---|---|
 | Renommage en GRID, logotype `public/grid.svg` | **fait** |
 | Depot GitHub `MarketBony/GRID` (prive), pousse | **fait** |
-| Projet Supabase `ganeczlhcprljuazldpp`, `eu-west-3` — 20 migrations, seed | **fait** |
+| Projet Supabase `ganeczlhcprljuazldpp`, `eu-west-3` — 22 migrations, seed | **fait** |
 | RLS, 13 RPC, diffusion Realtime — `test:rls` 87/87 sur les deux bases | **fait** |
 | Front en ligne sur Cloudflare : `https://grid.bonyauto-mobile.workers.dev/` | **fait** |
 | Edge Function `gerer-comptes` — creation de comptes depuis l'interface | **fait** |
@@ -912,12 +912,35 @@ nginx et `scripts/sauvegarde.sh` ont ete ecrits, valides, puis supprimes le 01/0
 | `backup.yml` — dump hebdomadaire + **epreuve de restauration** | **fait, vert en CI** |
 | `invariants.yml` — interdit n.6, base neuve ET Supabase | **fait** |
 | `DEPLOIEMENT.md` — runbook Supabase + Cloudflare | **fait** |
-| Copie de sauvegarde **hors du depot** | a faire, et a ne pas oublier |
-| Archiver les comptes `.test` sur Supabase avant la mise en service | **a faire** |
-| Rotation des trois secrets exposes en conversation | **a faire, cote utilisateur** |
+| Les 1107 RDV de juin en base, recoupes au classeur | **fait** |
+| Comptes `.test` archives, et `test:rls` rendue autonome | **fait** |
+| Compte nominatif `tlabonne` (palier `admin`) | **fait** |
 
 Hors perimetre avant la campagne : ecrans A1 (plaques) et A2 (sites), fournis par le seed
 et stables en septembre.
+
+## CE QUI RESTE, au 01/09/2026 au soir
+
+Par ordre de ce qui bloquerait la session de septembre. Les quatre premiers points
+sont des travaux ; les trois derniers sont des gestes qui appartiennent a
+l'utilisateur.
+
+| # | Sujet | Pourquoi maintenant |
+|---|---|---|
+| 1 | **Les deux cellules a deux RDV** — module C affiche 1105, tableau de bord 1107 | Le seul point qui touche l'ERGONOMIE de septembre. Le cas se reproduira : un vendeur peut prendre deux clients dans la meme heure. Arbitrage produit, pas technique |
+| 2 | Migration `REVOKE EXECUTE … FROM PUBLIC` sur les 12 fonctions de trigger | Efface 10 alertes de l'analyseur Supabase. Aucun chemin d'exploitation (elles sont `RETURNS trigger`, PostgREST ne les expose pas), mais le bruit masque les vraies alertes |
+| 3 | Le mot de passe de `tlabonne` | `17061969` refuse par le plancher a 12 caracteres de l'Edge Function. Compte utilisable avec un mot de passe genere en attendant |
+| 4 | `test:rls` sur Supabase : 2 min 12 | Le decor est rebati a chaque controle. Un decor pose une fois par SECTION diviserait par cinq, sans rien perdre de l'isolement |
+| 5 | « Leaked Password Protection » (Supabase, *Authentication → Policies*) | Compare les mots de passe a HaveIBeenPwned. Un interrupteur |
+| 6 | Copie de sauvegarde **hors du depot** | Le dump hebdomadaire vit dans le depot ; si le depot disparait, tout disparait |
+| 7 | Rotation des trois secrets exposes en conversation | Jeton `sbp_` (compte entier, gearbox compris), cle `sb_secret_`, mot de passe de la base |
+
+**Deux ecarts assumes et documentes**, a ne pas « corriger » sans lire pourquoi :
+
+- les vues `perimetre_saisie` et `rdv_agrege` contournent la RLS (`SECURITY DEFINER`),
+  signalees CRITICAL par Supabase. C'est delibere et compense — voir `ETAT-BACKEND.md` ;
+- les ports 5432/6543 sont bloques par intermittence depuis le poste du bureau. Mesurer
+  avant de conclure a une panne.
 
 **Point de bascule :** a J6 au soir, decision binaire sur les criteres de recette 3, 4
 et 5 — septembre se saisit dans l'outil, ou dans l'Excel intact.

@@ -130,8 +130,9 @@ npm --prefix backend run comparer -- "<url locale>"
 npm --prefix backend run seed
 
 # 5. Les suites, SUR SUPABASE. Une suite verte en local ne dit rien de la production.
-npm --prefix backend run test:garde-fous   # 33/33
-npm --prefix backend run test:rls          # 81/81
+npm --prefix backend run test:garde-fous   # 39/39
+npm --prefix backend run test:rls          # 87/87
+npm --prefix backend run test:invariants   # 10/10
 ```
 
 ### Ce qui a reellement tourne le 31/08/2026
@@ -235,7 +236,7 @@ deploiement.
 |---|---|---|
 | `keep-alive.yml` | tous les 3 jours | un `SELECT 1`. Le palier gratuit met le projet en **pause apres 7 jours d'inactivite**, et GRID ne sert que quelques jours par mois — sans lui, l'outil serait en panne un matin de session |
 | `backup.yml` | chaque lundi | `pg_dump` gzippe, **restaure dans un PostgreSQL 17 jetable**, lignes comptees, puis commite dans le depot. Retention : 8 |
-| `invariants.yml` | a chaque push, et sur `master` pour Supabase | `test:invariants` — interdit n.6. Prouve aussi que les 20 migrations se rejouent depuis une base VIDE |
+| `invariants.yml` | a chaque push, et sur `master` pour Supabase | `test:invariants` — interdit n.6. Prouve aussi que les 22 migrations se rejouent depuis une base VIDE |
 
 ### Le secret unique des workflows
 
@@ -283,10 +284,11 @@ restauration, les `auth_uid` du dump pointent vers des identites disparues : c'e
 | `hooks/useTempsReel.ts` + trigger de diffusion | **fait**, diffusion prouvee dans le navigateur |
 | Edge Function `gerer-comptes` | **deployee** (version 3, `verify_jwt`). Refus verifie pour la cle publique, un encadrant et `direction` ; creation, connexion et suppression eprouvees de bout en bout |
 | Workflows `keep-alive` et `backup` | **verts en CI**. Secret `SUPABASE_DB_URL` cree ; un dump de 24 Ko produit, restaure et commite |
+| Les 1107 RDV de juin en base | **fait** — recoupes au classeur par `importer-juin` |
+| Comptes `.test` archives | **fait**, `test:rls` etant devenue autonome |
 | Workflow `invariants` | **ecrit** — interdit n.6 sur base neuve et sur Supabase |
 | Les 14 comptes relies a Supabase Auth | **fait** — `admin` et les 7 chefs de table compris |
 | Reglage `site_url` de Supabase Auth vers l'URL Cloudflare | **fait** |
 | Suppression du code serveur mort (phase 8) | **fait** (01/09) |
 | Copie de sauvegarde **hors du depot** | a faire, et a ne pas oublier |
-| Archiver les comptes `.test` presents sur Supabase | avant mise en service |
 | Revocation des secrets exposes en conversation | a faire par l'utilisateur |
