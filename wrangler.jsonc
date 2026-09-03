@@ -1,0 +1,61 @@
+// ============================================================================
+// DEPLOIEMENT DU FRONT — Cloudflare Workers avec assets statiques.
+//
+// POURQUOI CE FICHIER EXISTE, alors que le produit tourne en ligne depuis le
+// 01/09/2026 sans lui. Le projet Cloudflare est un projet WORKERS, et non Pages
+// comme `DEPLOIEMENT.md` l'a longtemps ecrit — l'URL en `.workers.dev` et les
+// onglets « Liaisons / Observability » du tableau de bord le disent.
+//
+// Cloudflare Workers Builds execute une commande de deploiement :
+//
+//     npx wrangler versions upload      (branche autre que la production)
+//     npx wrangler deploy               (branche de production)
+//
+// Les deux exigent une configuration DANS LE DEPOT. Il n'y en avait aucune : le
+// build passait — « Success: Build command completed » — et l'etape suivante
+// echouait. Reproduit a l'identique en local le 03/09/2026 :
+//
+//     npx wrangler versions upload --dry-run
+//     -> Missing entry-point: ... create a "wrangler.jsonc" file containing ...
+//
+// Wrangler dicte lui-meme le remede, et c'est ce fichier.
+//
+// ---------------------------------------------------------------------------
+// LE NOM N'EST PAS UN LIBELLE, C'EST UNE ADRESSE
+// ---------------------------------------------------------------------------
+// `name` designe le Worker a mettre a jour. Une URL `workers.dev` s'ecrit
+// `<name>.<sous-domaine du compte>.workers.dev`, et le produit vit sur
+// `grid.bonyauto-mobile.workers.dev` : le Worker s'appelle donc `grid`.
+//
+// **Se tromper ici ne casse rien, ce qui est pire** : `wrangler deploy`
+// CREERAIT un second Worker a une autre adresse, laissant l'ancien en ligne
+// avec l'ancienne version. On aurait deux GRID, et celui que tout le monde
+// consulte ne bougerait plus.
+//
+// ---------------------------------------------------------------------------
+// AUCUN `main` : IL N'Y A PAS DE CODE SERVEUR
+// ---------------------------------------------------------------------------
+// Le front est statique et attaque Supabase en direct — il n'y a plus d'API
+// depuis le 01/09/2026. Ce Worker ne sert donc que le contenu de `dist`, et un
+// Worker d'assets seuls se declare sans point d'entree.
+//
+// `not_found_handling: "single-page-application"` rend `index.html` pour toute
+// route inconnue. L'application n'a pas de routeur — les onglets sont un etat
+// React — mais sans ce reglage, un rechargement sur une URL avec un chemin
+// rendrait un 404 de Cloudflare au lieu de l'application.
+//
+// `compatibility_date` est FIGEE et ne doit pas suivre la date du jour : c'est
+// elle qui garantit que le comportement du runtime ne change pas sous nos pieds
+// entre deux deploiements.
+// ============================================================================
+{
+  // Pas de `$schema` : `wrangler` n'est pas une dependance de ce projet, il est
+  // appele par `npx` cote Cloudflare. Une reference vers un fichier absent est
+  // un mensonge que l'editeur avale en silence.
+  "name": "grid",
+  "compatibility_date": "2026-09-03",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

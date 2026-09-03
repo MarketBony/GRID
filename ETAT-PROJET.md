@@ -492,8 +492,8 @@ Parite structurelle avec GEARBOX (`C:\Users\Operateur\Documents\gearbox3backup`)
 | Base | PostgreSQL 17, schema `relance`. Local en dev, **Supabase en prod** (`eu-west-3`) |
 | Autorisation | **La BASE fait autorite**, par RLS. 48 politiques, aucun filet derriere |
 | Temps reel | Supabase Realtime (a cabler) |
-| Deploiement | Cloudflare Pages, build `npm run build`, sortie `dist` |
-| URL cible | fournie par Cloudflare Pages |
+| Deploiement | Cloudflare **Workers** (assets), build `npm run build`, `dist` declare dans `wrangler.jsonc` |
+| URL cible | fournie par Cloudflare (`<worker>.<compte>.workers.dev`) |
 
 Le front n'appelle que des URL **relatives** (`/api/...`) : Vite proxifie en dev, Caddy
 sert les deux sous le meme domaine en prod. Aucune variable d'URL d'API a se tromper.

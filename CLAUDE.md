@@ -45,7 +45,7 @@ Ce fichier porte le contexte et les règles. Pour l'état réel du code :
 | `ETAT-PROJET.md` | Mémoire de référence : ce qui est fait, décisions, lotissement |
 | `ETAT-BACKEND.md` | API, base, invariants, sources de vérité uniques |
 | `BUGS-CONNUS.md` | Défauts identifiés, corrigés ou non |
-| `DEPLOIEMENT.md` | Runbook : Supabase + Cloudflare Pages |
+| `DEPLOIEMENT.md` | Runbook : Supabase + Cloudflare Workers |
 
 Ne jamais dupliquer leur contenu ici.
 
@@ -82,8 +82,14 @@ arborescence, même pipeline, même discipline documentaire.
 - PostgreSQL 17, schéma `relance`. **Local en développement, Supabase en
   production** — projet `ganeczlhcprljuazldpp`, région `eu-west-3` (Paris)
 - Authentification JWT + bcrypt, comptes créés par un administrateur. Pas d'Entra ID
-- Déploiement du front sur **Cloudflare Pages**, relié au dépôt : build
-  `npm run build`, sortie `dist`. HTTPS et nom de domaine fournis
+- Déploiement du front sur **Cloudflare Workers** (assets statiques, aucun code
+  serveur), relié au dépôt. **`wrangler.jsonc` à la racine est obligatoire** : Workers
+  Builds exécute `wrangler deploy` sur `master` et `wrangler versions upload` ailleurs,
+  et les deux exigent cette configuration. Sans elle le build réussit et le déploiement
+  échoue — un mode d'échec qu'aucune vérification locale ne voit. Les deux commandes se
+  contrôlent en `--dry-run`. HTTPS et nom de domaine fournis.
+  **Pousser une branche de travail ne met rien en ligne** : `versions upload` ne déploie
+  pas, il faut atteindre `master`
 - **Aucune ressource partagée avec gearbox.** Exigence textuelle de l'utilisateur :
   « Gearbox reste Gearbox ». Le VPS a été remis dans son état d'origine, il ne reste
   aucune trace de GRID dessus. `grid.bonyauto-mobile.com` n'existe pas en DNS et la
@@ -410,7 +416,10 @@ Repris de GEARBOX.
 5. **Migrations sur Supabase**, puis `comparer` pour prouver que les deux bases sont
    identiques, puis les suites rejouées **sur Supabase**. Compte rendu de ce qui a
    réellement tourné, jamais de ce qui était prévu.
-6. Le front part tout seul : chaque push sur le dépôt déclenche Cloudflare Pages.
+6. **Le front ne part tout seul que depuis `master`.** Un push sur une branche de
+   travail déclenche bien un build Cloudflare, mais sa commande de déploiement est
+   `wrangler versions upload`, qui téléverse une version **sans la mettre en ligne**.
+   Vérifier le déploiement, pas seulement le build : les deux échouent séparément.
 
 ## Commandes
 

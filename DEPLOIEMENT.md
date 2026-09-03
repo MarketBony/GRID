@@ -1,7 +1,12 @@
-# DEPLOIEMENT — GRID sur Supabase et Cloudflare Pages
+# DEPLOIEMENT — GRID sur Supabase et Cloudflare Workers
 
-Mise a jour : 31/08/2026, **apres** le deploiement du schema. Ce document decrit ce qui a
-reellement tourne, pas ce qui etait prevu.
+Mise a jour : 03/09/2026, **apres** la reparation du deploiement. Ce document decrit ce
+qui a reellement tourne, pas ce qui etait prevu.
+
+**Ce fichier disait « Cloudflare Pages » partout, et c'etait faux** : le projet est un
+projet **Workers** avec assets statiques. Ca n'etait pas un detail de vocabulaire — un
+projet Workers execute une commande de deploiement qui exige une configuration dans le
+depot, et il n'y en avait aucune. Voir la section « Le front sur Cloudflare ».
 
 Il remplace integralement le runbook VPS precedent. Le VPS de gearbox a ete remis dans son
 etat d'origine : **il ne reste aucune trace de GRID dessus**, et c'est une exigence de
@@ -11,8 +16,8 @@ l'utilisateur, pas une preference — « Gearbox reste Gearbox ».
 
 ## L'architecture, en trois lignes
 
-- **Front statique** sur Cloudflare Pages. Il porte une cle publique et attaque Supabase
-  en direct.
+- **Front statique** sur Cloudflare Workers (assets seuls, aucun code serveur). Il porte
+  une cle publique et attaque Supabase en direct.
 - **Base et API** : Supabase. PostgREST pour les lectures et les ecritures simples,
   13 fonctions `security definer` pour tout ce qui doit etre transactionnel.
 - **Aucun serveur applicatif.** L'autorisation est portee par la RLS, et **elle n'a aucun
@@ -180,13 +185,59 @@ voulu : `anon` n'a meme pas l'usage du schema. Une fuite se voit, un ecran vide 
 | | |
 |---|---|
 | Depot | `MarketBony/GRID` |
+| Type de projet | **Workers** avec assets statiques — pas Pages |
+| Nom du Worker | `grid` (d'ou `grid.bonyauto-mobile.workers.dev`) |
 | URL | `https://grid.bonyauto-mobile.workers.dev` |
 | Commande de build | `npm run build` |
-| Repertoire de sortie | `dist` |
-| Variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+| Repertoire de sortie | `dist`, declare dans `wrangler.jsonc` |
+| Variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, versionnees dans `.env.production` |
 
-Chaque push deploie. HTTPS et nom de domaine sont fournis par Cloudflare — c'est
-precisement ce qui rend ce chemin possible sans acces DNS.
+HTTPS et nom de domaine sont fournis par Cloudflare — c'est precisement ce qui rend ce
+chemin possible sans acces DNS.
+
+### `wrangler.jsonc` est OBLIGATOIRE, et il a manque
+
+**Symptome, le 03/09/2026 :** le build reussit — journal Cloudflare, « Success: Build
+command completed » — et l'etape **Deploiement** echoue 12 secondes plus tard, deux fois
+de suite. Rien n'est mis en ligne, et **la production reste debout sur la version
+precedente** : verifie, l'ancien bundle etait toujours servi.
+
+Cause. Cloudflare Workers Builds n'utilise pas « repertoire de sortie » comme Pages : il
+execute une commande de deploiement, qui differe selon la branche.
+
+| Branche | Commande | Effet |
+|---|---|---|
+| autre que la production | `npx wrangler versions upload` | televerse une version **sans la deployer** |
+| production (`master`) | `npx wrangler deploy` | met en ligne |
+
+Les deux exigent une configuration **dans le depot**, et il n'y en avait aucune.
+Reproduit a l'identique en local, sans rien deployer :
+
+```bash
+npx wrangler versions upload --dry-run
+# -> Missing entry-point: ... create a "wrangler.jsonc" file containing ...
+```
+
+Wrangler dicte lui-meme le remede : c'est `wrangler.jsonc`, a la racine, et le fichier
+porte le detail de chacun de ses quatre reglages.
+
+**A verifier avant de croire un deploiement :** les deux commandes valident en dry-run
+sans toucher au reseau.
+
+```bash
+npm run build
+npx wrangler deploy --dry-run          # doit lire les fichiers de dist
+npx wrangler versions upload --dry-run
+```
+
+**Le piege du nom.** `name` designe le Worker a mettre a jour. Se tromper ne casse rien —
+c'est pire : `wrangler deploy` CREERAIT un second Worker a une autre adresse, laissant
+l'ancien en ligne avec l'ancienne version. Deux GRID, et celui que tout le monde consulte
+ne bougerait plus.
+
+**Consequence pour le lotissement :** pousser une branche de travail ne met rien en ligne,
+meme quand le deploiement reussit — `versions upload` ne deploie pas. Il faut atteindre
+`master`.
 
 ### Les variables sont VERSIONNEES — il n'y a rien a regler cote Cloudflare
 

@@ -7,6 +7,60 @@ verifie, pas seulement corrige de memoire.
 
 ---
 
+## Deploiement Cloudflare — 03/09/2026
+
+### [CORRIGE] Le deploiement echouait apres un build reussi : aucun `wrangler.jsonc`
+
+Signale par l'utilisateur, journal Cloudflare a l'appui, deux echecs de suite.
+
+Ce que dit le journal, et c'est ce qui rend le defaut trompeur :
+
+```
+10:15:16.006  Success: Build command completed
+10:15:16.120  Executing user deploy command: npx wrangler versions upload
+10:15:25.880  [echec, 12 s]
+```
+
+**Le build reussit** — `tsc --noEmit` puis `vite build`, 113 modules, 1,42 Mo — et c'est
+l'etape suivante qui casse. Un lot de code parfaitement valide n'arrive donc jamais en
+ligne, sans qu'aucune verification locale ne puisse le voir.
+
+**Premiere chose verifiee, avant tout diagnostic : la production etait-elle tombee ?**
+Non. `https://grid.bonyauto-mobile.workers.dev` servait toujours l'application, sur
+l'ANCIEN bundle (`index-BMYtM9_z.js` en ligne, `index-kKDBZhWj.js` produit par le build).
+C'est coherent avec `versions upload`, qui televerse une version **sans la deployer**.
+
+Cause. Le projet Cloudflare est un projet **WORKERS**, pas Pages — `DEPLOIEMENT.md`
+ecrivait « Pages » de bout en bout, y compris dans son titre. Ce n'etait pas un ecart de
+vocabulaire : un projet Pages se contente d'un « repertoire de sortie » reglé au tableau
+de bord, un projet Workers execute une commande de deploiement qui exige une configuration
+**dans le depot**. Il n'y en avait aucune, et il n'y en a jamais eu — verifie sur `master`
+comme dans tout l'historique.
+
+Reproduit en local, sans rien deployer, plutot que devine :
+
+```
+npx wrangler versions upload --dry-run
+-> Missing entry-point: ... create a "wrangler.jsonc" file containing ...
+```
+
+Wrangler dicte le remede, et c'est le fichier ajoute. Les deux commandes valident
+desormais en dry-run, et `wrangler deploy --dry-run` lit bien les 5 fichiers de `dist`.
+
+**Ce qui reste a comprendre** : le deploiement du 01/09 a REUSSI avec le meme depot, donc
+sans configuration. Quelque chose a change cote Cloudflare entre les deux — migration
+Pages -> Workers, ou commande de deploiement modifiee. Sans acces au tableau de bord on ne
+peut pas le trancher, et ca ne change rien au correctif : la configuration est requise
+dans les deux cas.
+
+**La lecon, et elle vaut pour la suite : un build vert ne prouve rien sur le
+deploiement.** C'est le pendant exact de « un typecheck vert ne prouve rien sur le contrat
+de l'API », d'un cran plus haut. Les deux commandes de deploiement se verifient en dry-run,
+localement, avant de croire qu'un lot est en ligne — la marche a suivre est dans
+`DEPLOIEMENT.md`.
+
+---
+
 ## Audit d'ergonomie du front — 03/09/2026
 
 Parti d'une demande d'utilisateur en quatre points. Les mesures ont deplace trois
