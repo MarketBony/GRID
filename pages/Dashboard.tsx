@@ -16,6 +16,7 @@ import { useTempsReel } from '../hooks/useTempsReel';
 import { exporterDashboard } from '../utils/exportExcel';
 import { libelleJour } from '../utils/grille';
 import { BandeauKpi, BarresHorizontales, BarresParJour } from '../components/Graphiques';
+import { Segmente } from '../components/Segmente';
 import {
   basculer,
   comparerSelon,
@@ -235,35 +236,30 @@ export function Dashboard() {
       />
 
       <div className="barre-outils">
-        <div className="segments">
-          {AXES.filter((a) => a !== 'groupe').map((a) => (
-            <button
-              key={a}
-              type="button"
-              className={axe === a ? 'segment actif' : 'segment'}
-              onClick={() => setAxe(a)}
-            >
-              {LIBELLES_AXE[a]}
-            </button>
-          ))}
-        </div>
+        <Segmente
+          etiquette="Axe d'analyse"
+          valeur={axe}
+          onChange={setAxe}
+          options={AXES.filter((a) => a !== 'groupe').map((a) => ({
+            valeur: a,
+            libelle: LIBELLES_AXE[a],
+          }))}
+        />
 
         {/* LE CRITERE EST ICI, plus dans le titre du classement en bas de page.
             Il gouverne le graphique ET le classement, donc il appartient a la
             barre d'outils avec l'axe. Enfoui dans un `h3`, il commandait deux
             blocs sans etre visible depuis l'un des deux. */}
-        <div className="segments">
-          {(['global', 'vn', 'vo'] as const).map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={critere === c ? 'segment actif' : 'segment'}
-              onClick={() => setCritere(c)}
-            >
-              {c === 'global' ? 'Général' : c.toUpperCase()}
-            </button>
-          ))}
-        </div>
+        <Segmente
+          etiquette="Critère"
+          valeur={critere}
+          onChange={setCritere}
+          options={[
+            { valeur: 'global' as const, libelle: 'Général' },
+            { valeur: 'vn' as const, libelle: 'VN' },
+            { valeur: 'vo' as const, libelle: 'VO' },
+          ]}
+        />
 
         <div className="ligne-formulaire">
           <select

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useIndicateurGlissant } from './hooks/useIndicateurGlissant';
 import { Rempart } from './components/Rempart';
 import { useSession } from './contexts/SessionContext';
 import { useTheme } from './contexts/ThemeContext';
@@ -89,10 +90,35 @@ export default function App() {
     // la ref est nulle au premier rendu.
   }, [session]);
 
-  if (chargement) return <div className="attente">Chargement...</div>;
-  if (!session) return <Connexion />;
+  /// LES ONGLETS REELLEMENT VISIBLES, dans l'ordre d'affichage.
+  ///
+  /// Calcules AVANT les retours conditionnels, et c'est necessaire deux fois :
+  /// React exige un ordre d'appel de hooks stable — `useIndicateurGlissant`
+  /// placee plus bas disparaitrait du rendu quand la session est absente — et
+  /// l'index de la pastille doit porter sur CETTE liste, celle dont les boutons
+  /// enregistrent leurs refs. Le calculer sur la liste complete marcherait par
+  /// coincidence (`gereUtilisateurs` implique `administre`) et casserait au
+  /// premier palier ajoute.
+  ///
+  /// La navigation reservee reste un CONFORT et non une securite : chaque appel
+  /// est revalide par la RLS (interdit n.5). Ce filtre ne decide que de ce qui
+  /// s'affiche.
+  const droits = session?.droits;
+  const ongletsVisibles: Onglet[] = [
+    ...ONGLETS_TOUS,
+    ...(droits?.administre ? ONGLETS_ADMIN : []),
+    ...(droits?.gereUtilisateurs ? ONGLETS_GESTION : []),
+  ];
 
-  const { utilisateur, droits } = session;
+  const navigation = useIndicateurGlissant(
+    Math.max(0, ongletsVisibles.indexOf(onglet)),
+    ongletsVisibles.length
+  );
+
+  if (chargement) return <div className="attente">Chargement...</div>;
+  if (!session || !droits) return <Connexion />;
+
+  const { utilisateur } = session;
 
   return (
     <div className="application">
@@ -102,39 +128,26 @@ export default function App() {
           <span className="logotype-mot">GRID</span>
         </span>
 
-        <nav>
-          {ONGLETS_TOUS.map((o) => (
+        {/* UNE SEULE LISTE, et c'est ce qui permet a la pastille d'exister.
+            Les trois groupes de droits etaient rendus par trois `map`
+            successifs : il n'y avait donc aucune sequence continue le long de
+            laquelle un indicateur puisse glisser. Les paliers sont conserves —
+            ils decident seulement de ce qui ENTRE dans la liste. */}
+        <nav ref={navigation.conteneur} role="tablist" aria-label="Navigation">
+          <span className="pilule-onglet" aria-hidden="true" ref={navigation.indicateur} />
+          {ongletsVisibles.map((o, i) => (
             <button
               key={o}
               type="button"
+              role="tab"
+              aria-selected={onglet === o}
+              ref={navigation.cible(i)}
               className={onglet === o ? 'onglet actif' : 'onglet'}
               onClick={() => setOnglet(o)}
             >
               {LIBELLES[o]}
             </button>
           ))}
-          {droits.administre &&
-            ONGLETS_ADMIN.map((o) => (
-              <button
-                key={o}
-                type="button"
-                className={onglet === o ? 'onglet actif' : 'onglet'}
-                onClick={() => setOnglet(o)}
-              >
-                {LIBELLES[o]}
-              </button>
-            ))}
-          {droits.gereUtilisateurs &&
-            ONGLETS_GESTION.map((o) => (
-              <button
-                key={o}
-                type="button"
-                className={onglet === o ? 'onglet actif' : 'onglet'}
-                onClick={() => setOnglet(o)}
-              >
-                {LIBELLES[o]}
-              </button>
-            ))}
         </nav>
 
         <span className="identite">

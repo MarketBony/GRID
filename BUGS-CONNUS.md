@@ -1,9 +1,150 @@
 # BUGS-CONNUS
 
-Mise a jour : 03/09/2026, apres l'audit d'ergonomie du front.
+Mise a jour : 04/09/2026, apres le passage en liquid glass iOS.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
+
+---
+
+## Couche liquid glass iOS — 04/09/2026
+
+Demande de l'utilisateur, avec deux depots de reference a combiner :
+`rdev/liquid-glass-react` et `ybouane/liquidglass`. Les deux ont ete clones et lus.
+
+### [MESURE] La technique commune aux deux depots ne sert a rien sur ce produit
+
+**C'est le resultat le plus important du lot, et il contredit la premisse de la
+demande.**
+
+`rdev` genere une carte de deplacement (SDF de rectangle arrondi, canal rouge = X,
+canal bleu = Y) et l'injecte dans un `feDisplacementMap` applique par
+`backdrop-filter`. `ybouane` va plus loin : WebGL, rasterisation du DOM par
+`html-to-image`, refraction biconvexe, aberration chromatique, Fresnel et specular
+Blinn-Phong a quatre lumieres. Le second a ete ecarte d'emblee — il recapture le DOM
+**a chaque image** pour tout contenu marque `data-dynamic`, ce qui est inconcevable
+sur un ecran qui vit des heures.
+
+La technique de `rdev` a ete montee sur banc, quatre variantes comparees cote a cote
+sur des rayures a fort contraste PUIS sur le fond reel de GRID :
+
+| Montage | Sur rayures | Sur le fond de GRID |
+|---|---|---|
+| flou seul (l'existant) | correct | **le plus beau des quatre** |
+| + `filter: url(#refraction)` | torsion visible | **aucune torsion**, coins carres |
+| + refraction dans `backdrop-filter` | idem | idem |
+| + lumieres | idem | idem |
+
+Deux raisons de fond. Un degrade sombre et doux **n'a aucun detail haute frequence a
+tordre** : la refraction n'existe que sur des photos ou des motifs fins. Et `filter`
+sur un element qui porte `backdrop-filter` **perd le decoupage du `border-radius`**
+dans Chromium — ni `clip-path` (qui s'applique pourtant apres `filter`) ni un
+`overflow: hidden` sur le parent ne le rattrapent.
+
+Ces bibliotheques sont faites pour du verre pose sur des photos. Le verre se fait donc
+ici en couches CSS, ce qui a l'avantage de marcher dans tous les moteurs et de garder
+les coins : ombre double (diffuse + **contact**, comme le `exp(-d²)` + `exp(-d)` du
+shader de `ybouane`), liseré pondere vers le haut (son `topBias`), arc speculaire.
+
+### [CORRIGE] Une variable CSS dans `transform` ne s'interpole pas
+
+**Le piege le plus couteux du lot, et il ne se voit qu'a la mesure.**
+
+Premiere implementation de l'indicateur glissant : quatre variables CSS posees sur le
+conteneur, et le CSS lisant
+`transform: translate3d(var(--ind-x), var(--ind-y), 0)`. C'est elegant, c'est ce que
+montrent la plupart des exemples, le style calcule affiche bien la transition — et
+**rien ne bouge** :
+
+```
+t=0      y = 259 px   (depart)
+t=140ms  y = 259 px   <- rien n'a bouge
+t=840ms  y = 110 px   (arrivee)
+```
+
+Chromium traite le changement comme **DISCRET** quand la valeur depend d'une custom
+property non enregistree, et une transition discrete bascule a 50 % de sa duree —
+280 ms ici, ce qui colle exactement a la mesure. Aucune erreur, aucun avertissement.
+
+Corrige en posant la transformation **en dur** sur l'element mobile. L'autre remede
+serait d'enregistrer les proprietes avec `@property`, qui les rend interpolables ;
+ecarte parce que l'animation vit alors sur le conteneur et que la chaine de dependance
+devient difficile a suivre.
+
+Mesure apres correction, avant que le compositeur du volet ne se remette a etrangler :
+**23 valeurs distinctes et un depassement a 279 px pour une cible a 258** — soit les
+8 % du ressort z=0,62. Le mecanisme est le bon.
+
+### [CORRIGE] Deux fausses confirmations, et comment elles ont ete levees
+
+**Ces deux erreurs sont a moi, et elles ont ete affirmees a l'utilisateur avant
+d'etre corrigees.** Elles sont consignees parce que l'instrument est le meme la
+prochaine fois.
+
+1. **« La pastille en vol : largeur 69 entre 81 et 64 ».** Ce n'etait pas une
+   interpolation, c'etait l'etirement `scaleX` qui deformait la boite mesuree d'une
+   valeur DEJA arrivee. `getBoundingClientRect` sur un element en cours de mise a
+   l'echelle ne dit rien de la position.
+
+2. **`getComputedStyle().transform` rend la valeur CIBLE**, pas la valeur animee,
+   pour une transformation composee par le GPU. Mesure qui l'a revele : a +50 ms le
+   style calcule affichait deja la position finale ; a +950 ms il affichait un
+   etirement retire 760 ms plus tot.
+
+**L'instrument juste est `element.getAnimations()`** — il rend les objets
+`CSSTransition`, leur propriete, leur duree et leur etat.
+
+### [A CONNAITRE] Le volet navigateur de l'agent ne mesure pas le mouvement
+
+Et c'est ce qui a rendu les deux erreurs ci-dessus possibles. Masque, son compositeur
+ne produit aucune image :
+
+- `requestAnimationFrame` ne se declenche pas — les images par seconde valent `0` ;
+- les transitions rapportent `playState: running` avec un `progress` **fige a 0** ;
+- les styles calcules montrent les valeurs cibles, jamais les valeurs animees.
+
+**La fluidite se juge dans une vraie fenetre, par l'utilisateur.** C'est pour cela que
+`atelier.html` existe.
+
+### [CORRIGE] L'etirement de l'indicateur ne se voyait pas
+
+Mesure : etirement maximal atteint **1,000**, c'est-a-dire aucun. Translation et
+etirement vivent dans le MEME `transform`, donc dans la meme transition de 560 ms :
+re-cibler l'echelle a 1 seize millisecondes plus tard ne lui laisse pas le temps de
+s'eloigner de 1. Il est desormais tenu ~190 ms, soit un tiers de la course.
+
+### [CORRIGE] Le banc d'essai partait en production
+
+Trouve en verifiant le contenu de `dist` avant de livrer. `public/banc-liquid-glass.html`
+etait recopie tel quel : **tout ce qui est dans `public/` part dans `dist`**. Un
+fichier HTML a la RACINE, lui, est servi en developpement et exclu du build —
+`vite build` ne prend que `index.html` en entree. Le banc a ete retire ; `atelier.html`
+vit a la racine, et `dist` ne contient que quatre fichiers, verifie.
+
+### [CORRIGE] Le degrade etait peint DEUX FOIS sur l'onglet actif
+
+Trouve en mesurant le style calcule de l'onglet actif apres avoir pose la pastille
+glissante : `background-image` valait encore `linear-gradient(...)`.
+
+Un second bloc `.onglet.actif`, ajoute en fin de fichier dans une section
+« finition », reposait le degrade et une lueur orange — a specificite egale et plus
+bas, donc gagnant. Consequence visible : la pastille glissait bien, mais elle etait
+**doublee a l'arrivee** par le fond de l'onglet et **trahie au depart**, l'onglet
+quitte gardant sa couleur jusqu'a la fin du trajet.
+
+Le survol des onglets inactifs ne pose plus de fond non plus : avec une pastille qui
+se deplace, un fond sous l'onglet voisin se lit comme une seconde selection.
+
+### [CORRIGE] Quatre valeurs declarees deux fois, encore
+
+`.segments`, `.glass` / `.glass-strong` (corps identiques),
+`.liste-vendeurs .vendeur.actif` et `.onglet.actif`. Dans chaque cas la seconde
+declaration gagnait sur les proprietes communes. C'est la **sixieme** occurrence de ce
+defaut dans `index.css` apres `main { max-width }` et `.saisie-corps`.
+
+Le motif est toujours le meme : une section « correctif » ou « finition » ajoutee en
+bas du fichier, qui re-declare une propriete deja posee plus haut. Elle se lit comme un
+ajout et agit comme un remplacement.
 
 ---
 

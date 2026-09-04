@@ -16,6 +16,7 @@ import {
   type SectionVendeur,
 } from '../services/saisie';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
+import { useIndicateurGlissant } from '../hooks/useIndicateurGlissant';
 
 // ============================================================================
 // ECRAN DE SAISIE — module C.
@@ -222,6 +223,13 @@ export function Saisie() {
     return tous.filter((v) => cleTri(v.nom).includes(q) || cleTri(v.siteCode).includes(q));
   }, [donnees, recherche]);
 
+  /// LE CURSEUR DE SELECTION GLISSE d'un vendeur a l'autre au lieu de sauter —
+  /// meme mecanique que la pastille du segmente, meme hook. L'index porte sur la
+  /// liste AFFICHEE et non sur le perimetre entier : c'est elle qui est a
+  /// l'ecran, et un filtre de recherche la raccourcit.
+  const indexVendeur = vendeursAffiches.findIndex((v) => v.id === vendeurId);
+  const curseur = useIndicateurGlissant(Math.max(0, indexVendeur), vendeursAffiches.length, 'y');
+
   // ---------------------------------------------------------------- actions
 
   const avecEnregistrement = async (action: () => Promise<void>) => {
@@ -344,7 +352,14 @@ export function Saisie() {
       )}
 
       <div className="saisie-corps">
-        <aside className="liste-vendeurs">
+        <aside className="liste-vendeurs" ref={curseur.conteneur}>
+          {/* Le curseur est le PREMIER enfant : il doit peindre sous les lignes.
+              `absent` quand le vendeur retenu est hors du filtre courant. */}
+          <span
+            className={`curseur-liste${indexVendeur < 0 ? ' absent' : ''}`}
+            aria-hidden="true"
+            ref={curseur.indicateur}
+          />
           {/* Le champ n'apparait qu'a partir de huit vendeurs : sur une table de
               six, il occuperait de la place sans rien resoudre. */}
           {donnees.vendeurs.length >= 8 && (
@@ -381,12 +396,13 @@ export function Saisie() {
             </p>
           )}
 
-          {vendeursAffiches.map((v) => {
+          {vendeursAffiches.map((v, i) => {
             const c = compteurs.get(v.id);
             return (
               <button
                 type="button"
                 key={v.id}
+                ref={curseur.cible(i)}
                 className={`vendeur ${v.id === vendeurId ? 'actif' : ''}`}
                 onClick={() => setVendeurId(v.id)}
               >

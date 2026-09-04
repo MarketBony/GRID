@@ -94,6 +94,11 @@ arborescence, même pipeline, même discipline documentaire.
   « Gearbox reste Gearbox ». Le VPS a été remis dans son état d'origine, il ne reste
   aucune trace de GRID dessus. `grid.bonyauto-mobile.com` n'existe pas en DNS et la
   zone Gandi n'est pas accessible : c'est ce qui a fermé la voie du VPS
+- **Tout ce qui est dans `public/` part TEL QUEL dans `dist`**, donc en production. Une
+  page de développement posée là s'y retrouve — constaté avec le banc d'essai liquid
+  glass. Un fichier HTML à la RACINE, lui, est servi en développement et **exclu du
+  build** : `vite build` ne prend que `index.html` en entrée. C'est là que vivent les
+  outils de mise au point, `atelier.html` en premier
 - **Sauvegardes à notre charge** : le palier gratuit de Supabase n'en garantit
   aucune, et met le projet en pause après **7 jours d'inactivité** — GRID ne sert que
   quelques jours par mois
@@ -187,6 +192,47 @@ par un second `.saisie-corps` de même spécificité : **le mode tablette n'a ja
 fonctionné**, alors que F-C.9 le vise explicitement. Une valeur ne se déclare qu'une fois,
 et un « correctif » ajouté en fin de fichier se fond dans la règle d'origine. C'est le
 troisième cas dans ce fichier après `main { max-width }`.
+
+**La sélection SE DÉPLACE, elle ne réapparaît pas ailleurs.** C'est le mouvement qui fait
+lire une interface comme iOS, plus que n'importe quel effet de verre. Le dégradé Bony était
+peint sur le segment actif et sur la ligne de vendeur active : il *sautait*. Il vit
+désormais sur **un seul** élément mobile par groupe, dont la géométrie est posée par
+`hooks/useIndicateurGlissant.ts` — la pastille du contrôle segmenté et le curseur de la
+liste du module C sont le même mécanisme, à l'axe près. Ne jamais en écrire un troisième
+exemplaire.
+
+**Une variable CSS dans `transform` NE S'INTERPOLE PAS.** Piège coûteux, mesuré le
+04/09/2026. `transform: translate3d(var(--x), var(--y), 0)` avec une `transition` semble
+correct, le style calculé affiche bien la transition — et rien ne bouge : Chromium traite
+le changement comme **discret** quand la valeur dépend d'une custom property non
+enregistrée, et une transition discrète bascule à 50 % de sa durée. Mesure : encore au
+départ à 140 ms, arrivé à 840 ms, pour une durée de 560 ms. **On pose donc la
+transformation en dur sur l'élément mobile** (ou on enregistre la propriété avec
+`@property`). Aucune erreur, aucun avertissement : ce défaut ne se voit qu'à la mesure.
+
+**Le mouvement se mesure avec `getAnimations()`, jamais avec `getComputedStyle()`.** Pour
+une transformation composée par le GPU, `getComputedStyle().transform` rend la valeur
+CIBLE et non la valeur animée — j'ai conclu deux fois de travers avant de m'en apercevoir.
+Et un `scale` en cours déforme la boîte : une largeur intermédiaire lue par
+`getBoundingClientRect` ressemble à une interpolation qui n'existe pas. Corollaire : **le
+volet navigateur de l'agent n'est pas un instrument de mesure du mouvement** — masqué, son
+compositeur ne produit aucune image, les transitions rapportent `running` avec un
+`progress` figé à 0, et les images par seconde valent 0. La fluidité se juge dans une vraie
+fenêtre, par l'utilisateur.
+
+**Les ressorts sont calculés, pas choisis à l'œil.** Trois caractères et pas un de plus —
+`--ressort-ample`, `--ressort-vif`, `--ressort-doux` — échantillonnés depuis un oscillateur
+amorti et figés en `linear()`, donc interpolés par le compositeur : aucun JavaScript par
+image. Un `ease-out` n'arrive jamais au-delà de sa cible ; un ressort si, et c'est ce
+dépassement qui fait le geste iOS.
+
+**La réfraction par carte de déplacement SVG ne sert à rien ici, c'est mesuré.** Les deux
+bibliothèques de référence (`rdev/liquid-glass-react`, `ybouane/liquidglass`) sont faites
+pour du verre posé sur des photos. Sur le fond de GRID — un dégradé sombre et doux — il n'y
+a aucun détail haute fréquence à tordre, et `filter` sur un élément qui porte
+`backdrop-filter` **perd le découpage du `border-radius`** dans Chromium, sans que
+`clip-path` ni `overflow: hidden` ne le rattrapent. Le verre se fait donc en couches CSS :
+ombre double (diffuse + contact), liseré pondéré vers le haut, arc spéculaire.
 
 **Pas de prose de présentation dans l'interface.** Les écrans portaient des paragraphes qui
 expliquaient le produit à lui-même — « remplace trois onglets du fichier », « rien n'est

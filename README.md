@@ -38,7 +38,9 @@ npm --prefix backend run migrate:deploy
 npm --prefix backend run seed          # affiche le mot de passe généré, à noter
 
 # 5. Le front. UN SEUL serveur : il n'y a plus rien à lancer à côté.
-npm run dev                            # front sur 3000
+npm run dev
+# http://localhost:3000/atelier.html — atelier de la couche visuelle,
+# les vrais composants et le vrai CSS, sans authentification                            # front sur 3000
 ```
 
 Sans configuration Supabase, l'application affiche un écran **« Configuration

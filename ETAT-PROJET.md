@@ -1041,11 +1041,81 @@ Une seule mesure nouvelle dans la coquille : `--h-entete`, posee par `App.tsx` a
 partir de la hauteur reelle de l'en-tete (`ResizeObserver`). Quatre endroits du CSS
 la lisent, aucun ne porte plus de nombre.
 
-## CE QUI RESTE, au 03/09/2026
+## 04/09/2026 — La couche liquid glass, et le mouvement iOS
 
-**Tout est en ligne depuis le 03/09/2026.** Le lot est sur `master`, la production sert
-le bundle du jour, la migration est appliquee sur Supabase et les six suites y sont
-vertes : 39/39 · 89/89 · 10/10 · 27/27 · 20/20 · 19/19. `comparer` ne rend aucun ecart.
+Demande de l'utilisateur : « pas juste l'effet liquid glass, mais également les
+animations à la Apple, sur les sélecteurs, transitions ». Deux depots donnes en
+reference, clones et lus : `rdev/liquid-glass-react` et `ybouane/liquidglass`.
+
+### Le resultat qui compte : leur technique commune ne sert a rien ici
+
+Monte sur banc, quatre variantes comparees. Sur le fond reel de GRID — un degrade
+sombre — la carte de deplacement SVG ne produit **aucune torsion visible**, et elle
+**perd les coins arrondis** (`filter` sur un element qui porte `backdrop-filter` casse
+le decoupage du `border-radius` dans Chromium). Ces bibliotheques sont faites pour du
+verre pose sur des photos. Detail et mesures dans `BUGS-CONNUS.md`.
+
+Ce qui fait « iOS » ici est donc ailleurs : les lumieres, et surtout le **mouvement**.
+
+### Ce qui a ete construit
+
+| | |
+|---|---|
+| **Ressorts calcules** | trois caracteres — `--ressort-ample/-vif/-doux` — echantillonnes depuis un oscillateur amorti et figes en `linear()`. Interpoles par le compositeur : aucun JS par image. `--ressort`, l'ancien `cubic-bezier`, pointe dessus : ses quatre usages sont upgrades sans etre touches |
+| **Controle segmente** | `components/Segmente.tsx`. La pastille de degrade GLISSE avec depassement et etirement directionnel. Clavier `tablist` aux fleches. Branche sur les 3 usages ; **plus aucun segment ecrit a la main** |
+| **Curseur de liste** | le degrade quitte la ligne active pour un curseur qui glisse dans la liste du module C. Il defile AVEC le contenu, et suit `Ctrl+N` |
+| **Mecanique partagee** | `hooks/useIndicateurGlissant.ts` — la pastille et le curseur sont le meme mecanisme, a l'axe pres (`scaleX` / `scaleY`) |
+| **Verre** | ombre double (diffuse + contact), liseré pondere vers le haut, arc speculaire. Deux paliers de verre, six familles de panneaux, deux themes |
+| **Appui** | `scale(0.965)` avec retour au ressort, au lieu d'un `translateY(1px) scale(0.99)` trop timide pour se sentir |
+| **Entree d'ecran** | montee de 8 px au ressort doux. **Pas sur la saisie** : 110 cases a composer hors ecran au moment ou un chef arrive pour saisir |
+| **Volets** | montee de 10 px, pivot en haut, chevron qui TOURNE au lieu de changer de glyphe. Vue d'ensemble, archivage, import, formulaires de creation |
+| **Barre de navigation** | la pastille glisse la aussi. C'est l'element le plus regarde du produit — a l'ecran en permanence — et c'etait le dernier a sauter. `App.tsx` compose desormais UNE liste d'onglets ; les trois paliers de droits decident seulement de ce qui y entre |
+| **Bascules iOS** | `.interrupteur` devient une vraie bascule, construite sur la case a cocher (`appearance: none`) pour garder role, focus clavier et etiquette. Les cases de la grille de marques ne sont PAS touchees : la, ce sont de vraies cases |
+| **Champs** | verre + anneau de focus qui grandit au ressort. Le survol pose une teinte, jamais un anneau — deux anneaux qui se ressemblent brouillent la lecture du focus |
+| **Messages** | erreur, succes, info : ils MONTENT. Ce sont les seuls elements qui surgissent sans qu'on les demande, donc les seuls qui doivent s'annoncer |
+| **Tuiles KPI, module B, lignes, etiquettes** | verre et physique d'appui. Les lignes ne recoivent QU'UN `background-color` : jusqu'a 104 a l'ecran, une transformation par ligne ferait autant de couches |
+| **`prefers-reduced-motion`** | tout se place au lieu de glisser. Rien ne disparait : c'est le mouvement qui est un confort, jamais l'information |
+
+**La grille de saisie reste la surface la plus sobre du produit, et c'est mesure.** Elle
+gagne un liseré au ressort sur la case active et une reaction au survol des cases
+remplies. Elle ne gagne NI `backdrop-filter` par case — il y en a 110 a l'ecran, chacune
+deviendrait une couche a composer — NI indicateur glissant : un curseur qui glisse de case
+en case prendrait du retard sur la frappe, or le chef saisit au clavier sans regarder et a
+besoin de savoir ou il est MAINTENANT. C'est le seul endroit du produit ou une selection
+doit sauter.
+
+**Six valeurs declarees deux fois ont ete consolidees** au fil du lot : `.segments`,
+`.glass` / `.glass-strong` (corps identiques), `.liste-vendeurs .vendeur.actif` et
+`.onglet.actif`. Dans chaque cas la seconde declaration gagnait — pour `.onglet.actif`
+elle repeignait le degrade SOUS la pastille, qui la doublait a l'arrivee et la trahissait
+au depart.
+
+### Un outil nouveau, et il reste
+
+`atelier.html` + `atelier.tsx` a la racine : il monte les **vrais** composants avec le
+**vrai** `index.css`, sans authentification. C'est ce qui a permis d'eprouver au
+clavier reel l'empilement a deux et trois RDV, `Ctrl+Entree`, l'archivage et le
+curseur — **sans ecrire une ligne dans Supabase**, la ou le lot precedent avait du y
+poser deux RDV d'essai.
+
+`vite build` ne prend que `index.html` en entree : il ne part jamais en production,
+verifie — `dist` ne contient que quatre fichiers.
+
+### Trois erreurs de ma part, consignees
+
+Elles sont dans `BUGS-CONNUS.md` parce que l'instrument est le meme la prochaine fois :
+une variable CSS dans `transform` ne s'interpole pas (transition discrete, bascule a
+50 % de la duree) ; `getComputedStyle().transform` rend la valeur CIBLE pour une
+transformation composee ; et le volet navigateur de l'agent, masque, ne produit aucune
+image — donc ne mesure ni les images par seconde ni le mouvement. **La fluidite a ete
+jugee par l'utilisateur dans une vraie fenetre.**
+
+## CE QUI RESTE, au 04/09/2026
+
+**Tout est en ligne.** Le lot du 03/09 est sur `master`, la migration est appliquee sur
+Supabase et les six suites y sont vertes : 39/39 · 89/89 · 10/10 · 27/27 · 20/20 ·
+19/19. `comparer` ne rend aucun ecart. **Le lot liquid glass du 04/09 ne touche ni la
+base ni le backend** — front seul.
 
 Il ne reste que des gestes qui appartiennent a l'utilisateur.
 

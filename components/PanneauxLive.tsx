@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Segmente } from './Segmente';
 import type { Dashboard, Rang, Totaux } from '../services/dashboard';
 import { trierPar } from '../backend/src/utils/tri';
 
@@ -61,7 +62,13 @@ export function PanneauxLive({
   return (
     <section className="panneaux-live">
       <button type="button" className="bascule-panneaux" onClick={basculer} aria-expanded={ouverts}>
-        {ouverts ? '▾' : '▸'} Vue d’ensemble
+        {/* UN SEUL glyphe, qui TOURNE. Deux caracteres qui se substituent
+            (`▾` / `▸`) se lisent comme un saut ; une rotation dit que c'est le
+            meme objet qui s'ouvre. */}
+        <span className="chevron" aria-hidden="true">
+          ▸
+        </span>{' '}
+        Vue d’ensemble
         <span className="note">
           {ouverts ? 'masquer' : 'les autres tables, le classement des concessions'}
         </span>
@@ -202,18 +209,12 @@ function PanneauClassement({ dashboard }: { dashboard: Dashboard }) {
     <div className="panneau">
       <header>
         <h4>Classement des concessions</h4>
-        <div className="segments">
-          {CRITERES.map((c) => (
-            <button
-              key={c.cle}
-              type="button"
-              className={critere === c.cle ? 'segment actif' : 'segment'}
-              onClick={() => setCritere(c.cle)}
-            >
-              {c.libelle}
-            </button>
-          ))}
-        </div>
+        <Segmente
+          etiquette="Critère du classement"
+          valeur={critere}
+          onChange={setCritere}
+          options={CRITERES.map((c) => ({ valeur: c.cle, libelle: c.libelle }))}
+        />
       </header>
 
       <ul className="liste-panneau classement">

@@ -31,6 +31,42 @@
   --h-entete: 3.6rem;
   --padding-main: 1.5rem;
 
+  /* ---- Mouvement ----
+
+     TROIS CARACTERES, ET PAS UN DE PLUS. Une interface ou chaque element a sa
+     propre courbe ne se lit pas comme un systeme, elle se lit comme un
+     accident.
+
+     Ce sont de VRAIS ressorts, pas des `cubic-bezier` choisis a l'oeil : chaque
+     courbe est l'echantillonnage d'un oscillateur amorti
+     x(t) = 1 - e^(-zwt)(cos(wd·t) + (zw/wd)·sin(wd·t)), calcule puis fige en
+     `linear()`. C'est ce qui donne le depassement d'iOS — un `ease-out`
+     n'arrive jamais au-dela de sa cible, un ressort si.
+
+     `linear()` est interpole par le COMPOSITEUR : aucun JavaScript par image.
+     C'est la condition pour que la saisie reste fluide. */
+
+  /* z=0.62 w=9 — depassement franc de 8 %. La pastille du segmente, les
+     panneaux qui entrent. Le dernier echantillon est force a 1 : la formule
+     rend 0.9952, et `linear()` s'arrete sur sa derniere valeur — l'element
+     finirait un demi-pour-cent trop court, ce qui se voit sur une pastille. */
+  --ressort-ample: linear(0,0.0599,0.202,0.38,0.5607,0.723,0.8558,0.9552,1.0226,1.0625,1.0805,1.083,1.0752,1.062,1.0468,1.0321,1.0193,1.0091,1.0016,0.9968,0.9941,0.9931,0.9932,0.994,1);
+
+  /* z=0.80 w=13 — a peine 1,4 % de depassement. L'appui et le survol : on veut
+     une reponse, pas un rebond. */
+  --ressort-vif: linear(0,0.2127,0.5463,0.796,0.9355,0.9961,1.014,1.014,1.0091,1.0046,1.0017,1.0004,0.9999,0.9998,0.9998,0.9999,1);
+
+  /* z=0.90 w=11 — quasi critique. Les entrees d'ecran, ou un rebond donnerait
+     le mal de mer sur six onglets. */
+  --ressort-doux: linear(0,0.1937,0.4942,0.7262,0.8686,0.9446,0.9804,0.9953,1.0004,1.0015,1.0013,1.0008,1.0005,1.0002,1);
+
+  --duree-vif: 220ms;
+  --duree: 380ms;
+  /* 560 ms. `DUREE_ETIREMENT` dans `hooks/useIndicateurGlissant.ts` vaut ~35 %
+     de cette valeur : les deux vont ensemble, changer l'une demande de relire
+     l'autre. */
+  --duree-ample: 560ms;
+
   /* ---- Marque Bony ---- */
   --bony-orange: #f75632;
   --bony-violet: #8f12ab;
@@ -73,7 +109,11 @@
 
   --rayon: 14px;
   --rayon-petit: 9px;
-  --ressort: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* CONSERVE SOUS SON NOM, mais ce n'est plus un `cubic-bezier` approche : il
+     pointe sur le ressort calcule. Quatre regles l'utilisaient deja ; elles
+     gagnent la vraie physique sans etre touchees, et il n'y a pas deux systemes
+     de mouvement dans le fichier. */
+  --ressort: var(--ressort-vif);
 
   font-family: 'Albert Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
@@ -157,24 +197,46 @@ body {
 
 /* ---------------------------------------------------------------- verre */
 
-.glass {
-  background: var(--glass-bg);
+/* LES DEUX PALIERS DE VERRE partagent tout sauf l'epaisseur du fond, d'ou la
+   regle commune : ce qui etait ecrit DEUX FOIS a l'identique — meme ombre, meme
+   flou, meme liseré — ne l'est plus qu'une.
+
+   L'arc SPECULAR est en couche de fond, pose AVANT la teinte : c'est lui qui
+   donne l'arete lumineuse en haut a gauche. Sans lui, un panneau translucide se
+   lit comme un rectangle gris, ce que ce fichier reproche deja aux fonds trop
+   opaques. */
+.glass,
+.glass-strong {
+  background-image:
+    radial-gradient(135% 110% at 6% -14%, rgba(255, 255, 255, 0.55), transparent 44%),
+    radial-gradient(85% 65% at 110% 114%, rgba(255, 255, 255, 0.18), transparent 56%);
   backdrop-filter: blur(var(--glass-blur)) saturate(200%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(200%);
   border: 1px solid var(--glass-border);
   box-shadow:
-    0 8px 32px -6px rgba(16, 18, 32, 0.18),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.55);
+    0 18px 44px -12px rgba(16, 18, 32, 0.26),
+    0 2px 6px -2px rgba(16, 18, 32, 0.16),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12);
 }
 
-.glass-strong {
-  background: var(--glass-bg-strong);
-  backdrop-filter: blur(var(--glass-blur)) saturate(200%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(200%);
-  border: 1px solid var(--glass-border);
+.glass { background-color: var(--glass-bg); }
+.glass-strong { background-color: var(--glass-bg-strong); }
+
+/* En sombre, l'arc doit etre PLUS marque en valeur relative, pas moins : sur un
+   fond clair l'oeil devine l'arete, sur un fond sombre il n'a que ca. */
+html.dark .glass,
+html.dark .glass-strong {
+  background-image:
+    radial-gradient(135% 110% at 6% -14%, rgba(255, 255, 255, 0.15), transparent 44%),
+    radial-gradient(85% 65% at 110% 114%, rgba(255, 255, 255, 0.06), transparent 56%);
   box-shadow:
-    0 8px 32px -6px rgba(16, 18, 32, 0.18),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.55);
+    0 20px 50px -14px rgba(0, 0, 0, 0.6),
+    0 2px 8px -2px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.24),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
 }
 
 html.dark .glass,
@@ -372,16 +434,35 @@ textarea {
   border: 1px solid var(--border-color);
   border-radius: var(--rayon-petit);
   background: var(--bg-input);
+  /* Du verre, comme le reste : le fond de la page monte dans les champs au lieu
+     de les laisser en aplat. */
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
   color: var(--text-main);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color var(--duree-vif) ease-out,
+    box-shadow var(--duree) var(--ressort-vif);
 }
 
+/* L'ANNEAU DE FOCUS GRANDIT au ressort au lieu d'apparaitre. C'est ce qui fait
+   qu'un champ se sent vivant sous le clavier — et la saisie du module C se fait
+   au clavier, donc le focus doit non seulement se voir, mais s'annoncer. */
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none;
   border-color: var(--bony-orange);
-  box-shadow: 0 0 0 3px rgba(247, 86, 50, 0.18);
+  box-shadow:
+    0 0 0 3.5px rgba(247, 86, 50, 0.2),
+    inset 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* Le survol d'un champ non focalise : une teinte, jamais un anneau. Deux
+   anneaux qui se ressemblent brouillent la lecture de ce qui a le focus. */
+input:hover:not(:focus-visible),
+select:hover:not(:focus-visible),
+textarea:hover:not(:focus-visible) {
+  border-color: var(--glass-border);
 }
 
 input[type='checkbox'] {
@@ -432,7 +513,7 @@ button {
     border-color 0.16s ease,
     background 0.16s ease,
     color 0.16s ease,
-    transform 0.12s var(--ressort),
+    transform var(--duree) var(--ressort),
     box-shadow 0.16s ease;
 }
 
@@ -441,8 +522,13 @@ button:hover:not(:disabled) {
   background: var(--glass-bg-strong);
 }
 
+/* L'APPUI. `scale(0.965)` sans translation, et le retour se fait au ressort :
+   c'est ce qui donne le rebond d'iOS. La version precedente descendait d'un
+   pixel et se tassait de 1 % — trop timide pour se sentir, assez pour faire
+   vibrer le texte. */
 button:active:not(:disabled) {
-  transform: translateY(1px) scale(0.99);
+  transform: scale(0.965);
+  transition-duration: 90ms;
 }
 
 /* Le focus clavier doit se voir : c'est le seul repere de celui qui n'utilise
@@ -601,29 +687,79 @@ nav {
   margin-left: 0.5rem;
 }
 
+/* ---------------------------------------------------------------- barre de nav
+
+   LA MEME REGLE QUE PARTOUT AILLEURS : la selection se deplace. Le degrade etait
+   peint sur l'onglet actif et SAUTAIT d'un onglet a l'autre. C'est l'element le
+   plus regarde du produit — il est a l'ecran en permanence — et c'etait le
+   dernier a sauter.
+
+   Trois `map` successifs rendaient les trois groupes de droits : il n'existait
+   aucune sequence continue le long de laquelle un indicateur puisse glisser.
+   `App.tsx` compose desormais UNE liste, et les paliers decident seulement de ce
+   qui y entre. */
+
+nav {
+  position: relative;
+}
+
+.pilule-onglet {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  top: 0;
+  /* Posees en dur par `useIndicateurGlissant` : une variable CSS dans
+     `transform` ne s'interpole pas — voir le hook. */
+  width: 0;
+  height: 0;
+  border-radius: 999px;
+  background-image: var(--bony-gradient);
+  box-shadow:
+    0 3px 10px -2px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  transform-origin: center;
+  transition:
+    transform var(--duree-ample) var(--ressort-ample),
+    width var(--duree-vif) var(--ressort-vif),
+    height var(--duree-vif) var(--ressort-vif);
+  pointer-events: none;
+}
+
 .onglet {
+  position: relative;
+  z-index: 1;
   font: inherit;
   font-size: 0.84rem;
   font-weight: 500;
-  padding: 0.4rem 0.8rem;
+  padding: 0.4rem 0.85rem;
   border: 1px solid transparent;
-  border-radius: var(--rayon-petit);
+  border-radius: 999px;
   background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+  /* La couleur change PLUS VITE que la pastille ne se deplace : sinon on lit du
+     gris sur du degrade pendant tout le trajet. */
+  transition: color var(--duree-vif) ease-out;
 }
 
-.onglet:hover {
+.onglet:hover:not(.actif) {
   color: var(--text-main);
-  background: var(--bg-input);
 }
 
 .onglet.actif {
   color: #fff;
-  background-image: var(--bony-gradient);
-  border-color: transparent;
   font-weight: 600;
+}
+
+/* L'appui tasse l'onglet SEUL, pas la barre : ici les onglets sont des
+   destinations distinctes, pas les parts d'un meme reglage — a la difference du
+   controle segmente, ou c'est la barre entiere qui se tasse. */
+.onglet:active:not(:disabled) {
+  transform: scale(0.955);
 }
 
 .identite {
@@ -789,7 +925,7 @@ main {
 .interrupteur {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
   margin: 0;
   font-weight: 500;
   font-size: 0.82rem;
@@ -797,6 +933,79 @@ main {
   letter-spacing: 0;
   color: var(--text-main);
   cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- bascule iOS
+
+   UNE CASE A COCHER NE DIT PAS LA MEME CHOSE QU'UNE BASCULE. Une case dit
+   « ceci fait partie d'une selection » ; une bascule dit « ceci est allume ou
+   eteint ». Les usages de `.interrupteur` dans GRID sont des reglages
+   d'affichage — « afficher les vendeurs sortis » — donc des bascules.
+
+   CONSTRUITE SUR LA VRAIE CASE A COCHER, jamais a cote : `appearance: none` la
+   redessine sans lui retirer son role, son focus clavier ni le lien avec son
+   etiquette. Un `<div>` avec un `onClick` aurait perdu les trois.
+
+   Les cases a cocher de la GRILLE DE MARQUES ne sont pas touchees : la, ce sont
+   de vraies cases — « ce vendeur vend-il du Dacia ? » — et une bascule y
+   mentirait sur la nature du choix. */
+
+.interrupteur input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 2.1rem;
+  height: 1.22rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--bg-input);
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  transition:
+    background-color var(--duree-vif) ease-out,
+    border-color var(--duree-vif) ease-out;
+}
+
+.interrupteur input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 0.94rem;
+  height: 0.94rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transform: translate3d(0, -50%, 0);
+  transition:
+    transform var(--duree) var(--ressort-vif),
+    width var(--duree-vif) ease-out;
+}
+
+.interrupteur input[type='checkbox']:checked {
+  background-image: var(--bony-gradient);
+  border-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.interrupteur input[type='checkbox']:checked::after {
+  /* La course : largeur du rail moins le bouton moins les deux retraits. */
+  transform: translate3d(calc(2.1rem - 0.94rem - 6px), -50%, 0);
+}
+
+.interrupteur input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--bony-violet);
+  outline-offset: 2px;
+}
+
+/* L'appui etire le bouton, comme sur iOS. */
+.interrupteur input[type='checkbox']:active::after {
+  width: 1.06rem;
 }
 
 /* ---------------------------------------------------------------- progression */
@@ -1113,14 +1322,16 @@ tr.sorti td {
   cursor: pointer;
 }
 
-.liste-vendeurs .vendeur:hover {
+/* Le survol reste DISCRET : il annonce qu'une ligne est cliquable, il ne
+   simule pas une selection — celle-ci est portee par le curseur. */
+.liste-vendeurs .vendeur:hover:not(.actif) {
   background: var(--bg-input);
 }
 
-.liste-vendeurs .vendeur.actif {
-  border-color: var(--bony-orange);
-  background: var(--bg-input);
-}
+/* L'etat actif est declare UNE SEULE FOIS, plus bas, avec le curseur glissant.
+   Il l'etait deux fois — ici avec une bordure orange, la-bas avec le degrade
+   plein — et la seconde gagnait. Troisieme occurrence de ce defaut dans ce
+   fichier apres `.segments` et `.saisie-corps`. */
 
 .liste-vendeurs .nom {
   grid-area: nom;
@@ -1464,11 +1675,74 @@ kbd {
    negative devra devenir positive (une classe sur les boutons principaux) des
    qu'un troisieme ecran s'y heurtera. */
 
-.liste-vendeurs .vendeur.actif {
+/* ---------------------------------------------------------------- curseur
+
+   LA SELECTION SE DEPLACE, ELLE NE REAPPARAIT PAS AILLEURS.
+
+   Le degrade Bony etait peint sur la ligne active : changer de vendeur le
+   faisait SAUTER d'une ligne a l'autre. C'est la meme difference qu'entre un
+   segmente ordinaire et celui d'iOS — et elle compte d'autant plus ici que le
+   chef enchaine les vendeurs au clavier par `Ctrl+N` : le regard doit suivre un
+   objet, pas retrouver une couleur.
+
+   Le degrade vit donc sur UN seul element, `.curseur-liste`, dont la geometrie
+   est posee par `useIndicateurGlissant` — le meme hook que la pastille du
+   segmente. La ligne active ne garde que sa couleur de texte.
+
+   POURQUOI L'INDICATEUR DEFILE AVEC LA LISTE. Il est en `position: absolute`
+   dans `.liste-vendeurs`, qui est le conteneur de defilement ET son premier
+   ancetre positionne : ses coordonnees sont donc celles du CONTENU, pas de la
+   fenetre. Sans le `position: relative`, il resterait colle en haut pendant que
+   les 104 vendeurs defilent dessous.
+
+   `scaleY` et non `scaleX` : sur une liste verticale, l'etirement du trajet se
+   lit dans le sens du trajet. Le hook expose un seul `--etirement`, c'est le CSS
+   qui choisit l'axe. */
+
+.liste-vendeurs {
+  position: relative;
+}
+
+.liste-vendeurs .curseur-liste {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  top: 0;
+  /* Posees en dur par le hook — voir la pastille du segmente et le commentaire
+     du hook : une variable CSS dans `transform` ne s'interpole pas. */
+  width: 0;
+  height: 0;
+  border-radius: var(--rayon-petit);
   background-image: var(--bony-gradient);
+  box-shadow:
+    0 3px 10px -2px rgba(16, 18, 32, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  transform-origin: center;
+  transition:
+    transform var(--duree-ample) var(--ressort-ample),
+    height var(--duree-vif) var(--ressort-vif),
+    width var(--duree-vif) var(--ressort-vif),
+    opacity var(--duree-vif) ease-out;
+  pointer-events: none;
+}
+
+/* Le vendeur selectionne peut sortir du filtre de recherche. L'indicateur
+   s'efface alors au lieu de rester sur une ligne qui n'est plus la. */
+.liste-vendeurs .curseur-liste.absent {
+  opacity: 0;
+}
+
+/* Les lignes passent AU-DESSUS du curseur, sinon il les recouvrirait. */
+.liste-vendeurs .vendeur {
+  position: relative;
+  z-index: 1;
+}
+
+.liste-vendeurs .vendeur.actif {
   border-color: transparent;
   color: #fff;
-  box-shadow: 0 2px 6px rgba(16, 18, 32, 0.16);
+  /* Aucun fond : c'est le curseur qui le porte. */
+  background: none;
 }
 
 .liste-vendeurs .vendeur.actif .detail {
@@ -1898,26 +2172,10 @@ kbd {
   grid-row: 1;
 }
 
-.segments {
-  display: inline-flex;
-  border: 1px solid var(--border-color);
-  border-radius: calc(var(--rayon) - 6px);
-  overflow: hidden;
-}
-
-.segments .segment {
-  background: transparent;
-  border: 0;
-  padding: 0.25rem 0.6rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.segments .segment.actif {
-  background: var(--bony-gradient);
-  color: #fff;
-}
+/* Le controle segmente est DECLARE UNE SEULE FOIS, dans la section
+   « CONTROLE SEGMENTE » plus bas. Il l'etait deux fois — ici et la-bas — et la
+   seconde gagnait sur les proprietes communes. Meme defaut que `.saisie-corps`
+   et que `main { max-width }` avant elles. */
 
 /* ==========================================================================
    MODULE D — le tableau de bord.
@@ -2366,15 +2624,48 @@ body::after {
    Le point 2 est celui qui manquait partout, et c'est lui qui donne l'épaisseur.
    ========================================================================== */
 
+/* ---------------------------------------------------------------- lumieres
+
+   CE QUI FAIT « VERRE » PLUTOT QUE « RECTANGLE FLOU ». Trois choses, dans cet
+   ordre d'importance :
+
+     1. une OMBRE DOUBLE — une large et diffuse, plus une de CONTACT, courte et
+        dense. Le shader de `ybouane/liquidglass` fait exactement ca
+        (`outerShadow` en exp(-d²) plus `contactShadow` en exp(-d)) ; sans la
+        seconde, la surface flotte sans poids ;
+     2. un LISERE PONDERE VERS LE HAUT. Le meme shader appelle ca `topBias` :
+        l'arete haute recoit la lumiere, la basse presque rien. Un liseré
+        uniforme se lit comme une bordure, un liseré pondere comme une arete ;
+     3. un SPECULAR en haut a gauche, pose en couche de fond et non en
+        pseudo-element : deux `radial-gradient` sous le fond existant, ce qui
+        evite de reserver un `::before` sur six familles d'elements qui en
+        utilisent deja.
+
+   Ce qui n'est PAS fait, et c'est mesure : la refraction par carte de
+   deplacement SVG (la technique de `rdev/liquid-glass-react`). Sur le fond de
+   GRID — un degrade sombre et doux — elle ne produit aucune torsion visible,
+   parce qu'il n'y a aucun detail haute frequence a tordre. Et elle coute les
+   coins arrondis : `filter` sur un element qui porte `backdrop-filter` perd le
+   decoupage du `border-radius` dans Chromium, et ni `clip-path` ni un
+   `overflow: hidden` sur le parent ne le rattrapent. Banc d'essai a l'appui,
+   quatre montages compares. Elle est faite pour du verre pose sur des photos,
+   pas sur un tableau de bord. */
+
 .carte,
 .panneau,
 .colonne-table,
 .liste-vendeurs,
 .tableau-grille,
 .apercu {
+  background-image:
+    radial-gradient(135% 105% at 8% -12%, rgba(255, 255, 255, 0.5), transparent 46%),
+    radial-gradient(90% 70% at 108% 112%, rgba(255, 255, 255, 0.16), transparent 58%);
   box-shadow:
-    0 8px 28px rgba(10, 12, 24, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    0 14px 34px -10px rgba(10, 12, 24, 0.2),
+    0 2px 5px -2px rgba(10, 12, 24, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 }
 
 html.dark .carte,
@@ -2383,9 +2674,15 @@ html.dark .colonne-table,
 html.dark .liste-vendeurs,
 html.dark .tableau-grille,
 html.dark .apercu {
+  background-image:
+    radial-gradient(135% 105% at 8% -12%, rgba(255, 255, 255, 0.15), transparent 46%),
+    radial-gradient(90% 70% at 108% 112%, rgba(255, 255, 255, 0.055), transparent 58%);
   box-shadow:
-    0 10px 34px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    0 16px 40px -12px rgba(0, 0, 0, 0.55),
+    0 2px 6px -2px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.075),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .carte,
@@ -2396,58 +2693,135 @@ html.dark .apercu {
 }
 
 /* ==========================================================================
-   SEGMENTS — un vrai contrôle segmenté.
+   CONTROLE SEGMENTE — la pastille qui glisse.
 
-   Ils étaient attrapés par la règle fourre-tout : quatre pavés en dégradé plein,
-   collés, sans aucune réaction au survol ni au clic. Rien ne disait lequel était
-   actif, et rien ne disait qu'ils étaient cliquables.
+   HISTORIQUE. Premiere version : les segments etaient attrapes par la regle
+   fourre-tout qui donnait le degrade a tout `button`. Quatre paves en degrade
+   plein, colles, sans reaction au survol : rien ne disait lequel etait actif.
+   Corrigee en donnant le degrade au seul segment actif.
 
-   Un seul segment porte le dégradé — l'actif. Les autres sont neutres, se
-   teintent au survol, et un séparateur fin les distingue.
+   DEUXIEME VERSION, celle-ci. Le degrade sur le segment actif marchait, mais il
+   SAUTAIT d'un segment a l'autre. C'est la difference entre une interface qui
+   fonctionne et une interface iOS : la selection n'apparait pas ailleurs, elle
+   se DEPLACE. Une pastille unique glisse, avec un depassement de ressort et un
+   etirement dans le sens du trajet.
+
+   COMMENT, ET A QUEL PRIX. `hooks/useIndicateurGlissant.ts` ne fait que poser
+   quatre nombres — `--ind-x/-y/-l/-h` — mesures sur le segment actif. Le meme
+   hook place le curseur de la liste des vendeurs : la mecanique est ecrite une
+   fois, seule la FORME differe. Le
+   deplacement est ensuite interpole par le COMPOSITEUR, en `transform` et
+   `width` : aucun JavaScript par image, aucune mise en page recalculee. C'est
+   la seule facon d'avoir ce mouvement sans le payer sur l'ecran de saisie.
+
+   `overflow: hidden` a disparu : il decoupait la pastille pendant son
+   depassement, qui sort de quelques pixels au-dela du dernier segment.
    ========================================================================== */
 
 .segments {
+  position: relative;
   display: inline-flex;
   padding: 3px;
   gap: 2px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--rayon-petit);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
   background: var(--bg-input);
-  overflow: hidden;
+  /* Le rail est du verre lui aussi : c'est ce qui fait que la pastille a l'air
+     de flotter DANS quelque chose, et non posee sur un aplat. */
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
-.segments .segment,
-.ecran .segments .segment {
+/* LA PASTILLE. Un seul element pour toute la barre — c'est ce qui permet au
+   deplacement d'exister. Elle porte le degrade Bony : l'action selectionnee
+   reste la surface qui porte la marque. */
+.segments .pilule {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  top: 0;
+  /* Largeur, hauteur et transformation sont posees en DUR par
+     `useIndicateurGlissant`, et non lues dans des variables CSS : Chromium
+     n'interpole pas `transform` quand sa valeur depend d'une custom property non
+     enregistree — le mouvement basculait alors d'un coup a 50 % de la duree.
+     Mesure et detail dans le hook. */
+  width: 0;
+  height: 0;
+  border-radius: 999px;
+  background-image: var(--bony-gradient);
+  box-shadow:
+    0 2px 8px -1px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  transform-origin: center;
+  transition:
+    transform var(--duree-ample) var(--ressort-ample),
+    width var(--duree-ample) var(--ressort-ample),
+    height var(--duree-vif) var(--ressort-vif);
+  pointer-events: none;
+}
+
+.segments .segment {
+  position: relative;
+  z-index: 1;
   border: 0;
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  padding: 0.34rem 0.8rem;
-  border-radius: calc(var(--rayon-petit) - 3px);
+  padding: 0.36rem 0.85rem;
+  border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 500;
   color: var(--text-muted);
   box-shadow: none;
-  transition: color 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+  /* La couleur du texte change PLUS VITE que la pastille ne se deplace, et
+     c'est voulu : le libelle devient blanc des le clic, sinon on lit du gris
+     sur du degrade pendant tout le trajet. */
+  transition: color var(--duree-vif) ease-out, opacity var(--duree-vif) ease-out;
 }
 
-.segments .segment:hover:not(.actif),
-.ecran .segments .segment:hover:not(.actif) {
-  background: var(--glass-bg-strong);
+.segments .segment:hover:not(.actif) {
   color: var(--text-main);
   border-color: transparent;
 }
 
-.segments .segment.actif,
-.ecran .segments .segment.actif {
-  background-image: var(--bony-gradient);
+.segments .segment.actif {
   color: #fff;
   font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
+/* L'appui : la BARRE ENTIERE se tasse, pas le segment seul. C'est ce que fait
+   iOS, et c'est plus juste — on appuie sur un objet, pas sur une de ses
+   parties. */
 .segments .segment:active:not(:disabled) {
   transform: none;
+}
+
+.segments:has(.segment:active) {
+  transform: scale(0.978);
+  transition: transform var(--duree-vif) var(--ressort-vif);
+}
+
+.segments .segment .detail {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+/* AUCUN MOUVEMENT QUAND ON N'EN VEUT PAS. La pastille saute alors a sa place,
+   ce qui reste parfaitement lisible — c'est le mouvement qui est un confort,
+   pas la selection. */
+@media (prefers-reduced-motion: reduce) {
+  .segments .pilule {
+    transition: none;
+  }
+  .segments:has(.segment:active) {
+    transform: none;
+  }
 }
 
 /* ==========================================================================
@@ -3030,24 +3404,24 @@ html.dark .etiquette.vo {
 }
 
 /* ==========================================================================
-   ONGLETS DE NAVIGATION — l'actif doit se voir, les autres réagir.
+   ONGLETS DE NAVIGATION — declares UNE SEULE FOIS, dans la section « barre de
+   nav » plus haut, avec leur pastille glissante.
+
+   Ce bloc reposait `background-image: var(--bony-gradient)` sur `.onglet.actif`,
+   a specificite egale et plus bas dans le fichier : il gagnait. Le degrade etait
+   donc peint DEUX FOIS — sur la pastille qui glisse et sur l'onglet lui-meme,
+   qui la doublait a l'arrivee et la trahissait au depart. Mesure a l'ecran, sur
+   le style calcule de l'onglet actif.
+
+   SIXIEME occurrence de ce defaut dans ce fichier, apres `main { max-width }`,
+   `.saisie-corps`, `.segments`, `.glass` / `.glass-strong` et
+   `.liste-vendeurs .vendeur.actif`. La regle du projet est ecrite dans
+   `CLAUDE.md` : une valeur ne se declare qu'une fois, et un « correctif » ajoute
+   en fin de fichier se fond dans la regle d'origine.
+
+   Le survol des onglets inactifs ne pose plus de fond : avec une pastille qui se
+   deplace, un fond sous l'onglet voisin se lit comme une seconde selection.
    ========================================================================== */
-
-.onglet:hover:not(.actif) {
-  background: var(--glass-bg-strong);
-  color: var(--text-main);
-  border-color: transparent;
-}
-
-.onglet.actif {
-  background-image: var(--bony-gradient);
-  color: #fff;
-  font-weight: 600;
-  border-color: transparent;
-  box-shadow:
-    0 3px 12px rgba(247, 86, 50, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
 
 /* ==========================================================================
    MENUS DEROULANTS — à la charte, état fermé ET liste ouverte.
@@ -3197,4 +3571,320 @@ html.dark input[type='date'] {
 /* Un compte désactivé reste lisible mais se retire du premier plan. */
 .tableau tbody tr.sorti td {
   opacity: 0.5;
+}
+
+
+/* ==========================================================================
+   ENTREE D'ECRAN.
+
+   `App` DEMONTE l'ecran quitte et remonte l'ecran choisi — c'est deja
+   documente, et c'est ce qui avait impose le `CampagneContext`. Consequence
+   utile ici : une animation posee sur `.ecran` se rejoue a chaque changement
+   d'onglet, sans aucun etat a tenir.
+
+   MONTEE DE 8 PX, PAS DE GLISSEMENT LATERAL. iOS glisse lateralement quand il y
+   a une hierarchie — on entre DANS quelque chose. Six onglets au meme niveau
+   n'ont pas de hierarchie : un glissement horizontal y raconterait une
+   navigation qui n'existe pas.
+
+   Le ressort DOUX, quasi critique : un depassement sur un ecran entier de
+   donnees donne le mal de mer, et cet ecran-la est projete.
+   ========================================================================== */
+
+@keyframes entree-ecran {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.994);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ecran {
+  animation: entree-ecran var(--duree) var(--ressort-doux) both;
+}
+
+/* L'ecran de saisie N'EST PAS ANIME, et c'est un choix.
+
+   Il porte une grille de 110 cases, deux colonnes defilantes et une hauteur
+   figee a la fenetre. L'animer signifie composer tout ca hors ecran pendant
+   380 ms, au moment precis ou un chef de table arrive pour saisir. « En cas
+   d'arbitrage entre l'elegance d'un ecran d'administration et la fluidite de la
+   saisie, la saisie gagne toujours. » */
+.ecran.saisie {
+  animation: none;
+}
+
+/* ==========================================================================
+   PAS DE MOUVEMENT SI L'UTILISATEUR N'EN VEUT PAS.
+
+   `prefers-reduced-motion` n'est pas une preference esthetique : c'est une
+   declaration medicale pour une partie des gens qui la posent. Tout ce qui
+   bouge s'arrete — le fond vivant est deja fige ailleurs dans ce fichier, on
+   ajoute ici les ressorts, l'entree d'ecran et l'appui.
+
+   RIEN NE DISPARAIT : la pastille se place sans glisser, l'ecran apparait sans
+   monter, l'appui change de teinte sans se tasser. C'est le mouvement qui est
+   un confort, jamais l'information.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .ecran {
+    animation: none;
+  }
+
+  button:active:not(:disabled),
+  .segments:has(.segment:active) {
+    transform: none;
+  }
+
+  /* Les indicateurs se PLACENT au lieu de glisser. La selection reste
+     parfaitement lisible : c'est le mouvement qui est un confort. */
+  .liste-vendeurs .curseur-liste,
+  .segments .pilule,
+  .pilule-onglet,
+  .interrupteur input[type='checkbox']::after {
+    transition: none;
+  }
+
+  .onglet:active:not(:disabled) {
+    transform: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ==========================================================================
+   VOLETS — ce qui s'ouvre monte, avec un ressort.
+
+   Quatre choses s'ouvrent dans GRID, et toutes apparaissaient d'un coup :
+   la vue d'ensemble du module C, le volet d'archivage, l'import par collage, et
+   les formulaires de creation. Un panneau qui apparait sans transition se lit
+   comme un changement de page ; un panneau qui MONTE se lit comme un panneau
+   qu'on ouvre — c'est la meme difference qu'entre une selection qui saute et une
+   selection qui glisse.
+
+   ---------------------------------------------------------------------------
+   L'ENTREE SEULEMENT, ET C'EST UN CHOIX
+   ---------------------------------------------------------------------------
+   React RETIRE ces noeuds de l'arbre quand on les ferme (`{ouvert && <...>}`).
+   Animer la SORTIE demanderait de les garder montes — donc de calculer et de
+   composer la vue d'ensemble, ses deux panneaux et ses classements meme replies,
+   sur l'ecran de saisie. Les panneaux sont replies par defaut precisement pour ne
+   rien couter la : « en cas d'arbitrage, la saisie gagne toujours ».
+
+   La fermeture est donc immediate. C'est le bon compromis — on regarde ce qui
+   s'ouvre, on ne regarde pas ce qu'on ferme.
+
+   Le ressort DOUX, quasi critique : un depassement sur un panneau de chiffres
+   projete donnerait le mal de mer.
+   ========================================================================== */
+
+@keyframes volet-monte {
+  from {
+    opacity: 0;
+    /* 10 px, pas 40 : au-dela, l'oeil suit le deplacement au lieu de lire le
+       contenu qui arrive. */
+    transform: translate3d(0, 10px, 0) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.volet,
+.grille-panneaux,
+.apercu {
+  animation: volet-monte var(--duree) var(--ressort-doux) both;
+  /* `transform-origin` en haut : un panneau qui s'ouvre pivote depuis son
+     attache, pas depuis son centre. */
+  transform-origin: 50% 0;
+}
+
+/* Le chevron TOURNE au lieu de changer de caractere. Un glyphe qui se substitue
+   est un saut ; une rotation dit que c'est le meme objet qui s'ouvre. */
+.bascule-panneaux .chevron {
+  display: inline-block;
+  transition: transform var(--duree) var(--ressort-ample);
+}
+
+.bascule-panneaux[aria-expanded='true'] .chevron {
+  transform: rotate(90deg);
+}
+
+/* L'en-tete du volet reagit a l'appui comme un bouton de barre : la surface
+   entiere se tasse, ce qui dit qu'on appuie sur le panneau et non sur son
+   titre. */
+.bascule-panneaux:active:not(:disabled) {
+  transform: scale(0.995);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .volet,
+  .grille-panneaux,
+  .apercu {
+    animation: none;
+  }
+
+  .bascule-panneaux .chevron {
+    transition: none;
+  }
+}
+
+
+/* ==========================================================================
+   BALAYAGE — le reste des surfaces passe au meme verre et au meme mouvement.
+
+   Ce qui suit ne cree aucune classe : il reprend celles qui existent deja pour
+   les aligner sur la couche liquid glass. La regle est toujours la meme —
+   double ombre, liseré pondere vers le haut, arc speculaire, et un mouvement
+   qui vient du ressort et non d'un `ease`.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- messages
+
+   Les trois blocs — erreur, succes, info — apparaissaient d'un coup. Ce sont
+   les seuls elements de l'interface qui SURGISSENT sans qu'on les ait demandes :
+   ils doivent donc s'annoncer, sinon on ne les voit pas arriver et on croit que
+   le clic n'a rien fait.
+
+   Ils montent, comme les volets, mais plus court : c'est une notification, pas
+   un panneau qu'on ouvre. */
+.erreur-bloc,
+.succes-bloc,
+.info-bloc {
+  animation: volet-monte var(--duree-vif) var(--ressort-doux) both;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  box-shadow:
+    0 10px 26px -10px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+/* ---------------------------------------------------------------- tuiles KPI
+
+   Elles portent les chiffres qu'on lit de loin, projetes sur un ecran
+   collectif. Le verre y sert a autre chose qu'a la decoration : il detache la
+   tuile du fond vivant, qui derive dessous. */
+.bandeau-kpi .kpi {
+  transition:
+    transform var(--duree) var(--ressort-vif),
+    box-shadow var(--duree) ease-out;
+}
+
+/* Elles ne sont PAS cliquables : pas de reaction a l'appui, seulement un
+   souleve tres discret au survol pour dire qu'elles sont vivantes. Reagir a
+   l'appui sur un element inerte est un mensonge. */
+.bandeau-kpi .kpi:hover {
+  transform: translate3d(0, -2px, 0);
+}
+
+/* ---------------------------------------------------------------- module B
+
+   Les cartes de vendeur et les colonnes de table se prennent, se deposent et se
+   selectionnent : ce sont les surfaces les plus manipulees du produit apres la
+   grille. Elles gagnent la physique d'appui. */
+.cartes-vendeurs .carte-vendeur {
+  transition:
+    transform var(--duree) var(--ressort-vif),
+    background var(--duree-vif) ease-out,
+    box-shadow var(--duree-vif) ease-out;
+}
+
+.cartes-vendeurs .carte-vendeur:hover:not(:disabled) {
+  transform: translate3d(0, -1px, 0);
+}
+
+.cartes-vendeurs .carte-vendeur:active:not(:disabled) {
+  transform: scale(0.975);
+}
+
+/* ---------------------------------------------------------------- lignes
+
+   Les lignes de tableau, de panneau et de classement : un survol qui se pose
+   au lieu de clignoter. `background-color` seul — surtout PAS de `transform` :
+   il y a jusqu'a 104 lignes a l'ecran, et une transformation par ligne
+   demanderait autant de couches au compositeur. */
+.tableau tbody tr,
+.liste-panneau li,
+.classement-complet li {
+  transition: background-color var(--duree-vif) ease-out;
+}
+
+.tableau tbody tr:hover,
+.liste-panneau li:hover,
+.classement-complet li:hover {
+  background-color: var(--bg-input);
+}
+
+/* ---------------------------------------------------------------- etiquettes
+
+   Elles sont partout — metier, plaque, code site, palier de compte. Un liseré
+   haut suffit a les faire lire comme du verre plutot que comme des pastilles
+   plates, sans les alourdir : il y en a parfois vingt dans le champ de vision. */
+.etiquette {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.etiquette.marque {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 1px 3px -1px rgba(0, 0, 0, 0.3);
+}
+
+/* ---------------------------------------------------------------- la grille
+
+   ELLE RESTE LA PLUS SOBRE DU PRODUIT, et c'est un choix mesure.
+
+   Ce qui est ajoute : la case active gagne son liseré au ressort, et une case
+   remplie reagit au survol. C'est tout.
+
+   Ce qui est REFUSE :
+     - aucun `backdrop-filter` par case. Il y en a 110 a l'ecran, chacune
+       deviendrait une couche a composer ;
+     - aucune transformation sur la case ACTIVE. Un indicateur qui glisse de
+       case en case prendrait du retard sur le curseur — or le chef saisit au
+       clavier, souvent sans regarder, et il a besoin de savoir OU IL EST
+       maintenant, pas dans 200 ms. C'est le seul endroit du produit ou une
+       selection doit sauter.
+
+   « En cas d'arbitrage entre l'elegance d'un ecran d'administration et la
+   fluidite de la saisie, la saisie gagne toujours. » */
+.tableau-grille .case {
+  transition:
+    box-shadow var(--duree-vif) var(--ressort-vif),
+    background-color var(--duree-vif) ease-out;
+}
+
+.tableau-grille .case.remplie:hover:not(.figee) {
+  background-color: color-mix(in srgb, var(--succes-fond) 70%, #fff 30%);
+}
+
+html.dark .tableau-grille .case.remplie:hover:not(.figee) {
+  background-color: color-mix(in srgb, var(--succes-fond) 70%, #fff 12%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erreur-bloc,
+  .succes-bloc,
+  .info-bloc {
+    animation: none;
+  }
+
+  .bandeau-kpi .kpi:hover,
+  .cartes-vendeurs .carte-vendeur:hover:not(:disabled),
+  .cartes-vendeurs .carte-vendeur:active:not(:disabled) {
+    transform: none;
+  }
 }

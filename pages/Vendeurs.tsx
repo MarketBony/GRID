@@ -343,7 +343,7 @@ export function Vendeurs() {
       )}
 
       {zoneCollage && (
-        <div className="carte">
+        <div className="carte volet">
           <h3>Import des marques par collage</h3>
           {/* CELLE-CI RESTE : elle dit ce qu'on peut coller, et sans elle le champ
               est un textarea vide. C'est de l'aide a l'action, pas de la
@@ -1027,7 +1027,7 @@ function ZoneArchivage({
   };
 
   return (
-    <div className="carte">
+    <div className="carte volet">
       <h3>
         Archivage
         <span className="etiquette">{archives?.length ?? '…'}</span>

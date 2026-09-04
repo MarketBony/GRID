@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Atelier — couche liquid glass</title>
+    <link rel="icon" type="image/svg+xml" href="/grid.svg" />
+  </head>
+  <body>
+    <!-- ==================================================================
+         ATELIER DE LA COUCHE VISUELLE — artefact de developpement.
+
+         Il monte les VRAIS composants avec le VRAI `index.css`, sans
+         authentification. Raison d'etre : les six ecrans de GRID sont derriere
+         une session, et une session ne se fabrique pas sans saisir un mot de
+         passe. Cet atelier permet d'eprouver le mouvement et les surfaces —
+         souris, clavier, deux themes — sur les memes classes et les memes
+         composants que la production.
+
+         `vite build` ne prend que `index.html` en entree : ce fichier ne part
+         donc JAMAIS dans `dist`. Il est a retirer du depot avant livraison.
+         ================================================================== -->
+    <div id="racine"></div>
+    <script type="module" src="/atelier.tsx"></script>
+  </body>
+</html>
