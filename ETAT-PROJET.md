@@ -1110,6 +1110,37 @@ transformation composee ; et le volet navigateur de l'agent, masque, ne produit 
 image — donc ne mesure ni les images par seconde ni le mouvement. **La fluidite a ete
 jugee par l'utilisateur dans une vraie fenetre.**
 
+## 04/09/2026 — Lavaur : un vingtieme site
+
+Demande de l'utilisateur, sans vendeur ni affectation. `LAV` / **Lavaur**, plaque
+**SUD-OUEST**, presente dans les **deux** bases : 20 sites actifs de part et d'autre,
+9 sur SUD-OUEST.
+
+**Il n'y a aucun ecran pour ca**, et c'est pour cette raison que l'utilisateur ne l'a
+pas trouve dans Supabase : les ecrans d'administration couvrent les vendeurs, les
+comptes, les campagnes et les marques — jamais les plaques ni les sites. Un site se
+cree donc encore a la main. A verser au **reste a faire** si le cas se represente.
+
+**Ecrit dans `donnees-source.ts` en plus de la base**, et c'est le point qui compte :
+la base porte la verite du jour, mais une base RECONSTRUITE repart de cette liste. Le
+site n'etant pas dans le classeur de juin, rejouer `scripts/extraire-seed.mjs`
+l'effacerait de la liste — l'en-tete du fichier le dit maintenant.
+
+**Insert direct, pas `seed`.** Le seed remet a jour libelles et rattachements de
+**99 vendeurs** par `upsert` : le rejouer aujourd'hui ecraserait ce qui a ete modifie
+depuis l'interface. Un `insert ... on conflict (code) do nothing` ne touche qu'une
+ligne.
+
+**Supabase a ete atteint par PostgREST, pas par `psql`** : les ports 5432 et 6543 ont
+timeout depuis le poste ce jour-la, alors qu'ils repondaient le 31/08. Le blocage
+reseau est donc **intermittent** — a re-mesurer avant de rebatir quoi que ce soit
+dessus, dans un sens comme dans l'autre.
+
+Les six suites rejouees en local apres coup : **39/39 · 89/89 · 10/10 · 27/27 · 20/20 ·
+19/19**. Le « 19 sites » de `test:agregats` porte sur les 1107 RDV de juin **en
+memoire**, pas sur la base : Lavaur n'ayant aucun vendeur, il n'entre dans aucun
+agregat et le compte reste juste.
+
 ## CE QUI RESTE, au 04/09/2026
 
 **Tout est en ligne.** Le lot du 03/09 est sur `master`, la migration est appliquee sur

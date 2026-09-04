@@ -6,6 +6,13 @@
 // Comptes verifies a l'extraction : 4 plaques, 19 sites,
 // 99 vendeurs, 8 tables, 48 affectations.
 //
+// UNE LIGNE A ETE AJOUTEE A LA MAIN DEPUIS : le site `LAV` / Lavaur (SUD-OUEST),
+// le 04/09/2026, a la demande de l'utilisateur. Il n'est PAS dans le classeur de
+// juin, donc rejouer `scripts/extraire-seed.mjs` le ferait disparaitre de cette
+// liste — et un seed sur une base neuve repartirait a 19 sites. Le site existe
+// deja dans les deux bases (insert direct, `on conflict (code) do nothing`) ;
+// cette liste sert a ce qu'une base RECONSTRUITE le retrouve.
+//
 // ATTENTION SUR `marques` — cette donnee N'EXISTE PAS dans le fichier Excel :
 // tous les blocs vendeur y portent une section Renault ET une section Dacia,
 // quelle que soit la realite du terrain. Ce qui suit est donc un PLACEHOLDER, a
@@ -130,6 +137,11 @@ export const SITES = [
   {
     "code": "CARM",
     "libelle": "Carmaux",
+    "plaque": "SUD-OUEST"
+  },
+  {
+    "code": "LAV",
+    "libelle": "Lavaur",
     "plaque": "SUD-OUEST"
   }
 ] as const;

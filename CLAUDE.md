@@ -349,7 +349,8 @@ l'urgence. Si une demande les enfreint, le dire et proposer l'alternative.
    dénormalisé, pas de table de synthèse. Tout se calcule en lecture par vue ou
    requête. C'est la cause racine de la fragilité du fichier Excel : 677 références
    figées vers des totaux maintenus à la main.
-3. **Aucune structure en dur dans le code.** Les 4 plaques, les 19 sites, les 5 jours,
+3. **Aucune structure en dur dans le code.** Les 4 plaques, les **20** sites — 19 à
+   l'extraction du classeur, Lavaur ajouté le 04/09/2026 —, les 5 jours,
    les 11 créneaux, les 3 marques sont des **données**. Toute constante trouvée en dur
    dans le code est un bug, même si elle est correcte aujourd'hui.
 4. **L'autorisation est portée par la BASE, et elle n'a aucun filet.**
