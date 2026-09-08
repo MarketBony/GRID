@@ -61,6 +61,14 @@ export interface Dashboard {
   rattachements: {
     siteVersPlaque: Record<string, string>;
     tableVersPlaque: Record<string, string>;
+    /// Ajoute le 08/09/2026 pour les filtres du classement. Sans lui, une ligne
+    /// de l'axe « Vendeurs » ne porte que sa cle et son libelle : impossible de
+    /// savoir de quel site elle releve, donc impossible de la filtrer.
+    ///
+    /// Ce rattachement N'EST PAS derive du libelle ni devine : il vient de la
+    /// meme jointure `site.plaque_id` que le reste. Le rattachement d'un site a
+    /// une plaque est modifiable, c'est un piege herite du fichier source.
+    vendeurVersSite: Record<string, string>;
   };
   totaux: Record<Axe, Totaux[]>;
   /// Les classements, pour CHAQUE axe et CHAQUE critere.
@@ -170,6 +178,7 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
   }
 
   const siteVersPlaque: Record<string, string> = {};
+  const vendeurVersSite: Record<string, string> = {};
   const lignesV = (verifier(vendeurs) as unknown as LigneV[]).filter((v) =>
     // LA PRESENCE PENDANT LA CAMPAGNE, et non « aujourd'hui ». Sans ce filtre,
     // la moyenne RDV/vendeur d'une campagne passee change des qu'un vendeur part —
@@ -186,6 +195,7 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
   const lignesVendeur: LigneVendeur[] = lignesV.map((v) => {
     const table = tableParVendeur.get(v.id) ?? null;
     if (v.site?.plaque) siteVersPlaque[txt(v.site.id)] = txt(v.site.plaque.id);
+    if (v.site) vendeurVersSite[txt(v.id)] = txt(v.site.id);
     return {
       id: txt(v.id),
       nom: v.nom,
@@ -251,7 +261,7 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
       jour: r.jour,
       creneauCode: r.creneau_code,
     })),
-    rattachements: { siteVersPlaque, tableVersPlaque },
+    rattachements: { siteVersPlaque, tableVersPlaque, vendeurVersSite },
   };
 }
 

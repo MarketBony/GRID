@@ -1347,7 +1347,19 @@ tr.sorti td {
   padding: 0.08rem 0.3rem;
 }
 
-.liste-vendeurs .detail {
+/* SCOPE `.vendeur`, et pas la liste entiere. Trouve au navigateur le 08/09/2026
+   en posant le segmente « ma table / mon equipe » en tete de cette liste : son
+   compteur devenait GRIS SUR LE DEGRADE — donc invisible — parce que
+   `.liste-vendeurs .detail` (0,2,0) attrapait n'importe quel `.detail`
+   descendant et lui imposait `--text-muted` ET un `grid-area`.
+   La regle ne visait que la ligne de vendeur ; `.grid-template-areas` est
+   declare sur `.liste-vendeurs .vendeur`, et le pendant actif juste en dessous
+   etait DEJA scope `.vendeur.actif`. C'est la meme lecon que
+   `header { position: sticky }` qui attrapait dix elements.
+   `.nom` et `.compteur` juste au-dessus portent le meme selecteur trop large.
+   Ils ne mordent pas aujourd'hui — aucun autre descendant de la liste ne porte
+   ces classes — donc ils sont laisses en place et signales ici. */
+.liste-vendeurs .vendeur .detail {
   grid-area: detail;
   font-size: 0.72rem;
   color: var(--text-muted);
@@ -3885,6 +3897,114 @@ html.dark .tableau-grille .case.remplie:hover:not(.figee) {
   .bandeau-kpi .kpi:hover,
   .cartes-vendeurs .carte-vendeur:hover:not(:disabled),
   .cartes-vendeurs .carte-vendeur:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   FILTRES DU CLASSEMENT — plaques et sites, choix multiple (08/09/2026).
+
+   SELECTEURS NOUVEAUX, pas une redeclaration. `.puces` existe deja plus haut
+   mais il habille des `li` d'affichage ; ici ce sont des BASCULES cliquables,
+   avec un etat retenu et une reaction a l'appui. Les confondre aurait donne un
+   septieme cas de valeur declaree deux fois.
+   ========================================================================== */
+
+.filtres-classement {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.rangee-filtre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.etiquette-filtre {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  min-width: 4rem;
+}
+
+.puce-filtre {
+  padding: 0.32rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  /* Le fond et la bordure suivent le ressort vif ; la transformation reste sur
+     l'appui seul. Une puce qui grandit au survol ferait bouger la rangee
+     entiere, et il y en a jusqu'a vingt. */
+  transition:
+    background-color var(--duree-vif) var(--ressort),
+    border-color var(--duree-vif) var(--ressort),
+    color var(--duree-vif) var(--ressort),
+    transform var(--duree-vif) var(--ressort);
+}
+
+.puce-filtre:hover:not(.retenue) {
+  background: var(--glass-bg-strong);
+  border-color: var(--text-muted);
+}
+
+.puce-filtre:active {
+  transform: scale(0.96);
+}
+
+.puce-filtre.retenue {
+  background-image: var(--bony-gradient);
+  /* `transparent` comme `.principal` : le degre peint par-dessus, mais laisser
+     une couleur dessous rend le rendu dependant de l'ordre de peinture. */
+  background-color: transparent;
+  border-color: transparent;
+  color: #fff;
+  box-shadow:
+    0 2px 8px rgba(247, 86, 50, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* IL FAUT CETTE REGLE, et elle a ete trouvee au navigateur, pas a la lecture.
+   `button:hover:not(:disabled)` vaut (0,2,1) — deux pseudo-classes plus un
+   element — contre (0,2,0) pour `.puce-filtre.retenue` : la regle GENERIQUE
+   gagne. Et comme elle emploie le RACCOURCI `background`, elle remet
+   `background-image` a `none`.
+   Resultat mesure : une puce retenue perdait son degrade des que la souris
+   passait dessus, et gardait `color: #fff` — texte blanc sur verre
+   translucide, donc illisible en theme clair.
+   `.puce-filtre.retenue:hover:not(:disabled)` vaut (0,4,0) et reprend la main.
+   C'est exactement ce que fait `.principal:hover:not(:disabled)` plus haut, et
+   pour la meme raison. */
+.puce-filtre.retenue:hover:not(:disabled) {
+  background-image: var(--bony-gradient-hover);
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow:
+    0 4px 14px rgba(247, 86, 50, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+/* Le segmente « ma table / mon equipe / tout » en tete de la liste de gauche.
+   Il prend toute la largeur : la colonne est etroite, et trois segments
+   centres y laisseraient deux marges perdues. */
+.liste-vendeurs .segments.origine-saisie {
+  margin: 0.5rem 0.5rem 0.2rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .puce-filtre {
+    transition: none;
+  }
+
+  .puce-filtre:active {
     transform: none;
   }
 }

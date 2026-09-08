@@ -1,6 +1,7 @@
 import {
   classer,
   comparer,
+  mobilisation,
   totauxPar,
   totauxParJour,
   SANS_MARQUE,
@@ -395,6 +396,92 @@ verifier(
   'la moyenne suit l effectif PRESENT, pas le nombre de RDV',
   avecDeux.effectif === 2 && avecDeux.moyenne === 0.5 && avecUn.effectif === 1 && avecUn.moyenne === 1,
   `2 vendeurs -> ${avecDeux.moyenne} · 1 vendeur -> ${avecUn.moyenne}`
+);
+
+// ---------------------------------------------- qui compte dans l'effectif (F-D.3)
+//
+// La regle arbitree le 08/09/2026 apres le premier exercice reel. Elle n'existait
+// pas avant : la moyenne divisait par TOUS les presents, et les reservistes
+// diluaient le resultat de ceux qui telephonaient (CENTRE : 10,69 au lieu de
+// 14,25 sur 24 mobilises).
+//
+// Quatre cas, et il en faut quatre : c'est le croisement « la plaque a-t-elle des
+// tables » x « ce vendeur est-il sur une table » x « a-t-il saisi ».
+const v = (
+  id: string,
+  plaqueId: string,
+  tableId: string | null
+): LigneVendeur => ({
+  id,
+  nom: id.toUpperCase(),
+  siteId: 's',
+  siteLibelle: 'Site',
+  plaqueId,
+  plaqueLibelle: plaqueId,
+  tableId,
+  tableLibelle: tableId,
+  typeVehicule: 'VN',
+});
+const rdvDe = (vendeurId: string): LigneRdv => ({
+  vendeurId,
+  typeVehicule: 'VN',
+  marqueId: 'R',
+  jour: 'j',
+  creneauCode: 'c',
+});
+
+/// Plaque PAR TABLE (au moins un vendeur sur une table) : `surTable` travaille,
+/// `reserveMuette` non, `reserveQuiSaisit` a quand meme pris des RDV.
+/// Plaque SANS TABLE : `parSite` compte, sans avoir de table.
+const jeuMobilisation: LigneVendeur[] = [
+  v('surTable', 'P1', 'T1'),
+  v('reserveMuette', 'P1', null),
+  v('reserveQuiSaisit', 'P1', null),
+  v('parSite', 'P2', null),
+];
+const rdvMobilisation: LigneRdv[] = [rdvDe('surTable'), rdvDe('surTable'), rdvDe('reserveQuiSaisit')];
+const mobilises = mobilisation(rdvMobilisation, jeuMobilisation);
+
+verifier(
+  'sur une table : compte, meme a 0 RDV',
+  mobilises.has('surTable'),
+  'mobilise'
+);
+verifier(
+  'en reserve et sans aucun RDV : NE compte PAS',
+  !mobilises.has('reserveMuette'),
+  'exclu de l effectif, mais il figure quand meme au classement'
+);
+verifier(
+  'en reserve mais AYANT SAISI : compte',
+  mobilises.has('reserveQuiSaisit'),
+  'ses RDV sont au numerateur, il doit etre au denominateur'
+);
+verifier(
+  'plaque sans aucune table : tout le monde compte',
+  mobilises.has('parSite'),
+  'mode par site — il n y a pas de reserve quand il n y a pas de table'
+);
+
+/// LE PANIER EXISTE MEME QUAND L'EFFECTIF EST NUL. Un reserviste muet doit
+/// FIGURER au classement — c'est le defaut de `schema.sql`, ou un vendeur a
+/// 0 RDV disparaissait — sans peser sur la moyenne.
+const parVendeurMob = totauxPar('vendeur', rdvMobilisation, jeuMobilisation);
+const muet = parVendeurMob.find((t) => t.cle === 'reserveMuette');
+verifier(
+  'un reserviste muet figure au classement avec un effectif nul',
+  parVendeurMob.length === 4 && !!muet && muet.effectif === 0 && muet.total === 0 && muet.moyenne === 0,
+  `${parVendeurMob.length} entrees · reserviste muet : effectif ${muet?.effectif}, moyenne ${muet?.moyenne}`
+);
+
+/// LE TOTAL NE BOUGE PAS. La regle ne retire aucun RDV : les 3 RDV du jeu — dont
+/// un pose par la reserve — restent comptes. Sans quoi le tableau de bord
+/// cesserait d'etre d'accord avec le module C, exactement le defaut 1107/1105.
+const plaqueP1 = totauxPar('plaque', rdvMobilisation, jeuMobilisation).find((t) => t.cle === 'P1')!;
+verifier(
+  'les RDV de la reserve restent dans le total, seul l effectif change',
+  plaqueP1.total === 3 && plaqueP1.effectif === 2 && plaqueP1.moyenne === 1.5,
+  `P1 : ${plaqueP1.total} RDV / ${plaqueP1.effectif} mobilises = ${plaqueP1.moyenne}`
 );
 
 /// Un RDV dont le vendeur est absent de la liste est ignore, jamais range dans un

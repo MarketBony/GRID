@@ -1207,6 +1207,89 @@ aucun ecart. C'est ce qui autorise a toucher a l'ossature de l'interdit n.4.
 
 Details, mesures et lecon d'instrumentation dans `BUGS-CONNUS.md`.
 
+## 08/09/2026, apres l'exercice — Trois retours du terrain
+
+Demandes de l'utilisateur apres le premier exercice reel de relance, une fois la
+session terminee et les donnees exportees.
+
+### 1. La moyenne RDV/vendeur divisait par la reserve
+
+**Le defaut.** En mode `par_table`, une partie de la plaque n'est affectee a aucune
+table : elle est EN RESERVE et ne participe pas. La moyenne divisait pourtant par
+TOUS les presents. Sur CENTRE en septembre : 32 presents, 24 sur table, 8 en
+reserve — **10,69 annonce au lieu de 14,25**. Les huit reservistes diluaient le
+resultat des vingt-quatre qui telephonaient.
+
+**La regle retenue, arbitree par l'utilisateur** : « on ne compte que les vendeurs
+des tables, mais si un reserviste se retrouve avec un ou plusieurs RDV alors il est
+compte egalement ». Un reserviste qui a pris des RDV a pris part a l'exercice : ses
+RDV sont au numerateur, il doit etre au denominateur.
+
+| Septembre 2026 | RDV | effectif avant | apres | moyenne avant | apres |
+|---|---|---|---|---|---|
+| CENTRE | 342 | 32 | **26** | 10,69 | **13,15** |
+| SUD | 192 | 18 | **15** | 10,67 | **12,80** |
+| NORD (par site) | 206 | 18 | 18 | 11,44 | 11,44 |
+| SUD-OUEST (par site) | 306 | 28 | 28 | 10,93 | 10,93 |
+| Groupe | 1046 | 96 | **87** | 10,90 | **12,02** |
+
+**Aucun total ne bouge** : la regle ne retire aucun RDV, elle ne change que le
+denominateur. Le tableau de bord reste d'accord avec le module C.
+
+**LE MODE DE SESSION N'EST PAS UN PARAMETRE.** `mobilisation()` derive la regle de
+ce qu'elle a deja : une plaque fonctionne par table DES QU'UN de ses vendeurs est
+sur une table. Trois appelants n'ont donc rien a rapatrier — et sur le seul cas ou
+les deux formulations divergent, la derivation est la meilleure : une session
+declaree `par_table` dont les tables ne sont pas encore construites rendrait un
+effectif de ZERO avec le mode, et rend tout le monde ici.
+
+**JUIN N'EST PAS REECRIT, et c'est verifie par un calcul independant** : dans le
+classeur de juin, TOUS les presents de CENTRE et SUD etaient sur une table. Il n'y
+avait aucune reserve, donc l'effectif 99 et la moyenne 11,18 du **critere de
+recette n.4** sont inchanges. Le test des agregats passe de 27 a **33 controles**,
+les 27 d'origine intacts.
+
+### 2. « Ma table » et « mon equipe de vente » etaient melangees
+
+Un chef de vente rattache a une table voyait, dans une seule liste, les vendeurs de
+sa concession ET ceux de sa table — qui viennent d'autres concessions, c'est tout
+l'interet de l'exercice. Sans moyen de savoir ce qu'il regardait.
+
+`VendeurSaisie` porte desormais **deux booleens et non un champ a deux valeurs** :
+`dansMaTable` et `dansMonEquipe`. Un vendeur de ma concession que j'ai place dans
+ma table porte LES DEUX, et doit apparaitre dans les deux filtres. Un segmente en
+tete de la liste bascule entre les trois vues, et **il n'apparait que s'il sert** :
+il faut que les deux origines soient peuplees et qu'elles ne se recouvrent pas.
+
+« Mon equipe » = les sites encadres DURABLEMENT (`encadrement_site`), plus ceux dont
+je suis chef pour cette campagne, plus les plaques entieres dont je suis chef
+(`role_campagne`).
+
+### 3. Filtres plaque / site au tableau de bord, choix multiple
+
+Sur l'axe « Vendeurs », des puces a bascule filtrent par plaque et par site. Le
+tableau des totaux ET le classement suivent le meme filtre — deux listes du meme axe
+qui ne montreraient pas les memes lignes seraient l'ecart 1107/1105 sous une autre
+forme.
+
+**LES RANGS NE SONT PAS RENUMEROTES** : un vendeur 7e du groupe reste 7e quand on
+filtre sur son site. Le filtre choisit qui on REGARDE, il ne refait pas le
+classement — renumeroter donnerait deux verites pour le meme vendeur selon l'ecran
+ouvert. Une table n'est jamais filtrable par site : elle melange les sites par
+construction.
+
+`rattachements.vendeurVersSite` a ete ajoute au service : une ligne de classement ne
+portait que sa cle et son libelle, donc rien qui permette de la filtrer.
+
+### Deux defauts de CSS trouves AU NAVIGATEUR, pas a la lecture
+
+Ils sont dans `BUGS-CONNUS.md`. Le premier : `button:hover:not(:disabled)` vaut
+(0,2,1) et battait `.puce-filtre.retenue` en (0,2,0) — avec le RACCOURCI
+`background`, qui remet `background-image` a `none`. Le second :
+`.liste-vendeurs .detail` attrapait n'importe quel `.detail` descendant, donc le
+compteur du nouveau segmente. **Aucun des deux ne se voit au typecheck ni a la
+relecture du fichier**, et le second etait une bombe posee depuis longtemps.
+
 ## CE QUI RESTE, au 04/09/2026
 
 **Tout est en ligne.** Le lot du 03/09 est sur `master`, la migration est appliquee sur

@@ -91,7 +91,9 @@ export interface Totaux {
   /// `marqueId` -> nombre de RDV. Les RDV d'un vendeur VO sont comptes sous
   /// `SANS_MARQUE`.
   parMarque: Record<string, number>;
-  /// Nombre de vendeurs presents, calcule et non saisi (F-D.3).
+  /// Nombre de vendeurs MOBILISES, calcule et non saisi (F-D.3). Voir
+  /// `mobilisation()` : ce n'est pas le nombre de presents, c'est le nombre de
+  /// ceux qui ont pris part a l'exercice.
   effectif: number;
   /// `total / effectif`, arrondi au centieme. `0` si l'effectif est nul — un site
   /// sans vendeur est un cas prevu (l'onglet MDP du fichier source).
@@ -121,6 +123,70 @@ const rattachement = (v: LigneVendeur, axe: Axe): { cle: string; libelle: string
 
 const arrondi = (n: number) => Math.round(n * 100) / 100;
 
+/// QUI COMPTE DANS L'EFFECTIF — la regle du 08/09/2026, arbitree par l'utilisateur
+/// apres le premier exercice reel.
+///
+/// ---------------------------------------------------------------------------
+/// LE DEFAUT CONSTATE
+/// ---------------------------------------------------------------------------
+/// La moyenne RDV/vendeur divisait par TOUS les vendeurs presents. Or en mode
+/// `par_table`, une partie de la plaque reste EN RESERVE : elle n'est affectee a
+/// aucune table, donc elle ne participe pas a l'exercice. Sur CENTRE en septembre
+/// 2026 : 32 presents, 24 sur une table, 8 en reserve — la moyenne annoncait
+/// 10,69 au lieu de 14,25. Les huit reservistes diluaient le resultat des
+/// vingt-quatre qui telephonaient.
+///
+/// ---------------------------------------------------------------------------
+/// LA REGLE, DANS LES MOTS DE L'UTILISATEUR
+/// ---------------------------------------------------------------------------
+/// « On ne compte que les vendeurs des tables, mais si un reserviste se retrouve
+/// avec un ou plusieurs RDV alors il est compte egalement. » Un reserviste qui a
+/// pris des RDV a bien pris part a l'exercice, meme sans table : ses RDV sont au
+/// numerateur, il doit etre au denominateur.
+///
+/// ---------------------------------------------------------------------------
+/// POURQUOI ELLE NE PREND PAS LE MODE DE SESSION EN PARAMETRE
+/// ---------------------------------------------------------------------------
+/// Le mode (`par_site` | `par_table`) vit sur `session_plaque`. Le passer ici
+/// obligerait TROIS appelants a le rapatrier et a le rattacher correctement — un
+/// calcul de plus a se tromper, dans trois endroits.
+///
+/// Il est deja derivable de ce qu'on a : UNE PLAQUE FONCTIONNE PAR TABLE DES
+/// QU'UN DE SES VENDEURS EST SUR UNE TABLE. Et cette formulation est meilleure
+/// que le mode lui-meme sur le seul cas ou les deux divergent : une session
+/// declaree `par_table` dont les tables ne sont pas encore construites rendrait
+/// un effectif de ZERO — donc une moyenne de zero sur une plaque qui travaille.
+/// Ici elle rend tout le monde, ce qui est la reponse sure.
+///
+/// ---------------------------------------------------------------------------
+/// L'EFFET DE BORD, ASSUME ET DECLARE
+/// ---------------------------------------------------------------------------
+/// L'effectif depend desormais des RDV pour les SEULS reservistes. Archiver le
+/// dernier RDV d'un reserviste le fait sortir de l'effectif, et la moyenne MONTE
+/// (13,15 -> 13,64 sur CENTRE). C'est contraire a l'esprit du garde-fou
+/// `RANK!AG` — un chiffre historique ne devrait pas bouger tout seul — et
+/// l'utilisateur l'a maintenu en connaissance de cause, la regle metier primant
+/// sur la stabilite du chiffre. Voir `BUGS-CONNUS.md`.
+///
+/// L'invariant d'origine reste vrai partout ailleurs : en mode par site, et pour
+/// tout vendeur affecte a une table, l'effectif ne depend PAS des RDV. C'est ce
+/// que le controle « la moyenne suit l'effectif PRESENT » continue de verifier.
+export function mobilisation(rdvs: LigneRdv[], vendeurs: LigneVendeur[]): Set<string> {
+  // Une plaque fonctionne par table des qu'un de ses vendeurs est sur une table.
+  const plaquesParTable = new Set<string>();
+  for (const v of vendeurs) if (v.tableId !== null) plaquesParTable.add(v.plaqueId);
+
+  const aSaisi = new Set<string>();
+  for (const r of rdvs) aSaisi.add(r.vendeurId);
+
+  const mobilises = new Set<string>();
+  for (const v of vendeurs) {
+    const sansTableSurLaPlaque = !plaquesParTable.has(v.plaqueId);
+    if (sansTableSurLaPlaque || v.tableId !== null || aSaisi.has(v.id)) mobilises.add(v.id);
+  }
+  return mobilises;
+}
+
 /// Totaux sur un axe (F-D.1, F-D.3).
 ///
 /// L'ordre de rendu est celui de la premiere apparition dans `vendeurs` : la
@@ -128,13 +194,20 @@ const arrondi = (n: number) => Math.round(n * 100) / 100;
 /// Pour un ordre par valeur, passer le resultat a `classer`.
 export function totauxPar(axe: Axe, rdvs: LigneRdv[], vendeurs: LigneVendeur[]): Totaux[] {
   const paniers = new Map<string, Totaux>();
+  const mobilises = mobilisation(rdvs, vendeurs);
 
   // Les paniers d'abord, depuis les VENDEURS. C'est ce qui garantit qu'un vendeur,
   // un site ou une table a 0 RDV figure quand meme au resultat.
+  //
+  // UN RESERVISTE CREE SON PANIER SANS ENTRER DANS L'EFFECTIF. Les deux choses
+  // sont distinctes et doivent le rester : il doit FIGURER au classement — c'est
+  // le defaut de `schema.sql`, ou un vendeur a 0 RDV disparaissait sans erreur —
+  // mais il ne doit pas DILUER la moyenne de ceux qui telephonaient.
   for (const v of vendeurs) {
     const { cle, libelle } = rattachement(v, axe);
+    const compte = mobilises.has(v.id) ? 1 : 0;
     const existant = paniers.get(cle);
-    if (existant) existant.effectif++;
+    if (existant) existant.effectif += compte;
     else {
       paniers.set(cle, {
         cle,
@@ -143,7 +216,7 @@ export function totauxPar(axe: Axe, rdvs: LigneRdv[], vendeurs: LigneVendeur[]):
         vn: 0,
         vo: 0,
         parMarque: {},
-        effectif: 1,
+        effectif: compte,
         moyenne: 0,
       });
     }

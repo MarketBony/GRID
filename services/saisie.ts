@@ -32,6 +32,19 @@ export interface VendeurSaisie {
   siteCode: string;
   siteLibelle: string;
   sections: SectionVendeur[];
+  /// LES DEUX ORIGINES SONT DISTINCTES, ET UN VENDEUR PEUT PORTER LES DEUX.
+  ///
+  /// Un chef de vente anime une table composee de vendeurs d'AUTRES concessions —
+  /// « je mets 5 vendeurs de 5 concessions differentes, et un chef de vente d'une
+  /// autre concession pour les coacher », c'est tout l'interet de l'exercice — et
+  /// il encadre par ailleurs sa propre equipe. Les deux listes arrivaient
+  /// melangees dans un seul perimetre, sans moyen de savoir ce qu'on regardait.
+  ///
+  /// Ce ne sont donc PAS deux valeurs d'un meme champ : le vendeur de mon site que
+  /// j'ai place dans ma table est dans les deux, et il doit apparaitre dans les
+  /// deux filtres.
+  dansMaTable: boolean;
+  dansMonEquipe: boolean;
 }
 
 export interface RdvSaisie {
@@ -112,7 +125,12 @@ export async function chargerSaisie(campagneId: string): Promise<PerimetreSaisie
     return { campagne: entete, perimetre: null, vendeurs: [], rdvs: [], message: AUCUN_PERIMETRE };
   }
 
-  const [vendeurs, rdvs, tables] = await Promise.all([
+  // UN SEUL APPEL POUR MON IDENTIFIANT. Il servait trois fois dans cette vague, et
+  // `monId()` est un aller-retour reseau : trois requetes de plus a chaque
+  // chargement de la saisie, sur l'ecran le plus joue du produit.
+  const moi = await monId();
+
+  const [vendeurs, rdvs, tables, encadrements, rolesCampagne] = await Promise.all([
     supabase
       .from('vendeur')
       .select(
@@ -139,9 +157,25 @@ export async function chargerSaisie(campagneId: string): Promise<PerimetreSaisie
     // « ma table » de « une table ou se trouvent mes vendeurs ».
     supabase
       .from('table_phoning')
-      .select('id, libelle, session_plaque!inner(campagne_id, plaque(id, libelle))')
-      .eq('chef_utilisateur_id', await monId())
+      .select(
+        'id, libelle, session_plaque!inner(campagne_id, plaque(id, libelle)), affectation(vendeur_id, archive_le)'
+      )
+      .eq('chef_utilisateur_id', moi)
       .eq('session_plaque.campagne_id', id)
+      .is('archive_le', null),
+    // MON EQUIPE DE VENTE — l'encadrement DURABLE d'un site, hors campagne.
+    supabase
+      .from('encadrement_site')
+      .select('site_id')
+      .eq('utilisateur_id', moi)
+      .is('archive_le', null),
+    // Et l'encadrement DE CAMPAGNE : chef de site, chef de plaque. Deux portees
+    // differentes dans une seule table, on trie a l'arrivee.
+    supabase
+      .from('role_campagne')
+      .select('role, site_id, plaque_id')
+      .eq('utilisateur_id', moi)
+      .eq('campagne_id', id)
       .is('archive_le', null),
   ]);
 
@@ -156,10 +190,41 @@ export async function chargerSaisie(campagneId: string): Promise<PerimetreSaisie
     id: number;
     libelle: string;
     session_plaque: { campagne_id: number; plaque: { id: number; libelle: string } | null } | null;
+    affectation: { vendeur_id: number; archive_le: string | null }[];
   };
 
   const lignesVendeurs = verifier(vendeurs) as unknown as LigneVendeur[];
   const lignesTables = verifier(tables) as unknown as LigneTable[];
+
+  // ------------------------------------------------ les deux origines, separees
+  //
+  // MA TABLE : les vendeurs affectes aux tables QUE J'ANIME. Les affectations
+  // archivees sont ecartees ici et non par la requete : un filtre sur une
+  // ressource imbriquee de PostgREST retire la ligne PARENTE quand il ne trouve
+  // rien, donc une table dont toutes les affectations sont archivees
+  // disparaitrait — et avec elle l'intitule du perimetre.
+  const vendeursDeMesTables = new Set<string>();
+  for (const t of lignesTables) {
+    for (const a of t.affectation ?? []) {
+      if (a.archive_le === null) vendeursDeMesTables.add(txt(a.vendeur_id));
+    }
+  }
+
+  // MON EQUIPE DE VENTE : les sites que j'encadre durablement, plus ceux dont je
+  // suis chef pour CETTE campagne, plus les plaques entieres dont je suis chef.
+  const mesSites = new Set<string>();
+  const mesPlaques = new Set<string>();
+  for (const e of verifier(encadrements) as unknown as { site_id: number }[]) {
+    mesSites.add(txt(e.site_id));
+  }
+  for (const r of verifier(rolesCampagne) as unknown as {
+    role: string;
+    site_id: number | null;
+    plaque_id: number | null;
+  }[]) {
+    if (r.role === 'chef_site' && r.site_id !== null) mesSites.add(txt(r.site_id));
+    if (r.role === 'chef_plaque' && r.plaque_id !== null) mesPlaques.add(txt(r.plaque_id));
+  }
 
   const projetes: VendeurSaisie[] = lignesVendeurs.map((v) => ({
     id: txt(v.id),
@@ -168,6 +233,9 @@ export async function chargerSaisie(campagneId: string): Promise<PerimetreSaisie
     siteId: txt(v.site?.id),
     siteCode: v.site?.code ?? '',
     siteLibelle: v.site?.libelle ?? '',
+    dansMaTable: vendeursDeMesTables.has(txt(v.id)),
+    dansMonEquipe:
+      mesSites.has(txt(v.site?.id)) || mesPlaques.has(txt(v.site?.plaque_id)),
     sections:
       v.type_vehicule === 'VO'
         ? [{ marqueId: null, libelle: 'VO' }]

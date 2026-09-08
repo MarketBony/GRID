@@ -75,6 +75,13 @@ export function Dashboard() {
   const { campagneId, choisir: setCampagneId } = useCampagneCourante();
   const [donnees, setDonnees] = useState<DonneesDashboard | null>(null);
   const [axe, setAxe] = useState<Axe>('site');
+
+  /// FILTRES DU CLASSEMENT — plaques et sites, choix MULTIPLE, demandes apres
+  /// l'exercice du 08/09/2026. Vide = aucun filtre, et c'est le seul etat qui
+  /// signifie « tout » : un filtre qui contiendrait toutes les valeurs se
+  /// lirait pareil a l'ecran mais cesserait de suivre l'arrivee d'un site.
+  const [plaquesRetenues, setPlaquesRetenues] = useState<string[]>([]);
+  const [sitesRetenus, setSitesRetenus] = useState<string[]>([]);
   const [critere, setCritere] = useState<'global' | 'vn' | 'vo'>('global');
   const [comparaisonAvec, setComparaisonAvec] = useState('');
   const [comparaison, setComparaison] = useState<Comparaison | null>(null);
@@ -175,10 +182,95 @@ export function Dashboard() {
   if (erreur && !donnees) return <div className="erreur-bloc">{erreur}</div>;
   if (!donnees) return <div className="attente">Aucune campagne.</div>;
 
-  const lignes = donnees.totaux[axe];
+  // ------------------------------------------------------- filtres du classement
+  //
+  // OU S'APPLIQUENT-ILS. La plaque vaut pour tout axe dont le rattachement est
+  // connu ; le site ne vaut que pour les vendeurs et les sites. UNE TABLE MELANGE
+  // LES SITES par construction — « 5 vendeurs de 5 concessions differentes », c'est
+  // tout l'interet de l'exercice — donc la filtrer par site n'aurait aucun sens.
+  const { siteVersPlaque, tableVersPlaque, vendeurVersSite } = donnees.rattachements;
+  const filtrePlaqueSApplique = axe === 'vendeur' || axe === 'site' || axe === 'table' || axe === 'plaque';
+  const filtreSiteSApplique = axe === 'vendeur' || axe === 'site';
+
+  /// Le rattachement d'une LIGNE de classement, selon l'axe courant. Jamais
+  /// derive du libelle : il vient des tables de correspondance du service.
+  const rattachementLigne = (cle: string): { siteId: string | null; plaqueId: string | null } => {
+    switch (axe) {
+      case 'vendeur': {
+        const siteId = vendeurVersSite[cle] ?? null;
+        return { siteId, plaqueId: siteId ? (siteVersPlaque[siteId] ?? null) : null };
+      }
+      case 'site':
+        return { siteId: cle, plaqueId: siteVersPlaque[cle] ?? null };
+      case 'table':
+        return { siteId: null, plaqueId: tableVersPlaque[cle] ?? null };
+      case 'plaque':
+        return { siteId: null, plaqueId: cle };
+      default:
+        return { siteId: null, plaqueId: null };
+    }
+  };
+
+  const retenue = (cle: string): boolean => {
+    const { siteId, plaqueId } = rattachementLigne(cle);
+    if (filtrePlaqueSApplique && plaquesRetenues.length > 0) {
+      if (plaqueId === null || !plaquesRetenues.includes(plaqueId)) return false;
+    }
+    if (filtreSiteSApplique && sitesRetenus.length > 0) {
+      if (siteId === null || !sitesRetenus.includes(siteId)) return false;
+    }
+    return true;
+  };
+
+  const filtreActif =
+    (filtrePlaqueSApplique && plaquesRetenues.length > 0) ||
+    (filtreSiteSApplique && sitesRetenus.length > 0);
+
+  // LE TABLEAU DES TOTAUX ET LE CLASSEMENT SUIVENT LE MEME FILTRE. Deux listes
+  // du meme axe qui ne montreraient pas les memes lignes seraient un piege :
+  // c'est exactement l'ecart 1107/1105 sous une autre forme.
+  const lignes = filtreActif ? donnees.totaux[axe].filter((t) => retenue(t.cle)) : donnees.totaux[axe];
   // UNE INDEXATION, plus un `if` par axe. Les cinq axes et les trois criteres ont
   // desormais la meme forme cote service — voir `services/dashboard.ts`.
-  const rangs: Rang[] = donnees.classements[axe][critere];
+  const tousLesRangs: Rang[] = donnees.classements[axe][critere];
+  // LES RANGS NE SONT PAS RECALCULES. Un vendeur 7e du groupe reste 7e quand on
+  // filtre sur son site : le filtre CHOISIT QUI ON REGARDE, il ne refait pas le
+  // classement. Renumeroter donnerait deux verites pour le meme vendeur selon
+  // l'ecran ouvert.
+  const rangs: Rang[] = filtreActif ? tousLesRangs.filter((r) => retenue(r.cle)) : tousLesRangs;
+
+  /// Les plaques, depuis les SESSIONS de la campagne : ce sont celles qui y
+  /// participent, et non les quatre du referentiel.
+  const plaquesDisponibles = donnees.sessions
+    .map((s) => ({ id: s.plaqueId, libelle: s.plaqueLibelle }))
+    .sort((a, b) => a.libelle.localeCompare(b.libelle, 'fr'));
+
+  /// Les sites, restreints aux plaques retenues quand il y en a : sans ca la
+  /// rangee compte vingt puces et devient illisible.
+  const sitesDisponibles = donnees.totaux.site
+    .filter((t) => plaquesRetenues.length === 0 || plaquesRetenues.includes(siteVersPlaque[t.cle] ?? ''))
+    .map((t) => ({ id: t.cle, libelle: t.libelle }))
+    .sort((a, b) => a.libelle.localeCompare(b.libelle, 'fr'));
+
+  /// PAS `basculer` : ce fichier importe deja un `basculer` de `EnTeteTriable`,
+  /// qui prend trois arguments et sert au tri des colonnes. Deux fonctions du
+  /// meme nom dans un meme fichier ne se voient pas quand elles sont dans deux
+  /// portees differentes — celle-ci masquait l'autre par chance de placement.
+  const basculerDansListe = (liste: string[], id: string) =>
+    liste.includes(id) ? liste.filter((x) => x !== id) : [...liste, id];
+
+  /// Retirer une plaque doit retirer ses sites du filtre : sans ca un site reste
+  /// retenu alors que sa puce a disparu de l'ecran, et le classement se vide sans
+  /// que rien ne l'explique.
+  const basculerPlaque = (id: string) => {
+    const suivantes = basculerDansListe(plaquesRetenues, id);
+    setPlaquesRetenues(suivantes);
+    if (suivantes.length > 0) {
+      setSitesRetenus((actuels) =>
+        actuels.filter((siteId) => suivantes.includes(siteVersPlaque[siteId] ?? ''))
+      );
+    }
+  };
 
   const groupe = donnees.totaux.groupe[0];
   const meilleure = donnees.classements.site.global[0] ?? null;
@@ -292,6 +384,59 @@ export function Dashboard() {
           </select>
         </div>
       </div>
+
+      {/* ------------------------------------------- filtres plaque / site
+          Choix MULTIPLE, et seulement sur les axes ou le rattachement existe.
+          Les puces sont des `aria-pressed` et non des cases : ce sont des
+          bascules d'affichage, pas un formulaire a soumettre. */}
+      {filtrePlaqueSApplique && (
+        <div className="filtres-classement">
+          <div className="rangee-filtre">
+            <span className="etiquette-filtre">Plaques</span>
+            {plaquesDisponibles.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`puce-filtre${plaquesRetenues.includes(p.id) ? ' retenue' : ''}`}
+                aria-pressed={plaquesRetenues.includes(p.id)}
+                onClick={() => basculerPlaque(p.id)}
+              >
+                {p.libelle}
+              </button>
+            ))}
+          </div>
+
+          {filtreSiteSApplique && (
+            <div className="rangee-filtre">
+              <span className="etiquette-filtre">Sites</span>
+              {sitesDisponibles.map((st) => (
+                <button
+                  key={st.id}
+                  type="button"
+                  className={`puce-filtre${sitesRetenus.includes(st.id) ? ' retenue' : ''}`}
+                  aria-pressed={sitesRetenus.includes(st.id)}
+                  onClick={() => setSitesRetenus(basculerDansListe(sitesRetenus, st.id))}
+                >
+                  {st.libelle}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {filtreActif && (
+            <button
+              type="button"
+              className="lien"
+              onClick={() => {
+                setPlaquesRetenues([]);
+                setSitesRetenus([]);
+              }}
+            >
+              Tout afficher ({rangs.length} sur {tousLesRangs.length})
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ----------------------------------------- graphiques cote a cote */}
       <div className="grille-graphiques">

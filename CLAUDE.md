@@ -234,6 +234,25 @@ a aucun détail haute fréquence à tordre, et `filter` sur un élément qui por
 `clip-path` ni `overflow: hidden` ne le rattrapent. Le verre se fait donc en couches CSS :
 ombre double (diffuse + contact), liseré pondéré vers le haut, arc spéculaire.
 
+**Une classe seule ne tient pas un fond contre les règles génériques de `button`, et
+la spécificité se COMPTE.** `button:hover:not(:disabled)` vaut **(0,2,1)** — deux
+pseudo-classes plus un élément — et bat `.ma-classe.mon-etat` en (0,2,0). Pire, elle
+emploie le **raccourci** `background`, qui remet `background-image` à `none` : un
+dégradé disparaît au survol en gardant son `color: #fff`, donc du texte blanc sur du
+verre translucide. Mesuré le 08/09/2026 sur les puces de filtre. Tout élément qui
+porte le dégradé Bony doit déclarer son propre état survol, comme
+`.principal:hover:not(:disabled)` le fait depuis toujours.
+
+**Un sélecteur descendant large attrape ce qu'on n'a pas encore écrit.**
+`.liste-vendeurs .detail` visait la ligne de vendeur et imposait sa couleur — plus un
+`grid-area` — à tout `.detail` descendant : le compteur d'un segmenté posé en tête de
+liste est devenu gris sur le dégradé. Son pendant actif était pourtant **déjà** scopé
+`.vendeur.actif`. C'est la même leçon que `header { position: sticky }`, et la règle
+est la même : scoper au parent qu'on vise réellement.
+
+**Ces deux défauts-là ne se voient QU'AU NAVIGATEUR.** Les six suites étaient vertes,
+`tsc` propre, le build passant. Aucune de ces trois choses ne regarde la cascade CSS.
+
 **Pas de prose de présentation dans l'interface.** Les écrans portaient des paragraphes qui
 expliquaient le produit à lui-même — « remplace trois onglets du fichier », « rien n'est
 stocké », « jamais l'astuce `valeur − ROW()/1000000` ». Ce sont des arguments de conception,
@@ -432,6 +451,15 @@ l'urgence. Si une demande les enfreint, le dire et proposer l'alternative.
   qu'un site a au moins un vendeur
 - **Une plaque peut n'avoir aucune table.** NORD et SUD-OUEST sont dans ce cas en
   juin 2026. Le mode `par_site` doit être pleinement fonctionnel, pas un cas dégradé
+- **L'effectif n'est PAS le nombre de présents.** C'est le nombre de vendeurs
+  **mobilisés**, et `backend/src/utils/agregats.ts` (`mobilisation()`) en est la
+  source unique : en mode par table, la **réserve** — les vendeurs affectés à aucune
+  table — ne compte pas, **sauf si elle a saisi des RDV**. Arbitré par l'utilisateur
+  le 08/09/2026 après le premier exercice réel. La conséquence assumée est consignée
+  dans `BUGS-CONNUS.md` sous « ACCEPTÉ » : **ne pas la « corriger »**
+- **« Ma table » et « mon équipe de vente » sont deux origines, pas deux valeurs.**
+  Un vendeur de ma concession que j'ai placé dans ma table appartient aux deux, et
+  doit apparaître dans les deux filtres. `VendeurSaisie` porte donc deux booléens
 
 ## Style de travail attendu
 

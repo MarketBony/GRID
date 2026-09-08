@@ -55,6 +55,9 @@ const VENDEUR: VendeurSaisie = {
   siteId: '1',
   siteCode: 'VI',
   siteLibelle: 'Vichy',
+  // Les deux origines, pour que l'atelier monte le meme type que la production.
+  dansMaTable: true,
+  dansMonEquipe: true,
   sections: [
     { marqueId: '1', libelle: 'Renault' },
     { marqueId: '2', libelle: 'Dacia' },
@@ -120,6 +123,14 @@ function Atelier() {
   // La barre de navigation, cablee comme dans `App.tsx` : c'est l'element le
   // plus visible du produit, il doit etre eprouvable ici.
   const [ongletActif, setOngletActif] = useState(0);
+
+  // Les deux nouveautes du 08/09/2026, pour les VOIR : le selecteur d'origine de
+  // la liste de saisie, et les filtres a choix multiple du classement.
+  const [origine, setOrigine] = useState<'table' | 'equipe' | 'tout'>('table');
+  const [plaquesRetenues, setPlaquesRetenues] = useState<string[]>([]);
+  const [sitesRetenus, setSitesRetenus] = useState<string[]>([]);
+  const basculerDansListe = (liste: string[], id: string) =>
+    liste.includes(id) ? liste.filter((x) => x !== id) : [...liste, id];
   const ONGLETS = ['Saisie', 'Tableau de bord', 'Tables', 'Vendeurs', 'Campagnes', 'Comptes'];
   const navigation = useIndicateurGlissant(ongletActif, ONGLETS.length);
 
@@ -393,6 +404,73 @@ function Atelier() {
               </div>
             )}
           </section>
+
+          {/* ------------------------------------ nouveautes du 08/09/2026 */}
+          <div className="carte">
+            <h3>Filtres du classement — choix multiple</h3>
+            <div className="filtres-classement">
+              <div className="rangee-filtre">
+                <span className="etiquette-filtre">Plaques</span>
+                {['CENTRE', 'NORD', 'SUD', 'SUD-OUEST'].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    className={`puce-filtre${plaquesRetenues.includes(p) ? ' retenue' : ''}`}
+                    aria-pressed={plaquesRetenues.includes(p)}
+                    onClick={() => setPlaquesRetenues(basculerDansListe(plaquesRetenues, p))}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <div className="rangee-filtre">
+                <span className="etiquette-filtre">Sites</span>
+                {['Clermont-Ferrand', 'Massagettes', 'Mozac', 'Ussel', 'Vichy', 'Moulins', 'Thiers', 'Le Puy', 'Mende', 'Issoire', 'Gaillac', 'Albi', 'Rodez', 'Millau', 'Figeac', 'Aurillac', 'Villefranche', 'Carmaux', 'Lavaur'].map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    className={`puce-filtre${sitesRetenus.includes(st) ? ' retenue' : ''}`}
+                    aria-pressed={sitesRetenus.includes(st)}
+                    onClick={() => setSitesRetenus(basculerDansListe(sitesRetenus, st))}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+              {(plaquesRetenues.length > 0 || sitesRetenus.length > 0) && (
+                <button
+                  type="button"
+                  className="lien"
+                  onClick={() => {
+                    setPlaquesRetenues([]);
+                    setSitesRetenus([]);
+                  }}
+                >
+                  Tout afficher (12 sur 99)
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="carte">
+            <h3>Origine de la liste de saisie</h3>
+            <aside className="liste-vendeurs" style={{ maxWidth: '22rem' }}>
+              <Segmente
+                className="origine-saisie"
+                etiquette="Qui afficher"
+                valeur={origine}
+                onChange={setOrigine}
+                options={[
+                  { valeur: 'table' as const, libelle: 'Ma table', detail: '6' },
+                  { valeur: 'equipe' as const, libelle: 'Mon équipe', detail: '11' },
+                  { valeur: 'tout' as const, libelle: 'Tout', detail: '15' },
+                ]}
+              />
+              <div className="recherche-vendeur">
+                <input placeholder="Chercher un vendeur, un site…" spellCheck={false} />
+              </div>
+            </aside>
+          </div>
 
           <div className="carte">
             <h3>Journal des gestes</h3>

@@ -8,6 +8,95 @@ verifie, pas seulement corrige de memoire.
 ---
 
 
+
+## [CORRIGE LE 08/09/2026] Deux defauts de CSS que seul le navigateur a montres
+
+Trouves en montant les nouveautes du jour dans `atelier.html`. **Ni le typecheck ni
+la relecture du fichier ne pouvaient les voir** : dans les deux cas le CSS ecrit
+etait juste, c'est la CASCADE qui en decidait autrement.
+
+### Le degrade d'une puce retenue disparaissait au survol
+
+`.puce-filtre.retenue` posait `background-image: var(--bony-gradient)` et
+`color: #fff`. Mesure : `backgroundImage` valait **`none`** des que la souris passait
+sur la puce, `color` restant blanc — donc **texte blanc sur verre translucide, et
+illisible en theme clair**.
+
+La cause est une specificite, et elle se compte :
+
+| Selecteur | Specificite |
+|---|---|
+| `button:hover:not(:disabled)` | **(0,2,1)** — deux pseudo-classes + un element |
+| `.puce-filtre.retenue` | (0,2,0) — deux classes |
+
+La regle GENERIQUE gagne. Et comme elle emploie le **raccourci** `background`, elle
+ne se contente pas de changer la couleur : elle **remet `background-image` a
+`none`**.
+
+`.principal` ne tombe pas dans le piege parce qu'il porte deja son propre
+`.principal:hover:not(:disabled)` en (0,3,0) — la reponse etait dans le fichier,
+quinze cents lignes plus haut. La puce a desormais la sienne, en (0,4,0).
+
+**La lecon, qui vaut pour tout ce qui porte le degrade Bony** : une classe seule ne
+suffit pas a tenir un fond contre les regles generiques de `button`. Il faut un etat
+survol explicite, et il faut le compter — pas l'estimer.
+
+### `.liste-vendeurs .detail` attrapait un `.detail` qui n'etait pas une ligne
+
+En posant le segmente « ma table / mon equipe » en tete de la liste des vendeurs,
+son compteur est devenu **gris sur le degrade**, donc invisible. `.liste-vendeurs
+.detail` imposait `color: var(--text-muted)` ET `grid-area: detail` a **n'importe
+quel `.detail` descendant de la liste**.
+
+La regle ne visait que la ligne de vendeur : `grid-template-areas` est declare sur
+`.liste-vendeurs .vendeur`, et son pendant actif juste en dessous etait **deja**
+scope `.liste-vendeurs .vendeur.actif .detail`. L'un des deux etait scope, l'autre
+non. Corrige en `.liste-vendeurs .vendeur .detail`.
+
+C'est la meme lecon que `header { position: sticky }` qui rendait dix elements
+collants : **un selecteur descendant large attrape ce qu'on n'a pas encore ecrit.**
+Celui-ci attendait depuis le premier jour qu'on pose un `.detail` ailleurs dans la
+liste.
+
+`.liste-vendeurs .nom` et `.liste-vendeurs .compteur` portent le meme selecteur trop
+large. Ils ne mordent pas aujourd'hui, ils sont signales dans le fichier et laisses
+en place.
+
+### Ce que ca dit du dispositif de verification
+
+Les six suites etaient vertes, `tsc` propre, le build passant — et les deux defauts
+etaient la. **Aucune de ces trois choses ne regarde la cascade CSS.** C'est
+exactement ce que le pipeline du projet exige a l'etape 2 (« le front lance, et un
+vrai test dans le navigateur, pas seulement `tsc --noEmit` »), et c'est la deuxieme
+fois que cette etape paie.
+
+## [ACCEPTE LE 08/09/2026] L'effectif depend des RDV pour les seuls reservistes
+
+**Ce n'est pas un bug a corriger, c'est un arbitrage rendu en connaissance de
+cause.** Ecrit ici pour qu'une session suivante ne le « repare » pas.
+
+La regle de `mobilisation()` compte un reserviste dans l'effectif **s'il a au moins
+un RDV**. L'effectif depend donc des RDV pour ces vendeurs-la, ce qui heurte le
+garde-fou `RANK!AG` — un chiffre historique ne doit pas bouger tout seul.
+
+**L'effet de bord, chiffre avant la decision** : archiver le dernier RDV d'un
+reserviste le fait sortir de l'effectif, et **la moyenne MONTE**.
+
+| CENTRE, septembre | effectif | total | moyenne |
+|---|---|---|---|
+| avant archivage | 26 | 342 | 13,15 |
+| apres | 25 | 341 | **13,64 ↑** |
+
+J'ai recommande d'y renoncer, avec ce chiffre. L'utilisateur a maintenu : « si un
+reserviste a des RDV c'est qu'il n'a pas pris part a l'exercice par table, mais
+neanmoins il a quand meme pris des RDV donc doit etre pris en compte ». La regle
+metier prime sur la stabilite du chiffre, et c'est sa decision.
+
+**L'invariant d'origine reste vrai partout ailleurs**, et il est toujours teste : en
+mode par site, et pour tout vendeur affecte a une table, l'effectif ne depend PAS
+des RDV. Le controle « la moyenne suit l'effectif PRESENT, pas le nombre de RDV »
+passe sans modification — son jeu d'essai vit sur une plaque sans table.
+
 ## [CORRIGE LE 08/09/2026] GRID par terre en pleine session — l'effet de meute du temps reel
 
 **Le defaut le plus grave rencontre sur ce projet a ce jour**, et le seul qui ait

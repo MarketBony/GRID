@@ -17,6 +17,7 @@ import {
 } from '../services/saisie';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 import { useIndicateurGlissant } from '../hooks/useIndicateurGlissant';
+import { Segmente } from '../components/Segmente';
 import {
   FENETRE_PERIMETRE,
   FENETRE_VUE_ENSEMBLE,
@@ -65,6 +66,11 @@ function retirer(liste: RdvSaisie[] | undefined, id: string): RdvSaisie[] {
   return (liste ?? []).filter((r) => r.id !== id);
 }
 
+/// « Ma table » et « mon equipe de vente » sont deux ORIGINES de droit
+/// distinctes, pas deux valeurs d'un meme rattachement : un vendeur de ma
+/// concession que j'ai place dans ma table appartient aux deux.
+type Origine = 'table' | 'equipe' | 'tout';
+
 export function Saisie() {
   const [campagnes, setCampagnes] = useState<CampagneResume[]>([]);
   // Partagee avec les autres ecrans — voir `contexts/CampagneContext.tsx`.
@@ -79,6 +85,14 @@ export function Saisie() {
   /// vendeurs : trouver un nom demandait de faire defiler. Sur une table de six,
   /// le champ ne coute rien.
   const [recherche, setRecherche] = useState('');
+
+  /// ORIGINE AFFICHEE — « ma table » ou « mon equipe de vente ».
+  ///
+  /// Un chef de vente rattache a une table voyait les deux listes MELANGEES, sans
+  /// moyen de savoir ce qu'il regardait : les vendeurs de sa concession et ceux de
+  /// sa table, qui viennent d'autres concessions. Remonte apres l'exercice du
+  /// 08/09/2026.
+  const [origine, setOrigine] = useState<Origine>('table');
 
   /// Les RDV en memoire, indexes par vendeur puis par case. Une Map par vendeur
   /// evite de re-filtrer 2 000 RDV a chaque frappe.
@@ -248,12 +262,58 @@ export function Saisie() {
   ///
   /// LE TOTAL AFFICHE EN PIED RESTE CELUI DU PERIMETRE ENTIER, jamais celui du
   /// filtre : un total qui change quand on cherche un nom serait un piege.
+  /// LE SELECTEUR N'APPARAIT QUE S'IL SERT. Il faut que les deux origines soient
+  /// peuplees ET qu'elles ne se recouvrent pas exactement : un chef de table dont
+  /// la table ne contient que ses propres vendeurs n'a rien a dissocier, et un
+  /// bouton qui ne change rien est pire que pas de bouton.
+  const origines = useMemo(() => {
+    const tous = donnees?.vendeurs ?? [];
+    const table = tous.filter((v) => v.dansMaTable);
+    const equipe = tous.filter((v) => v.dansMonEquipe);
+    const utile =
+      table.length > 0 &&
+      equipe.length > 0 &&
+      !(table.length === equipe.length && table.every((v) => v.dansMonEquipe));
+    return { table, equipe, utile };
+  }, [donnees]);
+
+  /// Si le selecteur ne sert pas, on retombe sur TOUT le perimetre — sans quoi un
+  /// chef de site sans table verrait une liste vide au premier affichage.
+  const origineEffective: Origine = origines.utile ? origine : 'tout';
+
   const vendeursAffiches = useMemo(() => {
     const tous = donnees?.vendeurs ?? [];
+    const parOrigine =
+      origineEffective === 'table'
+        ? tous.filter((v) => v.dansMaTable)
+        : origineEffective === 'equipe'
+          ? tous.filter((v) => v.dansMonEquipe)
+          : tous;
     const q = cleTri(recherche.trim());
-    if (q === '') return tous;
-    return tous.filter((v) => cleTri(v.nom).includes(q) || cleTri(v.siteCode).includes(q));
-  }, [donnees, recherche]);
+    if (q === '') return parOrigine;
+    return parOrigine.filter(
+      (v) => cleTri(v.nom).includes(q) || cleTri(v.siteCode).includes(q)
+    );
+  }, [donnees, recherche, origineEffective]);
+
+  /// CHANGER D'ORIGINE DEPLACE LA SELECTION, il ne la laisse pas hors champ.
+  ///
+  /// Pendant une RECHERCHE on garde au contraire le vendeur retenu, curseur en
+  /// « absent » : on cherche pour aller voir, pas pour changer de vendeur. Ici
+  /// c'est l'inverse — on change de liste, donc de sujet.
+  const changerOrigine = (suivante: Origine) => {
+    setOrigine(suivante);
+    const tous = donnees?.vendeurs ?? [];
+    const liste =
+      suivante === 'table'
+        ? tous.filter((v) => v.dansMaTable)
+        : suivante === 'equipe'
+          ? tous.filter((v) => v.dansMonEquipe)
+          : tous;
+    setVendeurId((actuel) =>
+      actuel && liste.some((v) => v.id === actuel) ? actuel : (liste[0]?.id ?? null)
+    );
+  };
 
   /// LE CURSEUR DE SELECTION GLISSE d'un vendeur a l'autre au lieu de sauter —
   /// meme mecanique que la pastille du segmente, meme hook. L'index porte sur la
@@ -392,6 +452,32 @@ export function Saisie() {
             aria-hidden="true"
             ref={curseur.indicateur}
           />
+          {origines.utile && (
+            <Segmente
+              className="origine-saisie"
+              etiquette="Qui afficher"
+              valeur={origineEffective}
+              onChange={changerOrigine}
+              options={[
+                {
+                  valeur: 'table' as const,
+                  libelle: 'Ma table',
+                  detail: String(origines.table.length),
+                },
+                {
+                  valeur: 'equipe' as const,
+                  libelle: 'Mon équipe',
+                  detail: String(origines.equipe.length),
+                },
+                {
+                  valeur: 'tout' as const,
+                  libelle: 'Tout',
+                  detail: String(donnees.vendeurs.length),
+                },
+              ]}
+            />
+          )}
+
           {/* Le champ n'apparait qu'a partir de huit vendeurs : sur une table de
               six, il occuperait de la place sans rien resoudre. */}
           {donnees.vendeurs.length >= 8 && (
@@ -424,7 +510,11 @@ export function Saisie() {
 
           {vendeursAffiches.length === 0 && (
             <p className="note" style={{ padding: '0.6rem' }}>
-              Aucun vendeur ne correspond à « {recherche} ».
+              {recherche !== ''
+                ? `Aucun vendeur ne correspond à « ${recherche} ».`
+                : origineEffective === 'table'
+                  ? 'Aucun vendeur dans les tables que vous animez.'
+                  : 'Aucun vendeur dans les sites que vous encadrez.'}
             </p>
           )}
 

@@ -304,7 +304,7 @@ backend/
     tester-garde-fous.ts     39 invariants de la base, chacun doit REFUSER
     tester-rls.ts            89 controles des politiques ET des RPC — decor autonome
     tester-invariants.ts     10 controles code <-> base (interdit n.6)
-    tester-agregats.ts       27 controles des totaux, contre les 1107 RDV de juin
+    tester-agregats.ts       33 controles des totaux, contre les 1107 RDV de juin
     importer-rdv-juin.ts     charge les 1107 RDV de juin, et les recoupe au classeur
   src/                       LE SEUL CODE QUE LE NAVIGATEUR EXECUTE
     auth/roles.ts            listes de valeurs valides — PAS de referentiel metier
@@ -657,7 +657,7 @@ cote navigateur.
 | Les `GRANT` de colonnes sur `utilisateur` | Ni `password_hash` ni `auth_uid` ne sont accordes a `authenticated` : la projection publique est tenue par la BASE, plus par une fonction qu'il faut penser a appeler |
 | `utils/presenceVendeur.ts` | Presence d'un vendeur pendant une campagne — utilisee par le perimetre ET par l'effectif du dashboard |
 | `auth/roles.ts` | Listes de valeurs valides. Comparees a la base par `test:invariants` |
-| `utils/agregats.ts` | **Tous les totaux, classements et moyennes du produit.** Fonctions pures, verifiees contre les 1107 RDV reels de juin |
+| `utils/agregats.ts` | **Tous les totaux, classements et moyennes du produit.** Fonctions pures, verifiees contre les 1107 RDV reels de juin. Porte aussi `mobilisation()` — QUI COMPTE DANS L'EFFECTIF, source unique |
 | `utils/repartition.ts` | La repartition automatique, graine 42. Pure |
 | `utils/tri.ts` | Tri et normalisation des libelles — `sansDiacritiques`, `cleTri`, `comparerLibelle`. Executee par le navigateur, pas recopiee |
 | `services/supabase.ts` — `messageLisible` | Le retrait du prefixe `RELANCE:` d'un message PostgREST |
@@ -667,6 +667,23 @@ cote navigateur.
 ete retire du produit (voir plus bas). Sa lecon, elle, reste — deux implementations
 divergeaient d'un denominateur, 99 contre 72, sans que rien ne le signale, parce que
 l'ecran n'appelait que l'une des deux.
+
+### `mobilisation()` — l'effectif n'est pas le nombre de presents (08/09/2026)
+
+Source **unique** de la reponse a « qui compte au denominateur de la moyenne
+RDV/vendeur ». Trois faits, dans cet ordre :
+
+1. la plaque fonctionne-t-elle **par table** — vrai des qu'un de ses vendeurs est
+   sur une table. Derive, et non lu sur `session_plaque.mode` : trois appelants
+   n'ont ainsi rien a rapatrier, et une session `par_table` sans tables construites
+   rendrait un effectif de zero avec le mode, alors qu'ici elle rend tout le monde ;
+2. ce vendeur est-il **sur une table** ;
+3. a-t-il **saisi au moins un RDV**.
+
+Est mobilise : tout vendeur d'une plaque sans table, tout vendeur sur une table, et
+tout reserviste ayant saisi. **Aucun total n'est modifie** — seul le denominateur
+l'est. Effet de bord assume et consigne dans `BUGS-CONNUS.md` : archiver le dernier
+RDV d'un reserviste fait MONTER la moyenne.
 
 `presenceVendeur.ts` merite une explication : `schema.sql` comptait l'effectif d'un site
 avec `date_sortie is null`, c'est-a-dire les presents **aujourd'hui**, tout en
