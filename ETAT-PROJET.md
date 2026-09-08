@@ -1141,6 +1141,43 @@ Les six suites rejouees en local apres coup : **39/39 · 89/89 · 10/10 · 27/27
 memoire**, pas sur la base : Lavaur n'ayant aucun vendeur, il n'entre dans aucun
 agregat et le compte reste juste.
 
+## 08/09/2026 — Incident de production : GRID par terre en pleine session
+
+**Premier arret de travail cause par l'outil.** ~25 postes en session, plus personne
+ne chargeait la page ni ne posait de RDV. Supabase annoncait POSTGRES et AUTH
+`unhealthy`.
+
+**Aucune donnee perdue, et c'est verifie** : 2 021 RDV en base, **901 poses ce
+jour-la**, le dernier a 15:35 UTC — les ecritures passaient encore, par
+intermittence. 111 vendeurs, 20 sites.
+
+**Ce n'etait pas la base.** `psql` en direct repondait en 160 ms, 20 connexions sur
+60, CPU 15 %, aucun verrou. Tout ce qui attendait, attendait en `ClientRead` — c'est
+a dire **Postgres qui attend PostgREST**. Le pool de PostgREST etait plein : les
+requetes HTTPS expiraient a 15 s sans jamais atteindre la base, `service_role`
+compris, et GoTrue — meme instance — se faisait affamer. D'ou le diagnostic trompeur
+du tableau de bord.
+
+**La cause est un effet de meute.** Le trigger de diffusion envoie un message a TOUS
+les postes de la campagne a chaque RDV ; chacun repondait par un rechargement complet
+du perimetre ET des agregats. Le cout est le PRODUIT des saisies par les
+spectateurs : 258 RDV/heure x 25 postes x 17 requetes = **65 000 requetes/heure pour
+un pool de 10 connexions** — et toutes au meme instant, puisque declenchees par le
+meme message. La RLS empechant le plus souvent de VOIR le RDV en question, chaque
+poste rechargeait tout pour le relire a l'identique.
+
+**Correctif** : `hooks/useRechargementCoalesce.ts` — filtre sur le perimetre,
+regroupement (8 s perimetre / 30 s vue d'ensemble) et gigue aleatoire pour disperser
+la meute. Front seul, **aucune migration, aucune ecriture**.
+
+**Il n'y avait aucun index a ajouter.** `perimetre_saisie` coute ~330 ms par appel
+dont 211 ms de PLANIFICATION — un `CROSS JOIN` campagne x vendeur avec quatre
+`EXISTS` par ligne — mais le plan utilise deja les bons index. Le defaut etait le
+nombre d'appels, pas leur cout. **Reste a faire** : cette vue est chere par
+construction et redevient le facteur limitant a la prochaine montee en charge.
+
+Details, mesures et lecon d'instrumentation dans `BUGS-CONNUS.md`.
+
 ## CE QUI RESTE, au 04/09/2026
 
 **Tout est en ligne.** Le lot du 03/09 est sur `master`, la migration est appliquee sur

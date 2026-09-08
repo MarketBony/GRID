@@ -17,6 +17,11 @@ import {
 } from '../services/saisie';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 import { useIndicateurGlissant } from '../hooks/useIndicateurGlissant';
+import {
+  FENETRE_PERIMETRE,
+  FENETRE_VUE_ENSEMBLE,
+  useRechargementCoalesce,
+} from '../hooks/useRechargementCoalesce';
 
 // ============================================================================
 // ECRAN DE SAISIE — module C.
@@ -158,22 +163,49 @@ export function Saisie() {
     rechargerVueDEnsemble(campagneId);
   }, [campagneId, recharger, rechargerVueDEnsemble]);
 
-  // Temps reel : un autre chef saisit, nos compteurs bougent. On recharge le
-  // perimetre plutot que de patcher a l'aveugle — c'est un appel par evenement
-  // recu, pas par frappe, et ca garantit qu'on affiche ce que la base contient.
-  useTempsReel(campagneId, {
-    'rdv:cree': () => campagneId && majTout(campagneId),
-    'rdv:modifie': () => campagneId && majTout(campagneId),
-    'rdv:archive': () => campagneId && majTout(campagneId),
-    // Un administrateur recompose une table pendant la session : mon perimetre
-    // peut changer sous mes pieds. On relit.
-    'tables:modifiees': () => campagneId && majTout(campagneId),
-  });
+  // Temps reel : un autre chef saisit, nos compteurs bougent. On recharge plutot
+  // que de patcher a l'aveugle — la charge utile ne porte PAS le nom du client
+  // (elle ne l'a jamais porte, c'est structurel), et la grille l'affiche.
+  //
+  // MAIS ON NE RECHARGE PLUS A CHAQUE EVENEMENT, et c'est ce qui a mis GRID a
+  // terre en pleine session le 08/09/2026. Le message part a TOUS les postes de
+  // la campagne : chacun rechargeait tout son perimetre pour un RDV que la RLS
+  // l'empeche le plus souvent de voir. 258 RDV/heure x 25 postes = 65 000
+  // requetes/heure sur un pool de 10 connexions. Deux garde-fous :
+  //
+  //   1. ON FILTRE SUR LE PERIMETRE. `vendeurId` est dans la charge utile et la
+  //      liste des vendeurs est deja en memoire : un evenement qui ne concerne
+  //      aucun de mes vendeurs ne change RIEN a ma grille. Le relire serait
+  //      relire a l'identique.
+  //   2. ON REGROUPE ce qui reste (`useRechargementCoalesce`), avec une gigue
+  //      pour que les postes ne repondent pas tous au meme instant.
+  //
+  // La vue d'ensemble, elle, bouge a chaque RDV du groupe par nature — mais
+  // c'est un CONFORT, et c'est le rechargement le plus cher : fenetre longue.
+  const majPerimetre = useRechargementCoalesce(() => {
+    if (campagneId) void recharger(campagneId).catch(() => undefined);
+  }, FENETRE_PERIMETRE);
 
-  function majTout(id: string) {
-    void recharger(id);
-    rechargerVueDEnsemble(id);
-  }
+  const majVueDEnsemble = useRechargementCoalesce(() => {
+    if (campagneId) rechargerVueDEnsemble(campagneId);
+  }, FENETRE_VUE_ENSEMBLE);
+
+  useTempsReel(campagneId, {
+    'rdv:modifie': (charge) => {
+      majVueDEnsemble();
+      const { vendeurId: concerne } = (charge ?? {}) as { vendeurId?: string };
+      // Sans `vendeurId` on ne sait pas trancher : on recharge, comme avant.
+      if (!concerne || (donnees?.vendeurs ?? []).some((v) => v.id === concerne)) {
+        majPerimetre();
+      }
+    },
+    // Un administrateur recompose une table pendant la session : mon perimetre
+    // peut changer sous mes pieds, donc AUCUN filtre ne s'applique ici.
+    'tables:modifiees': () => {
+      majPerimetre();
+      majVueDEnsemble();
+    },
+  });
 
   const vendeur = donnees?.vendeurs.find((v) => v.id === vendeurId) ?? null;
   const figee = donnees?.campagne.cloturee ?? false;

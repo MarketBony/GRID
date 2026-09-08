@@ -13,6 +13,10 @@ import { chargerCampagnes, type CampagneResume } from '../services/campagnes';
 import { chargerSaisie } from '../services/saisie';
 import { useReferentiels } from '../hooks/useReferentiels';
 import { useTempsReel } from '../hooks/useTempsReel';
+import {
+  FENETRE_VUE_ENSEMBLE,
+  useRechargementCoalesce,
+} from '../hooks/useRechargementCoalesce';
 import { exporterDashboard } from '../utils/exportExcel';
 import { libelleJour } from '../utils/grille';
 import { BandeauKpi, BarresHorizontales, BarresParJour } from '../components/Graphiques';
@@ -114,11 +118,21 @@ export function Dashboard() {
   }, [campagneId, recharger]);
 
   // F-D.8. Les evenements de saisie, pas une interrogation periodique.
+  //
+  // REGROUPES DEPUIS L'INCIDENT DU 08/09/2026. Le tableau de bord est le poste le
+  // plus couteux du produit — il recalcule les agregats de TOUTE la campagne — et
+  // il recevait un evenement par RDV saisi n'importe ou dans le groupe. Ouvert sur
+  // un ecran collectif pendant une session a 258 RDV/heure, un seul onglet
+  // declenchait 258 recalculs complets. Ils sont desormais regroupes par fenetre,
+  // avec une gigue : les chiffres retardent de moins d'une minute, ce qui est sans
+  // consequence pour un ecran qu'on regarde, et ne coute plus la session.
+  const majTableau = useRechargementCoalesce(() => {
+    if (campagneId) void recharger(campagneId).catch(() => undefined);
+  }, FENETRE_VUE_ENSEMBLE);
+
   useTempsReel(campagneId, {
-    'rdv:cree': () => campagneId && void recharger(campagneId).catch(() => undefined),
-    'rdv:modifie': () => campagneId && void recharger(campagneId).catch(() => undefined),
-    'rdv:archive': () => campagneId && void recharger(campagneId).catch(() => undefined),
-    'tables:modifiees': () => campagneId && void recharger(campagneId).catch(() => undefined),
+    'rdv:modifie': majTableau,
+    'tables:modifiees': majTableau,
   });
 
   const lancerComparaison = (autreId: string) => {

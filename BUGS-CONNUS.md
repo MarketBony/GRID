@@ -7,6 +7,96 @@ verifie, pas seulement corrige de memoire.
 
 ---
 
+
+## [CORRIGE LE 08/09/2026] GRID par terre en pleine session — l'effet de meute du temps reel
+
+**Le defaut le plus grave rencontre sur ce projet a ce jour**, et le seul qui ait
+arrete le travail de 25 personnes. Il n'etait visible ni en typecheck, ni dans les
+six suites, ni a deux onglets ouverts : **il ne se declenche qu'a partir d'une
+dizaine de postes connectes**.
+
+### Ce qu'on voyait
+
+Le tableau Supabase annoncait POSTGRES et AUTH `unhealthy`, 65 232 requetes de
+passerelle sur l'heure, RAM 74 %. Plus personne ne chargeait la page ni ne posait de
+RDV.
+
+### Ce qui se passait vraiment — et ce n'etait PAS la base
+
+Mesure en direct, connexion directe a Postgres :
+
+| Instrument | Lecture | Conclusion |
+|---|---|---|
+| `pg_stat_activity` | 20/60 connexions, CPU 15 %, **rien en attente de verrou** | la base n'est pas bloquee |
+| Tout ce qui attendait | `ClientRead` — Postgres attend le CLIENT | c'est PostgREST qui est en retard, pas Postgres |
+| `psql` direct | reponse en 160 ms | la base est **saine et rapide** |
+| PostgREST par HTTPS | **timeout a 15 s**, y compris `service_role` | le pool de connexions de PostgREST est sature |
+| `/auth/v1/health` | **timeout a 15 s** | GoTrue partage l'instance et se fait affamer |
+
+**La base allait bien. Le pool de PostgREST etait plein.** Les requetes n'arrivaient
+meme pas jusqu'a Postgres — d'ou une base au repos et une application morte, une
+combinaison qui envoie chercher au mauvais endroit.
+
+### La cause
+
+Le trigger `diffuser_rdv()` envoie **un message a TOUS les postes de la campagne** a
+chaque RDV. Chaque poste y repondait par un rechargement **complet** :
+`chargerSaisie` (7 requetes, dont deux a ~1 s) **et** `chargerDashboard` (agregats de
+toute la campagne).
+
+Le cout n'est donc pas la SOMME des saisies et des spectateurs, c'est leur **PRODUIT** :
+
+```
+258 RDV/heure  x  ~25 postes  x  ~17 requetes  =  ~65 000 requetes/heure
+                                                   pour un pool de 10 connexions
+```
+
+Et les 25 postes repondaient **au meme milliseme de seconde**, puisqu'ils reagissent
+au meme message. Une meute, pas une charge.
+
+Pire : la RLS empeche le plus souvent un poste de VOIR le RDV qui vient de le
+reveiller. Il rechargeait tout son perimetre pour le relire **a l'identique**.
+
+### Le chiffre qui a confirme
+
+`pg_stat_statements`, sur 7 jours : `perimetre_saisie` appele 10 297 fois pour
+**9 900 secondes** cumulees, soit **961 ms de moyenne**. Mesure isolee sur la vue :
+121 ms d'execution mais **211 ms de PLANIFICATION** — c'est un `CROSS JOIN`
+campagne x vendeur avec quatre `EXISTS` par ligne. La vue est intrinsequement chere,
+et il n'y a **aucun index a ajouter** : le plan utilise deja les bons. Le probleme
+n'etait pas le cout unitaire, c'etait le **nombre d'appels**.
+
+### Le correctif
+
+`hooks/useRechargementCoalesce.ts`, applique a la saisie et au tableau de bord :
+
+1. **Filtre sur le perimetre.** La charge utile porte `vendeurId` et la liste des
+   vendeurs est deja en memoire : un evenement qui ne concerne aucun de mes vendeurs
+   ne change rien a ma grille, on l'ignore. `tables:modifiees` n'est PAS filtre — mon
+   perimetre peut justement changer.
+2. **Regroupement** — tant qu'un rechargement est programme, les evenements suivants
+   n'en programment pas d'autre. Fenetre de 8 s pour le perimetre, 30 s pour la vue
+   d'ensemble, la plus chere.
+3. **Gigue aleatoire** jusqu'a la moitie de la fenetre. Sans elle, regrouper ne
+   ferait que **decaler la meute** au lieu de la disperser.
+
+**Ce qu'on perd, et c'est assume** : la saisie d'un collegue apparait au bout de la
+fenetre au lieu d'apparaitre tout de suite. Le critere de recette n.5 reste tenu, avec
+un delai. **Sa propre saisie n'est pas concernee** : elle s'affiche en memoire, sans
+passer par la.
+
+### La lecon, pour la prochaine fois
+
+**Une diffusion a N destinataires qui declenche un rechargement chez chacun est
+quadratique.** Deux onglets ouverts en developpement ne la font pas voir, et aucune des
+six suites ne la voit non plus — elles ne mesurent que des reponses justes, jamais un
+cout collectif. Toute reaction a un evenement diffuse doit etre **regroupee et
+dispersee** avant d'atteindre la production, et **un evenement qu'on n'a pas le droit
+de voir ne doit rien declencher**.
+
+Corollaire d'instrumentation : quand tout attend en `ClientRead` et que `psql` repond
+vite, **ce n'est pas la base**. Chercher du cote du client — ici le pool de PostgREST.
+
 ## Couche liquid glass iOS — 04/09/2026
 
 Demande de l'utilisateur, avec deux depots de reference a combiner :
