@@ -21,6 +21,7 @@ import { exporterDashboard } from '../utils/exportExcel';
 import { libelleJour } from '../utils/grille';
 import { BandeauKpi, BarresHorizontales, BarresParJour } from '../components/Graphiques';
 import { Segmente } from '../components/Segmente';
+import { MenuMultiple } from '../components/MenuMultiple';
 import {
   basculer,
   comparerSelon,
@@ -252,18 +253,12 @@ export function Dashboard() {
     .map((t) => ({ id: t.cle, libelle: t.libelle }))
     .sort((a, b) => a.libelle.localeCompare(b.libelle, 'fr'));
 
-  /// PAS `basculer` : ce fichier importe deja un `basculer` de `EnTeteTriable`,
-  /// qui prend trois arguments et sert au tri des colonnes. Deux fonctions du
-  /// meme nom dans un meme fichier ne se voient pas quand elles sont dans deux
-  /// portees differentes — celle-ci masquait l'autre par chance de placement.
-  const basculerDansListe = (liste: string[], id: string) =>
-    liste.includes(id) ? liste.filter((x) => x !== id) : [...liste, id];
 
-  /// Retirer une plaque doit retirer ses sites du filtre : sans ca un site reste
-  /// retenu alors que sa puce a disparu de l'ecran, et le classement se vide sans
-  /// que rien ne l'explique.
-  const basculerPlaque = (id: string) => {
-    const suivantes = basculerDansListe(plaquesRetenues, id);
+
+  /// CHANGER LES PLAQUES ELAGUE LES SITES RETENUS. Sans ca un site reste retenu
+  /// alors qu'il a disparu du menu, et le classement se vide sans que rien a
+  /// l'ecran ne l'explique.
+  const changerPlaques = (suivantes: string[]) => {
     setPlaquesRetenues(suivantes);
     if (suivantes.length > 0) {
       setSitesRetenus((actuels) =>
@@ -386,54 +381,39 @@ export function Dashboard() {
       </div>
 
       {/* ------------------------------------------- filtres plaque / site
-          Choix MULTIPLE, et seulement sur les axes ou le rattachement existe.
-          Les puces sont des `aria-pressed` et non des cases : ce sont des
-          bascules d'affichage, pas un formulaire a soumettre. */}
+          DEUX MENUS DEROULANTS, et non une puce par valeur. La premiere version
+          posait une puce par site : vingt puces sur deux rangees, qui
+          repoussaient les graphiques sous la ligne de flottaison pour un reglage
+          qu'on touche une fois par consultation. Le cout d'affichage d'un filtre
+          doit suivre la frequence a laquelle on s'en sert, pas le nombre de
+          valeurs qu'il porte.
+
+          Le compte filtre reste ecrit A COTE des menus : c'est la seule chose
+          qui dit qu'un filtre est actif quand les deux menus sont fermes. */}
       {filtrePlaqueSApplique && (
         <div className="filtres-classement">
-          <div className="rangee-filtre">
-            <span className="etiquette-filtre">Plaques</span>
-            {plaquesDisponibles.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`puce-filtre${plaquesRetenues.includes(p.id) ? ' retenue' : ''}`}
-                aria-pressed={plaquesRetenues.includes(p.id)}
-                onClick={() => basculerPlaque(p.id)}
-              >
-                {p.libelle}
-              </button>
-            ))}
-          </div>
+          <MenuMultiple
+            etiquette="Plaques"
+            libelleVide="Toutes"
+            options={plaquesDisponibles.map((p) => ({ id: p.id, libelle: p.libelle }))}
+            retenus={plaquesRetenues}
+            onChange={changerPlaques}
+          />
 
           {filtreSiteSApplique && (
-            <div className="rangee-filtre">
-              <span className="etiquette-filtre">Sites</span>
-              {sitesDisponibles.map((st) => (
-                <button
-                  key={st.id}
-                  type="button"
-                  className={`puce-filtre${sitesRetenus.includes(st.id) ? ' retenue' : ''}`}
-                  aria-pressed={sitesRetenus.includes(st.id)}
-                  onClick={() => setSitesRetenus(basculerDansListe(sitesRetenus, st.id))}
-                >
-                  {st.libelle}
-                </button>
-              ))}
-            </div>
+            <MenuMultiple
+              etiquette="Sites"
+              libelleVide="Tous"
+              options={sitesDisponibles.map((st) => ({ id: st.id, libelle: st.libelle }))}
+              retenus={sitesRetenus}
+              onChange={setSitesRetenus}
+            />
           )}
 
           {filtreActif && (
-            <button
-              type="button"
-              className="lien"
-              onClick={() => {
-                setPlaquesRetenues([]);
-                setSitesRetenus([]);
-              }}
-            >
-              Tout afficher ({rangs.length} sur {tousLesRangs.length})
-            </button>
+            <span className="compte-filtre">
+              {rangs.length} sur {tousLesRangs.length}
+            </span>
           )}
         </div>
       )}

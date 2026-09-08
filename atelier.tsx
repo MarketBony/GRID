@@ -1,6 +1,7 @@
 import { StrictMode, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Segmente } from './components/Segmente';
+import { MenuMultiple } from './components/MenuMultiple';
 import { basculer, EnTeteTriable, type SensNaturel, type Tri } from './components/EnTeteTriable';
 import { GrilleVendeur } from './components/GrilleVendeur';
 import type { RdvSaisie, VendeurSaisie } from './services/saisie';
@@ -407,47 +408,47 @@ function Atelier() {
 
           {/* ------------------------------------ nouveautes du 08/09/2026 */}
           <div className="carte">
-            <h3>Filtres du classement — choix multiple</h3>
+            <h3>Filtres du classement — deux menus a choix multiple</h3>
             <div className="filtres-classement">
-              <div className="rangee-filtre">
-                <span className="etiquette-filtre">Plaques</span>
-                {['CENTRE', 'NORD', 'SUD', 'SUD-OUEST'].map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    className={`puce-filtre${plaquesRetenues.includes(p) ? ' retenue' : ''}`}
-                    aria-pressed={plaquesRetenues.includes(p)}
-                    onClick={() => setPlaquesRetenues(basculerDansListe(plaquesRetenues, p))}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-              <div className="rangee-filtre">
-                <span className="etiquette-filtre">Sites</span>
-                {['Clermont-Ferrand', 'Massagettes', 'Mozac', 'Ussel', 'Vichy', 'Moulins', 'Thiers', 'Le Puy', 'Mende', 'Issoire', 'Gaillac', 'Albi', 'Rodez', 'Millau', 'Figeac', 'Aurillac', 'Villefranche', 'Carmaux', 'Lavaur'].map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    className={`puce-filtre${sitesRetenus.includes(st) ? ' retenue' : ''}`}
-                    aria-pressed={sitesRetenus.includes(st)}
-                    onClick={() => setSitesRetenus(basculerDansListe(sitesRetenus, st))}
-                  >
-                    {st}
-                  </button>
-                ))}
-              </div>
+              <MenuMultiple
+                etiquette="Plaques"
+                libelleVide="Toutes"
+                options={['CENTRE', 'NORD', 'SUD', 'SUD-OUEST'].map((p) => ({
+                  id: p,
+                  libelle: p,
+                }))}
+                retenus={plaquesRetenues}
+                onChange={setPlaquesRetenues}
+              />
+              <MenuMultiple
+                etiquette="Sites"
+                libelleVide="Tous"
+                options={[
+                  'Clermont-Ferrand',
+                  'Massagettes',
+                  'Mozac',
+                  'Ussel',
+                  'Vichy',
+                  'Moulins',
+                  'Thiers',
+                  'Le Puy',
+                  'Mende',
+                  'Issoire',
+                  'Gaillac',
+                  'Albi',
+                  'Rodez',
+                  'Millau',
+                  'Figeac',
+                  'Aurillac',
+                  'Villefranche',
+                  'Carmaux',
+                  'Lavaur',
+                ].map((st, i) => ({ id: st, libelle: st, detail: String(112 - i * 5) }))}
+                retenus={sitesRetenus}
+                onChange={setSitesRetenus}
+              />
               {(plaquesRetenues.length > 0 || sitesRetenus.length > 0) && (
-                <button
-                  type="button"
-                  className="lien"
-                  onClick={() => {
-                    setPlaquesRetenues([]);
-                    setSitesRetenus([]);
-                  }}
-                >
-                  Tout afficher (12 sur 99)
-                </button>
+                <span className="compte-filtre">12 sur 99</span>
               )}
             </div>
           </div>

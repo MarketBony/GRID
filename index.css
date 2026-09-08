@@ -3902,94 +3902,180 @@ html.dark .tableau-grille .case.remplie:hover:not(.figee) {
 }
 
 /* ==========================================================================
-   FILTRES DU CLASSEMENT — plaques et sites, choix multiple (08/09/2026).
+   FILTRES DU CLASSEMENT — deux menus deroulants a choix multiple (08/09/2026).
 
-   SELECTEURS NOUVEAUX, pas une redeclaration. `.puces` existe deja plus haut
-   mais il habille des `li` d'affichage ; ici ce sont des BASCULES cliquables,
-   avec un etat retenu et une reaction a l'appui. Les confondre aurait donne un
-   septieme cas de valeur declaree deux fois.
+   LA PREMIERE VERSION POSAIT UNE PUCE PAR VALEUR. Quatre plaques, mais VINGT
+   sites : deux rangees qui prenaient toute la largeur et repoussaient les
+   graphiques sous la ligne de flottaison, pour un reglage qu'on touche une fois
+   par consultation. Le cout d'affichage d'un filtre doit suivre la frequence a
+   laquelle on s'en sert, pas le nombre de valeurs qu'il porte.
+
+   Les styles de puce ont ete RETIRES et non laisses en place : du CSS mort finit
+   par etre reutilise par erreur, et il masque ce qui sert vraiment.
    ========================================================================== */
 
 .filtres-classement {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
   margin-bottom: 1rem;
 }
 
-.rangee-filtre {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
+/* LE SEUL INDICE qu'un filtre est actif quand les deux menus sont fermes. */
+.compte-filtre {
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
-.etiquette-filtre {
-  font-size: 0.72rem;
+.menu-multiple {
+  /* Le panneau ne s'ancre plus ici — il vit dans un portail — mais l'enveloppe
+     reste le repere du clic « dedans / dehors ». */
+  display: inline-flex;
+}
+
+.declencheur-menu {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.42rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--rayon-petit);
+  background: var(--bg-input);
+  color: var(--text-main);
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.declencheur-menu .etiquette-menu {
+  font-size: 0.68rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-muted);
-  min-width: 4rem;
 }
 
-.puce-filtre {
-  padding: 0.32rem 0.7rem;
-  border: 1px solid var(--border-color);
-  border-radius: 999px;
-  background: var(--bg-input);
-  color: var(--text-main);
-  font-size: 0.82rem;
-  font-weight: 500;
+.declencheur-menu .resume-menu {
+  font-weight: 600;
+}
+
+/* PAS DE DEGRADE ICI, deliberement. Un filtre actif n'est pas une action
+   principale, et un fond plein sur deux boutons cote a cote se lirait comme deux
+   actions. L'accent suffit — et il evite la bagarre de specificite avec
+   `button:hover:not(:disabled)`, qui vaut (0,2,1). */
+.declencheur-menu.filtre {
+  border-color: var(--bony-orange);
+}
+
+.declencheur-menu.filtre .resume-menu {
+  color: var(--bony-orange);
+}
+
+.declencheur-menu .chevron {
+  font-size: 0.9rem;
+  line-height: 1;
+  color: var(--text-muted);
+  /* Il TOURNE, il ne change pas de glyphe : la meme regle que les volets. */
+  transition: transform var(--duree-vif) var(--ressort);
+}
+
+.declencheur-menu[aria-expanded='true'] .chevron {
+  transform: rotate(180deg);
+}
+
+/* `fixed` ET DANS UN PORTAIL, les deux ensemble. `.carte` porte
+   `overflow-x: auto`, et CSS interdit qu'un axe defile pendant que l'autre reste
+   `visible` : la valeur UTILISEE de `overflow-y` devient `auto`, donc une carte
+   decoupe verticalement sans qu'aucune ligne de CSS ne le dise. Un panneau
+   `absolute` y disparaissait — mesure au navigateur, il etait bien dans le DOM
+   et visible, mais coupe. Le portail met le panneau hors de tout ancetre ; le
+   `fixed` le place depuis le rectangle du bouton, pose en JS. */
+.panneau-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  min-width: 13rem;
+  max-width: 20rem;
+  padding: 0.3rem;
+  border-radius: var(--rayon);
+  /* COLONNE FLEXIBLE : la hauteur maximale est posee en JS depuis la place
+     reellement disponible, et c'est la LISTE qui se retreint — le bouton
+     « tout afficher » doit rester visible, sinon on ne peut plus revenir en
+     arriere une fois le menu plein. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: volet-monte var(--duree-vif) var(--ressort-doux) both;
+  transform-origin: 50% 0;
+}
+
+.liste-menu {
+  /* DIX LIGNES AU PLUS quand la place le permet, puis on defile : le defilement
+     est INTERNE, jamais celui de la page. `min-height: 0` est indispensable —
+     sans lui un enfant flexible refuse de descendre sous sa hauteur de contenu
+     et le panneau deborde malgre son `max-height`. */
+  max-height: 17rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  outline: none;
+}
+
+.option-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--rayon-petit);
+  font-size: 0.84rem;
   cursor: pointer;
-  /* Le fond et la bordure suivent le ressort vif ; la transformation reste sur
-     l'appui seul. Une puce qui grandit au survol ferait bouger la rangee
-     entiere, et il y en a jusqu'a vingt. */
-  transition:
-    background-color var(--duree-vif) var(--ressort),
-    border-color var(--duree-vif) var(--ressort),
-    color var(--duree-vif) var(--ressort),
-    transform var(--duree-vif) var(--ressort);
 }
 
-.puce-filtre:hover:not(.retenue) {
+/* UN SEUL ETAT DE SURVOL, pose par la classe et non par `:hover`. Le clavier et
+   la souris deplacent le meme reperage : deux mises en valeur simultanees — une
+   sous la souris, une sous les fleches — feraient croire a deux selections. */
+.option-menu.survolee {
   background: var(--glass-bg-strong);
-  border-color: var(--text-muted);
 }
 
-.puce-filtre:active {
-  transform: scale(0.96);
+.option-menu.cochee {
+  font-weight: 600;
 }
 
-.puce-filtre.retenue {
-  background-image: var(--bony-gradient);
-  /* `transparent` comme `.principal` : le degre peint par-dessus, mais laisser
-     une couleur dessous rend le rendu dependant de l'ordre de peinture. */
-  background-color: transparent;
-  border-color: transparent;
-  color: #fff;
-  box-shadow:
-    0 2px 8px rgba(247, 86, 50, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+/* Largeur FIXE : sans elle les libelles se decalent d'un demi-caractere selon
+   que la coche est presente ou non, et toute la liste tremble au clic. */
+.option-menu .coche {
+  width: 0.9rem;
+  flex: none;
+  color: var(--bony-orange);
+  font-size: 0.8rem;
 }
 
-/* IL FAUT CETTE REGLE, et elle a ete trouvee au navigateur, pas a la lecture.
-   `button:hover:not(:disabled)` vaut (0,2,1) — deux pseudo-classes plus un
-   element — contre (0,2,0) pour `.puce-filtre.retenue` : la regle GENERIQUE
-   gagne. Et comme elle emploie le RACCOURCI `background`, elle remet
-   `background-image` a `none`.
-   Resultat mesure : une puce retenue perdait son degrade des que la souris
-   passait dessus, et gardait `color: #fff` — texte blanc sur verre
-   translucide, donc illisible en theme clair.
-   `.puce-filtre.retenue:hover:not(:disabled)` vaut (0,4,0) et reprend la main.
-   C'est exactement ce que fait `.principal:hover:not(:disabled)` plus haut, et
-   pour la meme raison. */
-.puce-filtre.retenue:hover:not(:disabled) {
-  background-image: var(--bony-gradient-hover);
-  background-color: transparent;
-  border-color: transparent;
-  box-shadow:
-    0 4px 14px rgba(247, 86, 50, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+.option-menu .libelle-option {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.option-menu .detail-option {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.vide-menu {
+  padding: 0.5rem;
+  margin: 0;
+}
+
+.effacer-menu {
+  display: block;
+  width: 100%;
+  margin-top: 0.2rem;
+  padding: 0.35rem 0.5rem;
+  border-top: 1px solid var(--border-color);
+  text-align: left;
+  font-size: 0.8rem;
 }
 
 /* Le segmente « ma table / mon equipe / tout » en tete de la liste de gauche.
@@ -4000,11 +4086,11 @@ html.dark .tableau-grille .case.remplie:hover:not(.figee) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .puce-filtre {
-    transition: none;
+  .panneau-menu {
+    animation: none;
   }
 
-  .puce-filtre:active {
-    transform: none;
+  .declencheur-menu .chevron {
+    transition: none;
   }
 }

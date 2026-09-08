@@ -250,7 +250,21 @@ liste est devenu gris sur le dégradé. Son pendant actif était pourtant **déj
 `.vendeur.actif`. C'est la même leçon que `header { position: sticky }`, et la règle
 est la même : scoper au parent qu'on vise réellement.
 
-**Ces deux défauts-là ne se voient QU'AU NAVIGATEUR.** Les six suites étaient vertes,
+**Un panneau flottant va dans un PORTAIL, jamais en `position: absolute` dans son
+parent.** `.carte` déclare `overflow-x: auto` — et CSS interdit qu'un axe défile
+pendant que l'autre reste `visible` : la valeur **utilisée** de `overflow-y` devient
+`auto`. Une carte découpe donc verticalement **sans qu'aucune ligne de CSS ne
+l'écrive**. Un menu `absolute` y disparaît : présent dans le DOM, visible,
+dimensionné, et coupé. `position: fixed` seul ne suffit pas non plus — un ancêtre
+`transform` redéfinit le bloc conteneur, et le projet en porte plusieurs. Voir
+`components/MenuMultiple.tsx`.
+
+**Le coût d'affichage d'un filtre suit la fréquence à laquelle on s'en sert, pas le
+nombre de valeurs qu'il porte.** Une puce par valeur donnait vingt puces sur deux
+rangées pour les sites, et repoussait les graphiques sous la ligne de flottaison.
+Au-delà de quelques valeurs, c'est un menu déroulant.
+
+**Ces défauts-là ne se voient QU'AU NAVIGATEUR.** Les six suites étaient vertes,
 `tsc` propre, le build passant. Aucune de ces trois choses ne regarde la cascade CSS.
 
 **Pas de prose de présentation dans l'interface.** Les écrans portaient des paragraphes qui

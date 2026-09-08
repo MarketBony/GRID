@@ -1281,6 +1281,36 @@ construction.
 `rattachements.vendeurVersSite` a ete ajoute au service : une ligne de classement ne
 portait que sa cle et son libelle, donc rien qui permette de la filtrer.
 
+### Les filtres sont devenus DEUX MENUS DEROULANTS, apres retour de l'utilisateur
+
+La premiere version posait **une puce par valeur** : quatre plaques, mais **vingt
+sites**. Deux rangees qui prenaient toute la largeur et repoussaient les graphiques
+sous la ligne de flottaison, pour un reglage qu'on touche une fois par consultation.
+Verdict de l'utilisateur : « ca prend une place pas possible, pas ergonomique ». Il a
+raison, et la lecon se generalise : **le cout d'affichage d'un filtre doit suivre la
+frequence a laquelle on s'en sert, pas le nombre de valeurs qu'il porte.**
+
+`components/MenuMultiple.tsx` — **un** composant, employe deux fois. Bouton compact
+qui dit l'etat sans qu'on l'ouvre (« Toutes », un nom quand il n'y en a qu'un,
+« 2 sur 19 » au-dela), panneau en `listbox` avec `aria-multiselectable`, fleches,
+Espace pour basculer, Echap qui ferme **en rendant le focus au bouton**. Les styles
+de puce ont ete **retires** et non laisses en place.
+
+**Le panneau vit dans un PORTAIL, et c'est une correction mesuree.** En `absolute` il
+n'apparaissait pas : present dans le DOM, `visibility: visible`, 208 x 284 px, et
+**decoupe**. `.carte` porte `overflow-x: auto`, et CSS interdit qu'un axe defile
+pendant que l'autre reste `visible` — la valeur **utilisee** de `overflow-y` devient
+`auto`. Une carte decoupe donc verticalement sans qu'aucune ligne de CSS ne le dise,
+et le tableau de bord ne fonctionnait que **par chance de placement**, ses filtres
+etant hors carte. Un portail est immune a `overflow` **et** a un ancetre `transform`,
+qui redecouperait un `fixed`.
+
+**Et il RETRECIT au lieu de deborder.** Premiere version : bascule vers le haut si ca
+ne tenait pas en bas, et plaquage contre le bord quand ca ne tenait ni en haut ni en
+bas — le panneau recouvrait alors la barre de navigation, vu dans un volet de 535 px.
+Un menu n'a pas a tenir entier puisque sa liste defile : il prend le cote le plus
+spacieux et s'adapte a la place disponible, `Tout afficher` toujours visible.
+
 ### Deux defauts de CSS trouves AU NAVIGATEUR, pas a la lecture
 
 Ils sont dans `BUGS-CONNUS.md`. Le premier : `button:hover:not(:disabled)` vaut

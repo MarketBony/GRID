@@ -62,10 +62,68 @@ liste.
 large. Ils ne mordent pas aujourd'hui, ils sont signales dans le fichier et laisses
 en place.
 
+### [CORRIGE LE 08/09/2026] Un panneau flottant decoupe par `overflow-x: auto`
+
+Troisieme defaut du meme lot, et le plus retors : **le menu ne s'ouvrait pas**. Pas
+d'erreur, pas d'avertissement — rien.
+
+Mesure au navigateur : le panneau etait **dans le DOM**, `position: absolute`,
+`visibility: visible`, `opacity: 1`, **208 x 284 px**. Il etait simplement decoupe.
+En remontant la chaine des ancetres a la recherche d'un `overflow` autre que
+`visible`, un seul coupable : `.carte`, avec `overflow: auto` sur **les deux axes**.
+
+Or `index.css` ne declare que `overflow-x: auto` sur `.carte`. **CSS interdit qu'un
+axe defile pendant que l'autre reste `visible`** : la valeur *utilisee* de
+`overflow-y` devient `auto` a son tour. Une carte decoupe donc verticalement sans
+qu'aucune ligne de CSS ne l'ecrive — c'est invisible a la relecture du fichier.
+
+Le tableau de bord, lui, fonctionnait : ses filtres sont poses **hors** carte. Il
+fonctionnait donc **par chance de placement**, et le composant aurait casse au
+premier deplacement.
+
+**Le correctif** : le panneau part dans `document.body` par un portail React, en
+`position: fixed`, place depuis le rectangle du bouton. Un portail est immune a
+`overflow` **et** a un ancetre `transform` — qui redefinirait le bloc conteneur d'un
+`fixed` et redecouperait tout. Le projet en porte plusieurs (les tuiles KPI, les
+cartes de vendeur, la barre segmentee), donc raisonner sur les blocs conteneurs
+aurait ete un pari.
+
+Deux consequences a ne pas oublier avec un portail :
+
+- **le clic « dehors » doit tester DEUX conteneurs.** Le panneau n'est plus un
+  descendant de l'enveloppe : sans le second test, cliquer une option fermait le menu
+  avant de la basculer ;
+- **les coordonnees se posent directement sur l'element**, pas par un etat React.
+  Replacer a chaque evenement de defilement provoquerait un rendu par image — meme
+  raison que dans `useIndicateurGlissant`.
+
+### [CORRIGE LE 08/09/2026] Le meme panneau recouvrait la barre de navigation
+
+Trouve juste apres, dans un volet de 535 px de haut. La regle de placement basculait
+vers le haut quand il n'y avait pas la place en bas, et **plaquait le panneau contre
+le bord** quand il n'y avait la place ni en haut ni en bas. Resultat : un panneau de
+284 px pose a 6 px du haut, par-dessus la navigation.
+
+L'erreur de raisonnement etait de vouloir **faire tenir le panneau entier**. Sa liste
+defile deja : il suffit de lui donner la place disponible et de le laisser
+retrecir — ce qui vaut aussi pour un portable en paysage. Il prend desormais le cote
+le plus spacieux, recoit un `max-height` calcule, et c'est la LISTE qui se retreint,
+`Tout afficher` restant visible.
+
+Deux details qui ne se devinent pas :
+
+- `min-height: 0` sur la liste est **indispensable** : sans lui un enfant flexible
+  refuse de descendre sous la hauteur de son contenu, et le panneau deborde malgre
+  son `max-height` ;
+- la hauteur se mesure **apres** avoir pose la contrainte, sinon on place le panneau
+  d'apres une hauteur qu'il n'a plus.
+
 ### Ce que ca dit du dispositif de verification
 
-Les six suites etaient vertes, `tsc` propre, le build passant — et les deux defauts
-etaient la. **Aucune de ces trois choses ne regarde la cascade CSS.** C'est
+Les six suites etaient vertes, `tsc` propre, le build passant — et les **quatre**
+defauts etaient la. **Aucune de ces trois choses ne regarde la cascade CSS ni la
+mise en page.** Trois d'entre eux avaient un mode d'echec entierement silencieux :
+un degrade qui disparait, un compteur gris sur gris, un menu qui ne s'ouvre pas. C'est
 exactement ce que le pipeline du projet exige a l'etape 2 (« le front lance, et un
 vrai test dans le navigateur, pas seulement `tsc --noEmit` »), et c'est la deuxieme
 fois que cette etape paie.
