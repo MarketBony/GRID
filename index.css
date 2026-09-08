@@ -4234,3 +4234,279 @@ html.dark .option-menu.cochee {
     animation: none;
   }
 }
+
+
+/* ==========================================================================
+   PLANNING IMPRIMABLE — la planche qui part au mur de la concession.
+
+   PATRON DU 08/09/2026. Deux choses commandent tout ce bloc :
+
+   1. ON ECRIT DESSUS. Les encadrants suivent les RDV au crayon pendant les cinq
+      jours. Une case doit accueillir un nom ECRIT A LA MAIN, ce qui demande
+      beaucoup plus de place qu'a l'ecran. D'ou les hauteurs de ligne en
+      MILLIMETRES et non en `rem` : la reference est la feuille, pas l'ecran.
+
+   2. AUCUN TOKEN DE THEME ICI. Les couleurs sont ecrites en dur, et c'est
+      DELIBERE : `--text-main` et `--bg-panel` basculent en sombre, et une
+      planche imprimee depuis un ecran sombre sortirait en blanc sur noir — une
+      cartouche d'encre par vendeur. Le papier n'a pas de theme.
+
+   Rien de tout ce bloc n'utilise `backdrop-filter`, d'ombre portee ni de trame
+   grise : l'encre coute, et une trame se voit sous le crayon.
+   ========================================================================== */
+
+@page {
+  size: A4 landscape;
+  /* 8 mm : en dessous, la plupart des imprimantes de bureau rognent. */
+  margin: 8mm;
+}
+
+.planning-imprimable {
+  /* Le papier n'a pas de theme : on force le clair, sur l'ecran comme au tirage,
+     pour que ce qu'on voit dans le patron soit ce qui sort de l'imprimante. */
+  color-scheme: light;
+  background: #ffffff;
+  color: #14141a;
+  font-family: 'Albert Sans', system-ui, sans-serif;
+}
+
+.page-planning {
+  /* Les dimensions REELLES d'une A4 paysage, moins les marges d'impression. A
+     l'ecran ca donne un apercu a l'echelle ; au tirage, ca tombe juste. */
+  width: 281mm;
+  min-height: 194mm;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+/* ---- L'EN-TETE : qui, ou, quelle marque ---------------------------------- */
+
+.entete-planning {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8mm;
+  padding-bottom: 2.5mm;
+  /* LE FILET EN DEGRADE BONY, et c'est la seule surface encree du document :
+     2 pt de haut. Un bandeau plein aurait coute une bande de toner par page. */
+  border-bottom: 2.4pt solid transparent;
+  border-image: linear-gradient(to right, #f75632, #8f12ab) 1;
+}
+
+.entete-planning h1 {
+  margin: 0;
+  font-family: 'Syncopate', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 15pt;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  color: #14141a;
+}
+
+.entete-planning .qui p,
+.entete-planning .quoi p {
+  margin: 0.8mm 0 0;
+  font-size: 8.5pt;
+  color: #4b5563;
+}
+
+.entete-planning .quoi {
+  text-align: right;
+  flex: none;
+}
+
+/* La marque est l'information qui distingue deux planches du MEME vendeur : elle
+   doit se lire de loin, une fois la feuille au mur. */
+.marque-planning {
+  display: inline-block;
+  font-family: 'Syncopate', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 12pt;
+  letter-spacing: 0.06em;
+  color: #f75632;
+}
+
+/* ---- LA GRILLE ----------------------------------------------------------- */
+
+.grille-planning {
+  width: 100%;
+  /* `fixed` : sans lui, une colonne portant un nom long s'elargit et les cinq
+     jours cessent d'avoir la meme largeur — un planning doit se lire en
+     colonnes regulieres. */
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin-top: 3mm;
+  flex: 1;
+}
+
+.grille-planning th,
+.grille-planning td {
+  border: 0.5pt solid #9ca3af;
+  padding: 0;
+  vertical-align: top;
+}
+
+.grille-planning thead th {
+  height: 8mm;
+  padding: 0 1mm;
+  background: #f3f4f6;
+  /* Sans ca, Chrome retire les fonds a l'impression pour economiser l'encre —
+     et la ligne de titre devient indistinguable des lignes de creneaux. */
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+  font-family: 'Syncopate', system-ui, sans-serif;
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #14141a;
+}
+
+.grille-planning thead th .jour-nom {
+  display: block;
+}
+
+.grille-planning thead th .jour-date {
+  display: block;
+  font-family: 'Albert Sans', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 7pt;
+  color: #4b5563;
+}
+
+.grille-planning .col-creneau {
+  width: 26mm;
+  background: #f9fafb;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+  font-family: 'Albert Sans', system-ui, sans-serif;
+  font-size: 8pt;
+  font-weight: 600;
+  text-align: center;
+  vertical-align: middle;
+  color: #14141a;
+}
+
+/* LA HAUTEUR DE LIGNE EST LA MESURE CLE DU DOCUMENT. 13 mm, c'est ce qui reste
+   apres l'en-tete et le pied pour onze creneaux — et c'est ce qui permet
+   d'ecrire un nom au stylo. La reduire pour faire tenir plus de choses viderait
+   la planche de son usage. */
+.grille-planning tbody tr {
+  height: 13mm;
+}
+
+/* PAS DE TRAME SUR LES CASES REMPLIES. Une case deja servie se lit a son
+   contenu ; un fond gris se verrait sous le crayon du suivi. */
+.grille-planning td.remplie {
+  background: none;
+}
+
+.rdv-imprime {
+  display: flex;
+  align-items: center;
+  gap: 1.2mm;
+  padding: 1mm 1.4mm 0;
+  font-size: 8.5pt;
+  line-height: 1.15;
+}
+
+/* LA PASTILLE A COCHER — le geste du suivi. Un cercle vide de 2,6 mm : assez
+   grand pour une croix au stylo, assez discret pour ne pas concurrencer le nom. */
+.rdv-imprime .pastille {
+  flex: none;
+  width: 2.6mm;
+  height: 2.6mm;
+  border: 0.5pt solid #6b7280;
+  border-radius: 50%;
+}
+
+.rdv-imprime .nom-client {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+/* ---- LE PIED ------------------------------------------------------------- */
+
+.pied-planning {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6mm;
+  margin-top: 2mm;
+  font-size: 8pt;
+  color: #4b5563;
+}
+
+.pied-planning strong {
+  color: #14141a;
+  font-size: 9.5pt;
+}
+
+/* LES DEUX CHIFFRES DU SUIVI SE REMPLISSENT A LA MAIN : c'est le bilan que
+   l'encadrant fait en fin d'operation, sur la feuille elle-meme. */
+.pied-planning .a-remplir {
+  display: inline-block;
+  width: 14mm;
+  border-bottom: 0.5pt solid #6b7280;
+}
+
+.pied-planning .marque-pied {
+  font-family: 'Syncopate', system-ui, sans-serif;
+  font-size: 7pt;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+}
+
+/* ---- L'IMPRESSION ELLE-MEME --------------------------------------------- */
+
+@media print {
+  /* On ne masque pas l'application : le declencheur d'export monte le planning
+     SEUL dans le document. Ce bloc ne fait donc que le mettre en pages. */
+  .page-planning {
+    /* `break-after` et non `page-break-after` : la seconde est depreciee, mais
+       on garde les deux — Safari ne comprend encore que l'ancienne. */
+    break-after: page;
+    page-break-after: always;
+    /* Une planche ne se coupe JAMAIS en deux : une demi-grille au mur ne sert a
+       rien. */
+    break-inside: avoid;
+    page-break-inside: avoid;
+    width: auto;
+    min-height: 0;
+  }
+
+  .page-planning:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /* Une ligne de creneau coupee en bas de page serait illisible. */
+  .grille-planning tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+/* APERCU A L'ECRAN — le patron, et rien d'autre. Ces regles ne s'appliquent
+   qu'hors impression : elles posent la feuille sur un fond gris pour qu'on juge
+   les marges, ce qui n'a aucun sens sur du papier. */
+@media screen {
+  .planning-imprimable {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8mm;
+    padding: 8mm;
+    background: #e5e7eb;
+  }
+
+  .page-planning {
+    padding: 8mm;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  }
+}

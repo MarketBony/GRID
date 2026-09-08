@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Patron — planning imprimable</title>
+    <link rel="icon" type="image/svg+xml" href="/grid.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Albert+Sans:ital,wght@0,100..900;1,100..900&family=Syncopate:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!--
+      PATRON DU PLANNING IMPRIMABLE — artefact de developpement.
+
+      Il monte le VRAI composant `PlanningImprimable` avec le VRAI `index.css`,
+      sur des donnees d'exemple reprises de l'ecran de saisie. Ce qu'on voit ici
+      est ce que l'imprimante sortira, aux donnees pres.
+
+      A LA RACINE et non dans `public/` : Vite le sert en developpement et
+      `vite build` ne prend que `index.html` en entree, donc il ne part JAMAIS
+      dans `dist`. Le banc d'essai liquid glass, pose dans `public/`, s'etait
+      retrouve en production.
+
+      Ctrl+P sur cette page donne l'apercu d'impression reel.
+    -->
+    <div id="racine"></div>
+    <script type="module" src="/patron-export.tsx"></script>
+  </body>
+</html>

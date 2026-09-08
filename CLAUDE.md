@@ -94,6 +94,10 @@ arborescence, même pipeline, même discipline documentaire.
   « Gearbox reste Gearbox ». Le VPS a été remis dans son état d'origine, il ne reste
   aucune trace de GRID dessus. `grid.bonyauto-mobile.com` n'existe pas en DNS et la
   zone Gandi n'est pas accessible : c'est ce qui a fermé la voie du VPS
+- **Les artefacts de mise au point vivent A LA RACINE** : `atelier.html` pour la
+  couche visuelle, `patron-export.html` pour le planning imprimable. Vite les sert
+  en développement et `vite build` ne prend que `index.html` en entrée, donc ils ne
+  partent jamais dans `dist` — vérifié à chaque lot, `dist` doit contenir 4 fichiers
 - **Tout ce qui est dans `public/` part TEL QUEL dans `dist`**, donc en production. Une
   page de développement posée là s'y retrouve — constaté avec le banc d'essai liquid
   glass. Un fichier HTML à la RACINE, lui, est servi en développement et **exclu du
@@ -476,6 +480,14 @@ l'urgence. Si une demande les enfreint, le dire et proposer l'alternative.
   `db/seed_referentiels.sql`
 - **Un site peut n'avoir aucun vendeur** (cas de l'onglet `MDP`). Ne pas supposer
   qu'un site a au moins un vendeur
+- **Le planning imprime n'est PAS la grille de saisie, et on ECRIT dessus.** Les
+  encadrants collent ces planches au mur et suivent les RDV au crayon pendant les
+  cinq jours, **en notant aussi de nouveaux rendez-vous**. Trois conséquences :
+  une case doit pouvoir accueillir un nom écrit à la main (48 × 13 mm sur A4
+  paysage, une feuille par vendeur et par marque) ; une section de marque **sans
+  aucun RDV** se garde, c'est là qu'ils écriront ; et `PlanningImprimable`
+  n'utilise **aucun token de thème** — le papier n'a pas de thème, et une planche
+  imprimée depuis l'écran sombre coûterait une cartouche par vendeur
 - **Une plaque peut n'avoir aucune table.** NORD et SUD-OUEST sont dans ce cas en
   juin 2026. Le mode `par_site` doit être pleinement fonctionnel, pas un cas dégradé
 - **L'effectif n'est PAS le nombre de présents.** C'est le nombre de vendeurs

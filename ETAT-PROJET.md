@@ -1351,6 +1351,77 @@ Ils sont dans `BUGS-CONNUS.md`. Le premier : `button:hover:not(:disabled)` vaut
 compteur du nouveau segmente. **Aucun des deux ne se voit au typecheck ni a la
 relecture du fichier**, et le second etait une bombe posee depuis longtemps.
 
+## 08/09/2026, soir — Le total suit la selection, et le patron du planning papier
+
+### Le total de RDV affichait toujours le perimetre entier
+
+Il annoncait « 149 RDV sur le perimetre » quelle que soit la selection, y compris
+sur une table de cinq vendeurs. Il suit desormais l'origine, **et l'intitule avec** :
+« RDV de ma table » / « RDV de mon equipe » / « RDV sur le perimetre ».
+
+**LES DEUX FILTRES SONT SEPARES, et c'est toute la nuance.** L'ORIGINE change de
+sujet : trois perimetres, trois totaux, le total doit les suivre. La RECHERCHE ne
+change pas de sujet — on cherche pour aller VOIR quelqu'un, pas pour restreindre —
+donc un total qui bougerait a la frappe serait un piege. C'etait deja ecrit dans
+`Saisie.tsx` et ca reste vrai : d'ou deux listes, `vendeursOrigine` et
+`vendeursAffiches`, le total se calculant sur la premiere.
+
+### Patron du planning imprimable — `components/PlanningImprimable.tsx`
+
+Livre pour validation AVANT d'ecrire l'export lui-meme. Il se regarde sur
+`patron-export.html` a la racine, et `Ctrl+P` y donne l'apercu d'impression reel.
+C'est le VRAI composant avec le VRAI `index.css`, pas une maquette.
+
+**CE QUI COMMANDE TOUT LE DESSIN : ON ECRIT DESSUS.** Les encadrants collent ces
+planches au mur et suivent les RDV au crayon pendant les cinq jours. Le calcul, sur
+A4 paysage — 297 x 210 mm, marges 8 mm :
+
+| | |
+|---|---|
+| Colonne creneau | 26 mm |
+| Chaque jour | **48 mm** |
+| Chaque ligne | **13 mm** |
+
+Mesure a l'ecran et non estimee : 1062 px de large, lignes de 49 px, cases de
+180 px a 96 dpi. Une case de 48 x 13 mm se remplit au stylo sans effort.
+
+C'est ce calcul qui impose **une feuille par vendeur ET par marque**. Empiler les
+deux sections d'un VN sur une A4 tomberait a 6,6 mm par ligne ; les mettre cote a
+cote a 23 mm par colonne, soit l'etroitesse de l'ecran sur un support ou l'on ecrit.
+
+**Les choix de dessin, et leur raison :**
+
+- **un filet en degrade Bony de 2,4 pt** sous l'en-tete, seule surface encree du
+  document. Un bandeau plein aurait coute une bande de toner par feuille ;
+- **la marque en gros a droite** : c'est ce qui distingue deux planches du meme
+  vendeur, une fois au mur ;
+- **aucune trame sur les cases remplies** — un fond gris se voit sous le crayon ;
+- **une pastille a cocher** devant chaque nom : le geste du suivi ;
+- **aucun token de theme, couleurs en dur.** `--text-main` bascule en sombre : une
+  planche imprimee depuis l'ecran sombre sortirait en blanc sur noir, soit une
+  cartouche par vendeur. Le papier n'a pas de theme ;
+- `print-color-adjust: exact` sur les fonds de titre, sans quoi Chrome les retire a
+  l'impression et la ligne d'en-tete devient indistinguable des lignes de creneaux ;
+- une case a **deux RDV** tient, et c'est verifie sur le patron.
+
+### Deux decisions de l'utilisateur, a NE PAS « optimiser » plus tard
+
+**Les encadrants ecrivent de NOUVEAUX rendez-vous sur la feuille**, ils ne font pas
+que cocher. Une section de marque **sans aucun RDV** est donc conservee a
+l'impression : c'est precisement la qu'ils noteront. Trois vendeurs d'exemple
+donnent cinq feuilles, dont deux quasi vides — **c'est voulu**. Sauter les sections
+vides economiserait du papier en retirant l'endroit ou l'on ecrit.
+
+**A4 paysage, une marque par feuille**, format retenu en priorite : imprimable
+partout, et le plus confortable au stylo. L'A3 cote a cote reste possible plus tard
+(46 x 22 mm par case, moitie moins de feuilles) mais suppose une imprimante A3.
+
+### Ce qui reste a ecrire pour l'export
+
+Le bouton dans l'ecran de saisie — visible seulement sur « mon equipe » —, le menu
+de selection des vendeurs (tous coches par defaut), et le declenchement de
+l'impression. Le patron etant valide, il n'y a plus de question de mise en forme.
+
 ## CE QUI RESTE, au 04/09/2026
 
 **Tout est en ligne.** Le lot du 03/09 est sur `master`, la migration est appliquee sur

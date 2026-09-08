@@ -248,11 +248,6 @@ export function Saisie() {
     return parVendeur;
   }, [donnees, rdvsParVendeur]);
 
-  const totalPerimetre = useMemo(
-    () => [...compteurs.values()].reduce((n, c) => n + c.total, 0),
-    [compteurs]
-  );
-
   /// Recherche insensible a la casse ET AUX ACCENTS : personne ne tape
   /// « THÉO » avec son accent dans un champ de recherche. Porte aussi sur le code
   /// site — « CLF » est une facon naturelle de filtrer.
@@ -281,20 +276,49 @@ export function Saisie() {
   /// chef de site sans table verrait une liste vide au premier affichage.
   const origineEffective: Origine = origines.utile ? origine : 'tout';
 
-  const vendeursAffiches = useMemo(() => {
+  /// LES DEUX FILTRES SONT SEPARES, ET C'EST TOUTE LA NUANCE DU TOTAL.
+  ///
+  /// L'ORIGINE change de sujet : « ma table », « mon equipe », « tout » sont trois
+  /// perimetres differents, donc trois totaux differents. Le total DOIT les
+  /// suivre — il affichait 149 en permanence, y compris sur une table de cinq
+  /// vendeurs, ce qui n'informait sur rien.
+  ///
+  /// LA RECHERCHE ne change pas de sujet : on cherche pour aller VOIR quelqu'un,
+  /// pas pour restreindre le perimetre. Un total qui bougerait a la frappe serait
+  /// un piege — c'etait deja ecrit ici, et ca reste vrai.
+  ///
+  /// D'ou deux listes et non une : le total se calcule sur la premiere.
+  const vendeursOrigine = useMemo(() => {
     const tous = donnees?.vendeurs ?? [];
-    const parOrigine =
-      origineEffective === 'table'
-        ? tous.filter((v) => v.dansMaTable)
-        : origineEffective === 'equipe'
-          ? tous.filter((v) => v.dansMonEquipe)
-          : tous;
+    if (origineEffective === 'table') return tous.filter((v) => v.dansMaTable);
+    if (origineEffective === 'equipe') return tous.filter((v) => v.dansMonEquipe);
+    return tous;
+  }, [donnees, origineEffective]);
+
+  /// Le total de l'origine courante. Il se somme sur `vendeursOrigine` et non sur
+  /// tous les compteurs : c'est ce qui le fait suivre « ma table » / « mon
+  /// equipe » / « tout ».
+  const totalOrigine = useMemo(
+    () => vendeursOrigine.reduce((n, v) => n + (compteurs.get(v.id)?.total ?? 0), 0),
+    [vendeursOrigine, compteurs]
+  );
+
+  /// L'INTITULE DIT SUR QUOI PORTE LE NOMBRE. « RDV sur le perimetre » a cote
+  /// d'un total de table etait faux : ce n'etait pas le perimetre.
+  const libelleTotal =
+    origineEffective === 'table'
+      ? 'RDV de ma table'
+      : origineEffective === 'equipe'
+        ? 'RDV de mon équipe'
+        : 'RDV sur le périmètre';
+
+  const vendeursAffiches = useMemo(() => {
     const q = cleTri(recherche.trim());
-    if (q === '') return parOrigine;
-    return parOrigine.filter(
+    if (q === '') return vendeursOrigine;
+    return vendeursOrigine.filter(
       (v) => cleTri(v.nom).includes(q) || cleTri(v.siteCode).includes(q)
     );
-  }, [donnees, recherche, origineEffective]);
+  }, [vendeursOrigine, recherche]);
 
   /// CHANGER D'ORIGINE DEPLACE LA SELECTION, il ne la laisse pas hors champ.
   ///
@@ -430,8 +454,8 @@ export function Saisie() {
           </p>
         </div>
         <div className="progression">
-          <strong>{totalPerimetre}</strong>
-          <span>RDV sur le périmètre</span>
+          <strong>{totalOrigine}</strong>
+          <span>{libelleTotal}</span>
         </div>
         <SelecteurCampagne campagnes={campagnes} valeur={campagneId} onChange={setCampagneId} />
       </header>
@@ -549,7 +573,7 @@ export function Saisie() {
           })}
           <div className="total-perimetre">
             <span>Total</span>
-            <strong>{totalPerimetre}</strong>
+            <strong>{totalOrigine}</strong>
           </div>
         </aside>
 
