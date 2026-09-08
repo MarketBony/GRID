@@ -118,6 +118,47 @@ Deux details qui ne se devinent pas :
 - la hauteur se mesure **apres** avoir pose la contrainte, sinon on place le panneau
   d'apres une hauteur qu'il n'a plus.
 
+### [CORRIGE LE 08/09/2026] `html.dark .glass` declare DEUX FOIS, a six lignes d'ecart
+
+Trouve en cherchant l'idiome du verre pour y aligner le menu. Les deux blocs sont
+**consecutifs**, meme selecteur, meme specificite :
+
+- le premier pose `background-image` — l'arc speculaire — et un `box-shadow` a
+  **cinq couches** : ombre portee, ombre de CONTACT, liseré haut, liseré interne,
+  liseré bas ;
+- le second ne pose qu'un `box-shadow` a **deux couches**.
+
+Le second gagne. En theme sombre, tout `.glass` et `.glass-strong` perdait donc son
+ombre de contact et ses deux liserés internes — precisement les trois choses qui
+detachent une plaque de verre du fond. Mesure apres correction : le `box-shadow`
+calcule passe de **2 a 5 couches**.
+
+Le premier bloc est visiblement l'intention : son commentaire explique que l'arc
+doit etre plus marque en sombre. Le second est un reste d'avant le lot liquid glass,
+laisse en place et jamais relu.
+
+**SEPTIEME occurrence de ce defaut dans `index.css`**, apres `main { max-width }`,
+`.saisie-corps`, `.segments`, `.glass` / `.glass-strong` (les corps identiques),
+`.liste-vendeurs .vendeur.actif` et `.onglet.actif`. Le motif ne varie jamais : une
+regle ajoutee sans voir celle qui existait deja, parfois **quelques lignes** plus
+haut. Ce n'est donc pas un probleme de distance dans le fichier.
+
+### [CORRIGE LE 08/09/2026] Un glyphe de police servait d'icone
+
+`« ⌄ »` et `« ✓ »` etaient ecrits **en texte** dans le menu deroulant. Signale par
+l'utilisateur sur l'ecran : une fleche fine, mal centree, etrangere au reste.
+
+**Un glyphe n'est pas une icone.** Son dessin, son epaisseur de trait et sa position
+sur la ligne de base appartiennent a la police qui le rend — et il n'existe aucune
+garantie qu'Albert Sans le dessine, donc il tombe sur une police de repli qui varie
+d'une machine a l'autre. Ni `font-size` ni `line-height` ne rattrapent un dessin
+qu'on ne controle pas.
+
+Remplaces par deux SVG a `stroke-linecap` et `stroke-linejoin` arrondis, en
+`currentColor` pour suivre la couleur du texte sans etre repeints a la main. Le
+chevron TOURNE de 180 degres au ressort au lieu de changer de glyphe — la meme regle
+que les volets, deja ecrite dans `CLAUDE.md`.
+
 ### Ce que ca dit du dispositif de verification
 
 Les six suites etaient vertes, `tsc` propre, le build passant — et les **quatre**

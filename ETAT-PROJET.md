@@ -1311,6 +1311,37 @@ bas — le panneau recouvrait alors la barre de navigation, vu dans un volet de 
 Un menu n'a pas a tenir entier puisque sa liste defile : il prend le cote le plus
 spacieux et s'adapte a la place disponible, `Tout afficher` toujours visible.
 
+### Le menu est passe a la charte verre, et un GLYPHE n'est pas une icone
+
+Premiere version fonctionnelle mais etrangere au reste : un fond plat, et un
+chevron ecrit **« ⌄ » en texte**. Releve par l'utilisateur — « c'est quoi cette
+petite fleche immonde ».
+
+Il avait raison sur le fond : **un glyphe n'est pas une icone.** Son dessin, son
+epaisseur de trait et sa position sur la ligne de base dependent de la police qui
+le rend, et Albert Sans ne dessine pas « ⌄ » comme une police systeme de repli. Les
+deux icones sont desormais des **SVG** a `stroke-linecap` arrondi — c'est le bout
+de trait arrondi qui rapproche le dessin d'iOS, plus que la forme.
+
+Ce que le declencheur a gagne, aligne sur les champs et les panneaux : forme de
+pastille, **arc speculaire** en couche de fond, flou d'arriere-plan, ombre double
+avec ombre de contact, liseré haut, **anneau de focus qui grandit au ressort**, et
+un tassement a l'appui. Le chevron **tourne** de 180 degres au ressort vif, comme
+celui des volets — il ne change pas de glyphe.
+
+Le panneau a recu le meme arc speculaire, et la coche **arrive au ressort** : c'est
+le seul retour visuel d'un clic, puisque le menu reste ouvert pour le choix suivant.
+
+**Une teinte, pas le degrade plein, sur une option cochee.** La selection est
+MULTIPLE : cinq lignes en degrade Bony feraient cinq actions principales dans un
+menu. La coche porte l'information, la teinte ne fait que l'appuyer.
+
+Et la specificite a de nouveau ete **comptee** avant d'ecrire :
+`.declencheur-menu:hover:not(:disabled)` vaut (0,3,0) pour battre le
+`button:hover:not(:disabled)` generique en (0,2,1), et il repose
+`background-image` — que le raccourci `background` de la regle generique
+effacerait.
+
 ### Deux defauts de CSS trouves AU NAVIGATEUR, pas a la lecture
 
 Ils sont dans `BUGS-CONNUS.md`. Le premier : `button:hover:not(:disabled)` vaut

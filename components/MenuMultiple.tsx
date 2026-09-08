@@ -60,6 +60,60 @@ import { createPortal } from 'react-dom';
 // retrouve au debut du document.
 // ============================================================================
 
+/// LES DEUX ICONES SONT DES SVG, PAS DES CARACTERES.
+///
+/// La premiere version ecrivait « ⌄ » et « ✓ » en texte. Un glyphe n'est pas une
+/// icone : son dessin, son epaisseur de trait et sa position sur la ligne de base
+/// dependent de la police qui le rend, et Albert Sans ne dessine pas « ⌄ » comme
+/// une police systeme de repli. Resultat a l'ecran, releve par l'utilisateur :
+/// une petite fleche fine, mal centree, etrangere au reste de l'interface.
+///
+/// `stroke-linecap` et `stroke-linejoin` arrondis : c'est ce qui rapproche le
+/// trait de celui d'iOS, plus que la forme elle-meme. `currentColor` pour que
+/// l'icone suive la couleur du texte sans etre repeinte a la main.
+function Chevron() {
+  return (
+    <svg
+      className="chevron"
+      viewBox="0 0 12 12"
+      width="12"
+      height="12"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M2.5 4.5 6 8l3.5-3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function Coche() {
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      width="12"
+      height="12"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M2 6.4 4.6 9l5.4-6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export interface OptionMenu {
   id: string;
   libelle: string;
@@ -223,9 +277,7 @@ export function MenuMultiple({
       >
         <span className="etiquette-menu">{etiquette}</span>
         <span className="resume-menu">{resume}</span>
-        <span className="chevron" aria-hidden="true">
-          ⌄
-        </span>
+        <Chevron />
       </button>
 
       {ouvert &&
@@ -256,7 +308,7 @@ export function MenuMultiple({
                   onMouseEnter={() => setSurvol(i)}
                 >
                   <span className="coche" aria-hidden="true">
-                    {coche ? '✓' : ''}
+                    {coche && <Coche />}
                   </span>
                   <span className="libelle-option">{o.libelle}</span>
                   {o.detail !== undefined && <span className="detail-option">{o.detail}</span>}

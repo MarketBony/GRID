@@ -250,6 +250,19 @@ liste est devenu gris sur le dégradé. Son pendant actif était pourtant **déj
 `.vendeur.actif`. C'est la même leçon que `header { position: sticky }`, et la règle
 est la même : scoper au parent qu'on vise réellement.
 
+**Un glyphe de police n'est pas une icone.** « ⌄ » et « ✓ » écrits en texte
+tombent sur une police de repli : dessin, épaisseur de trait et position sur la
+ligne de base varient d'une machine à l'autre, et ni `font-size` ni `line-height` ne
+rattrapent un dessin qu'on ne contrôle pas. Les icônes sont des **SVG** à
+`stroke-linecap` arrondi, en `currentColor` — c'est le bout de trait arrondi qui
+rapproche le dessin d'iOS, plus que la forme.
+
+**Un état sélectionné dans une liste à choix MULTIPLE reçoit une teinte, pas le
+dégradé plein.** Cinq lignes en dégradé Bony feraient cinq actions principales dans
+un menu. La coche porte l'information, la teinte ne fait que l'appuyer. Le dégradé
+plein reste réservé à la sélection UNIQUE — pastille du segmenté, onglet actif,
+curseur de liste.
+
 **Un panneau flottant va dans un PORTAIL, jamais en `position: absolute` dans son
 parent.** `.carte` déclare `overflow-x: auto` — et CSS interdit qu'un axe défile
 pendant que l'autre reste `visible` : la valeur **utilisée** de `overflow-y` devient
