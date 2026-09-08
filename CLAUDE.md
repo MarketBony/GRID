@@ -254,6 +254,12 @@ liste est devenu gris sur le dégradé. Son pendant actif était pourtant **déj
 `.vendeur.actif`. C'est la même leçon que `header { position: sticky }`, et la règle
 est la même : scoper au parent qu'on vise réellement.
 
+**Deux semantiques opposees ne partagent pas un composant.** `MenuMultiple` est un
+filtre : rien de coche veut dire TOUT. Le dialogue d'export est une selection : rien
+de coche veut dire RIEN. Les plier ensemble demanderait un drapeau « le vide veut
+dire tout ou rien ? », donc de lire ce drapeau pour comprendre chacun des deux
+usages. Elles partagent une apparence, ce qui est le travail du CSS.
+
 **Un glyphe de police n'est pas une icone.** « ⌄ » et « ✓ » écrits en texte
 tombent sur une police de repli : dessin, épaisseur de trait et position sur la
 ligne de base varient d'une machine à l'autre, et ni `font-size` ni `line-height` ne
@@ -266,6 +272,14 @@ dégradé plein.** Cinq lignes en dégradé Bony feraient cinq actions principal
 un menu. La coche porte l'information, la teinte ne fait que l'appuyer. Le dégradé
 plein reste réservé à la sélection UNIQUE — pastille du segmenté, onglet actif,
 curseur de liste.
+
+**Tout ce qui doit echapper a son contexte de mise en page va dans un PORTAIL.**
+Trois fois dans la meme journee : un panneau de menu decoupe par
+`overflow-x: auto`, un dialogue modal, et le document imprimable — ce dernier
+serait sorti en **pages blanches**, parce qu'il etait descendant de `.application`
+que `@media print` masque, et **un ancetre en `display: none` retire ses
+descendants du rendu, impression comprise**. Un `overflow`, un `transform` ou un
+`display: none` d'ancetre rattrape n'importe quel positionnement.
 
 **Un panneau flottant va dans un PORTAIL, jamais en `position: absolute` dans son
 parent.** `.carte` déclare `overflow-x: auto` — et CSS interdit qu'un axe défile

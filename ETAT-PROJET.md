@@ -1416,11 +1416,66 @@ vides economiserait du papier en retirant l'endroit ou l'on ecrit.
 partout, et le plus confortable au stylo. L'A3 cote a cote reste possible plus tard
 (46 x 22 mm par case, moitie moins de feuilles) mais suppose une imprimante A3.
 
-### Ce qui reste a ecrire pour l'export
+### L'export, ecrit apres validation du patron
 
-Le bouton dans l'ecran de saisie — visible seulement sur « mon equipe » —, le menu
-de selection des vendeurs (tous coches par defaut), et le declenchement de
-l'impression. Le patron etant valide, il n'y a plus de question de mise en forme.
+**Le bouton n'existe que sur « mon equipe ».** C'est l'encadrant qui suit SON equipe
+au mur ; un chef de table qui imprimerait « ma table » sortirait des vendeurs
+d'autres concessions, que personne ne suit chez lui. Il est pose juste SOUS le
+selecteur d'origine — la ou le choix vient d'etre fait, donc le lien de cause a
+effet se voit. Intitule : **« Imprimer les plannings de l'equipe »**, qui dit
+l'objet ET le geste, la ou « Exporter » ne dit ni l'un ni l'autre.
+
+**Le dialogue de selection n'est PAS `MenuMultiple`, et c'est deliberé.** Les deux
+affichent des cases a cocher, et c'est leur seul point commun : dans `MenuMultiple`
+rien de coche veut dire TOUT — c'est un filtre, et un filtre vide ne filtre pas.
+Ici rien de coche veut dire RIEN A IMPRIMER — c'est une selection. Les plier dans un
+meme composant demanderait un drapeau « le vide veut dire tout ou rien ? », donc de
+lire ce drapeau pour comprendre n'importe lequel des deux usages. **Deux semantiques
+opposees ne partagent pas un composant : elles partagent une apparence, ce qui est
+le travail du CSS.**
+
+**LE NOMBRE DE FEUILLES EST DANS LE BOUTON**, avant le clic. Une feuille par vendeur
+et par marque : sur une equipe de sept a deux marques, « j'imprime mon equipe »
+devient quatorze feuilles sans qu'on l'ait vu venir. Le compte est annonce
+(« Imprimer 5 feuilles »), il suit les cases, et il tombe a « Aucune feuille » —
+bouton desactive — quand tout est decoche. La boite d'impression du navigateur
+l'annoncerait aussi, mais trop tard.
+
+**L'impression passe par le navigateur, sans bibliotheque PDF.** Il sait deja mettre
+en pages, il connait les polices de la charte, et sa boite offre « Enregistrer au
+format PDF » comme « Imprimer » — or ce qu'on veut est du PAPIER AU MUR. Une
+bibliotheque redessinerait tout a la main et ne saurait pas imprimer directement.
+
+Trois precautions, chacune payee d'une panne evitee :
+
+1. on attend `document.fonts.ready`. Syncopate et Albert Sans viennent du reseau :
+   imprimer avant leur chargement sort la planche dans la police de repli, colonnes
+   decalees ;
+2. on attend une IMAGE de plus apres les polices, pour que le portail soit mis en
+   pages avant qu'on demande l'impression ;
+3. on demonte sur `afterprint`, pas apres l'appel. `window.print()` est bloquant
+   dans certains moteurs et rend la main aussitot dans d'autres : demonter juste
+   apres retirerait le document sous l'imprimante. `afterprint` se declenche aussi
+   quand on ANNULE la boite, donc le nettoyage a lieu dans les deux cas.
+
+### Deux defauts trouves en ecrivant l'export
+
+**On aurait imprime des PAGES BLANCHES.** Le planning etait d'abord monte dans
+l'ecran de saisie. Or l'impression masque l'application
+(`html.impression-planning .application { display: none }`) et cet ecran EST dans
+`.application` : **un ancetre en `display: none` retire ses descendants du rendu,
+impression comprise.** Aucune erreur, aucun avertissement — des pages vides. Le
+planning part donc dans un portail sur `document.body`, hors de la branche masquee.
+Troisieme fois du meme lot qu'un portail resout un probleme de mise en page.
+
+**`label` nu porte un style de LIBELLE DE CHAMP** dans `index.css` : petit, gras,
+gris, en capitales, espace, avec un `margin-top`. Legitime au-dessus d'un champ.
+Mais le dialogue emploie `label` pour autre chose — une LIGNE CLIQUABLE qui enveloppe
+une case a cocher, pour que le nom entier soit une cible. Resultat mesure :
+« 2 feuilles » sortait en « 2 FEUILLES », et le `margin-top` desserrait la liste
+ligne par ligne. Il a fallu remettre **les six proprietes**, pas seulement la casse.
+Le selecteur global reste en place et est signale comme trop large : le restreindre
+demanderait d'auditer chaque libelle de l'application.
 
 ## CE QUI RESTE, au 04/09/2026
 

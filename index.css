@@ -4464,9 +4464,56 @@ html.dark .option-menu.cochee {
 
 /* ---- L'IMPRESSION ELLE-MEME --------------------------------------------- */
 
+/* ---- LE BASCULEMENT ECRAN / IMPRESSION ----------------------------------- */
+
+/* HORS CHAMP, ET NON `display: none`. Le planning est monte le temps de
+   l'impression — dans un PORTAIL sur `document.body`, hors de `.application` que
+   l'impression masque — et il ne doit pas se voir a l'ecran pendant ce temps.
+   Mais un conteneur en `display: none` n'est PAS MIS EN PAGES : ses hauteurs de
+   ligne en millimetres ne sont pas resolues, et `break-after: page` n'a rien a
+   decouper. On le sort donc du champ visuel en le laissant dans le flux.
+
+   `left: -200vw` et non `visibility: hidden` : cette derniere laisse l'element
+   occuper sa place et rallongerait la page de saisie de plusieurs metres. */
+.hors-champ {
+  position: absolute;
+  left: -200vw;
+  top: 0;
+  width: 297mm;
+  pointer-events: none;
+}
+
 @media print {
-  /* On ne masque pas l'application : le declencheur d'export monte le planning
-     SEUL dans le document. Ce bloc ne fait donc que le mettre en pages. */
+  /* L'APPLICATION DISPARAIT, LE PLANNING RESTE. C'est la classe posee sur
+     `<html>` le temps de l'impression qui commande — sans elle, un Ctrl+P
+     ordinaire sur l'ecran de saisie imprimerait l'interface, ce qui est le
+     comportement attendu par defaut.
+
+     ET C'EST POURQUOI LE PLANNING EST DANS UN PORTAIL. Pose dans l'ecran, il
+     serait descendant de `.application` : un ancetre en `display: none` retire
+     ses descendants du rendu, impression comprise, et on imprimerait des pages
+     blanches sans le moindre avertissement. */
+  html.impression-planning .application {
+    display: none;
+  }
+
+  html.impression-planning .hors-champ {
+    position: static;
+    left: auto;
+    width: auto;
+  }
+
+  /* Le fond anime du corps n'a rien a faire sur du papier : deux degrades
+     radiaux plein format, soit une page entierement encree. */
+  html.impression-planning body::before,
+  html.impression-planning body::after {
+    display: none;
+  }
+
+  html.impression-planning body {
+    background: #ffffff;
+  }
+
   .page-planning {
     /* `break-after` et non `page-break-after` : la seconde est depreciee, mais
        on garde les deux — Safari ne comprend encore que l'ancienne. */
@@ -4508,5 +4555,172 @@ html.dark .option-menu.cochee {
   .page-planning {
     padding: 8mm;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  }
+}
+
+
+/* ==========================================================================
+   EXPORT DES PLANNINGS — le bouton et le dialogue de selection (08/09/2026).
+   ========================================================================== */
+
+/* Le bouton est pose dans la colonne des vendeurs, juste sous le selecteur
+   d'origine. Pleine largeur : la colonne est etroite, et un bouton centre y
+   laisserait deux marges perdues. */
+.liste-vendeurs .bouton-impression {
+  margin: 0.1rem 0.5rem 0.4rem;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.8rem;
+  text-align: center;
+  /* `normal` et non `nowrap` : l'intitule est long, et le tronquer retirerait
+     precisement ce qui le rend explicite. */
+  white-space: normal;
+  line-height: 1.25;
+}
+
+/* ---- LE VOILE ET LA BOITE ------------------------------------------------ */
+
+.voile-dialogue {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(10, 10, 16, 0.42);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: voile-parait var(--duree-vif) ease-out both;
+}
+
+@keyframes voile-parait {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.boite-dialogue {
+  width: min(30rem, 100%);
+  max-height: min(34rem, 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 1.1rem 1.2rem;
+  border-radius: var(--rayon);
+  /* Elle MONTE, comme les volets et les menus : c'est le meme geste, donc la
+     meme courbe. */
+  animation: volet-monte var(--duree) var(--ressort-doux) both;
+  transform-origin: 50% 0;
+  outline: none;
+}
+
+.boite-dialogue h3 {
+  margin: 0;
+  font-family: 'Syncopate', system-ui, sans-serif;
+  font-size: 0.94rem;
+  letter-spacing: 0.02em;
+}
+
+.boite-dialogue header .note {
+  margin: 0.4rem 0 0;
+  /* Ce paragraphe DIT CE QUI VA SE PASSER si on clique — le seul type de prose
+     que la charte autorise dans l'interface. */
+  max-width: 44ch;
+}
+
+.actions-selection {
+  display: flex;
+  gap: 0.8rem;
+  margin: 0.9rem 0 0.4rem;
+}
+
+/* ---- LA LISTE DES VENDEURS ---------------------------------------------- */
+
+.liste-export {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* Le defilement est INTERNE : une equipe de vingt vendeurs ne doit pas pousser
+     les boutons du pied hors de l'ecran. `min-height: 0` est indispensable dans
+     un conteneur flexible. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* IL FAUT REMETTRE LES SIX PROPRIETES, pas seulement la casse.
+   `label` nu porte un style de LIBELLE DE CHAMP dans ce fichier — petit, gras,
+   gris, en capitales, espace, avec un `margin-top` — et c'est legitime pour un
+   intitule pose au-dessus d'un champ. Ici, `label` sert a autre chose : une LIGNE
+   CLIQUABLE qui enveloppe une case a cocher, pour que le nom entier soit une
+   cible. Deux objets, un seul selecteur d'element.
+   Mesure au navigateur : « 2 feuilles » sortait en « 2 FEUILLES », et le
+   `margin-top: 0.7rem` desserrait la liste ligne par ligne.
+   Le selecteur `label` global reste en place : le restreindre demanderait
+   d'auditer chaque libelle de l'application, ce qui n'a rien a voir avec ce lot.
+   Il est signale ici comme trop large. */
+.liste-export label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0;
+  padding: 0.45rem 0.3rem;
+  border-radius: var(--rayon-petit);
+  color: var(--text-main);
+  font-size: 0.86rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: pointer;
+  transition: background-color var(--duree-vif) ease-out;
+}
+
+.liste-export label:hover {
+  background: var(--glass-bg-strong);
+}
+
+/* UNE VRAIE CASE A COCHER, et non l'interrupteur iOS du reste de l'interface.
+   Un interrupteur dit « ce reglage est actif » ; une case dit « cet element est
+   retenu ». Ce sont deux sens differents, et la grille des marques suit deja
+   cette regle. */
+.liste-export input[type='checkbox'] {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+
+.liste-export .nom-export {
+  flex: 1;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.liste-export .detail-export {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- LE PIED DU DIALOGUE ------------------------------------------------ */
+
+.boite-dialogue footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voile-dialogue,
+  .boite-dialogue {
+    animation: none;
+  }
+
+  .liste-export label {
+    transition: none;
   }
 }

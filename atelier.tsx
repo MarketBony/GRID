@@ -2,6 +2,7 @@ import { StrictMode, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Segmente } from './components/Segmente';
 import { MenuMultiple } from './components/MenuMultiple';
+import { DialogueExport } from './components/DialogueExport';
 import { basculer, EnTeteTriable, type SensNaturel, type Tri } from './components/EnTeteTriable';
 import { GrilleVendeur } from './components/GrilleVendeur';
 import type { RdvSaisie, VendeurSaisie } from './services/saisie';
@@ -108,6 +109,20 @@ const LIGNES = [
   { cle: 'carm', libelle: 'Carmaux', total: 0, vn: 0, vo: 0, effectif: 1 },
 ];
 
+/// Equipe d'exemple pour le dialogue d'export : deux VN a deux marques et un VO
+/// a une seule section, soit 5 feuilles — le compte que le bouton doit annoncer.
+const EQUIPE: VendeurSaisie[] = [
+  { ...VENDEUR, id: 'e1', nom: 'KEVIN DIJOUX' },
+  { ...VENDEUR, id: 'e2', nom: 'ANTHONY DONAS' },
+  {
+    ...VENDEUR,
+    id: 'e3',
+    nom: 'MATTHIAS VALLE',
+    typeVehicule: 'VO',
+    sections: [{ marqueId: null, libelle: 'VO' }],
+  },
+];
+
 function Atelier() {
   const [sombre, setSombre] = useState(true);
   const [axe, setAxe] = useState<Axe>('site');
@@ -130,6 +145,7 @@ function Atelier() {
   const [origine, setOrigine] = useState<'table' | 'equipe' | 'tout'>('table');
   const [plaquesRetenues, setPlaquesRetenues] = useState<string[]>([]);
   const [sitesRetenus, setSitesRetenus] = useState<string[]>([]);
+  const [dialogueExport, setDialogueExport] = useState(false);
   const basculerDansListe = (liste: string[], id: string) =>
     liste.includes(id) ? liste.filter((x) => x !== id) : [...liste, id];
   const ONGLETS = ['Saisie', 'Tableau de bord', 'Tables', 'Vendeurs', 'Campagnes', 'Comptes'];
@@ -451,6 +467,32 @@ function Atelier() {
                 <span className="compte-filtre">12 sur 99</span>
               )}
             </div>
+          </div>
+
+          <div className="carte">
+            <h3>Export des plannings — bouton et selection</h3>
+            <aside className="liste-vendeurs" style={{ maxWidth: '22rem' }}>
+              <button
+                type="button"
+                className="principal bouton-impression"
+                onClick={() => setDialogueExport(true)}
+              >
+                Imprimer les plannings de l’équipe
+              </button>
+            </aside>
+            {dialogueExport && (
+              <DialogueExport
+                vendeurs={EQUIPE}
+                onAnnuler={() => setDialogueExport(false)}
+                onImprimer={(retenus) => {
+                  setDialogueExport(false);
+                  setJournal((j) => [
+                    `export : ${retenus.length} vendeurs, ${retenus.reduce((n, v) => n + v.sections.length, 0)} feuilles`,
+                    ...j,
+                  ]);
+                }}
+              />
+            )}
           </div>
 
           <div className="carte">

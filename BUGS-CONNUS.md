@@ -9,6 +9,73 @@ verifie, pas seulement corrige de memoire.
 
 
 
+
+## [CORRIGE LE 08/09/2026] L'impression aurait sorti des PAGES BLANCHES
+
+Le defaut le plus silencieux du lot : ni erreur, ni avertissement, ni typecheck en
+defaut. Des feuilles vides.
+
+Le planning imprimable etait monte dans l'ecran de saisie. L'impression masque
+l'application pour ne laisser que le document :
+
+```css
+@media print {
+  html.impression-planning .application { display: none }
+}
+```
+
+Or l'ecran de saisie EST un descendant de `.application`. **Un ancetre en
+`display: none` retire ses descendants du rendu — impression comprise.** Le
+document a imprimer disparaissait avec l'interface qu'on voulait cacher.
+
+Corrige par un portail sur `document.body` : le planning sort de la branche
+masquee, et il n'y a toujours qu'UNE feuille de style — ouvrir une fenetre a part
+imposerait d'y recopier le CSS, donc d'entretenir deux verites sur l'apparence du
+document, dont une qui derive.
+
+**Troisieme fois dans le meme lot qu'un portail resout un probleme de mise en
+page** : le panneau du menu deroulant decoupe par `overflow-x: auto`, le dialogue
+modal, et maintenant le document imprimable. La regle se generalise : **tout ce qui
+doit echapper a son contexte de mise en page va dans un portail** — un `overflow`,
+un `transform` ou un `display: none` d'ancetre le rattraperait autrement.
+
+### Ce qui l'aurait attrape plus tot
+
+Rien de ce que le projet automatise. Les six suites ne regardent pas le DOM, `tsc`
+ne connait pas la cascade, et le volet navigateur de l'agent ne sait pas ouvrir une
+boite d'impression. Il a ete trouve **en relisant la structure**, pas en mesurant :
+« ou est ce `div` par rapport a ce que je masque ». C'est le seul defaut de ce lot
+qui n'ait pas ete trouve a l'ecran.
+
+## [CORRIGE LE 08/09/2026] `label` nu impose un style de libelle de champ
+
+`index.css` declare, sur l'element :
+
+```css
+label { font-size: .72rem; font-weight: 700; margin-top: .7rem;
+        color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em }
+```
+
+C'est juste pour un intitule pose au-dessus d'un champ, et c'est ce que fait le
+reste de l'application. Mais le dialogue d'export emploie `label` pour autre chose :
+une LIGNE CLIQUABLE enveloppant une case a cocher, pour que le nom entier soit une
+cible de clic.
+
+Mesure a l'ecran : « 2 feuilles » s'affichait « 2 FEUILLES », et le
+`margin-top: 0.7rem` desserrait la liste ligne par ligne. Il a fallu remettre **les
+six proprietes** localement — ne corriger que `text-transform` aurait laisse la
+graisse, la couleur, l'interlettrage et la marge.
+
+**Le selecteur global reste en place**, et c'est un choix : le restreindre
+demanderait d'auditer chaque libelle de l'application, ce qui n'a rien a voir avec ce
+lot. Il est signale comme trop large dans le fichier, aux cotes de
+`.liste-vendeurs .nom` et `.liste-vendeurs .compteur`.
+
+C'est le troisieme selecteur d'element trop large trouve sur ce projet, apres
+`header { position: sticky }` et la regle fourre-tout qui donnait le degrade a tout
+`button`. Le motif est constant : **un selecteur d'element attrape ce qu'on n'a pas
+encore ecrit.**
+
 ## [CORRIGE LE 08/09/2026] Deux defauts de CSS que seul le navigateur a montres
 
 Trouves en montant les nouveautes du jour dans `atelier.html`. **Ni le typecheck ni

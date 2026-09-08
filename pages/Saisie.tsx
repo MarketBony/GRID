@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { GrilleVendeur } from '../components/GrilleVendeur';
 import { cleRdv } from '../utils/grille';
 import { cleTri } from '../backend/src/utils/tri';
@@ -14,10 +15,13 @@ import {
   type PerimetreSaisie,
   type RdvSaisie,
   type SectionVendeur,
+  type VendeurSaisie,
 } from '../services/saisie';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 import { useIndicateurGlissant } from '../hooks/useIndicateurGlissant';
 import { Segmente } from '../components/Segmente';
+import { DialogueExport } from '../components/DialogueExport';
+import { PlanningImprimable, paginer } from '../components/PlanningImprimable';
 import {
   FENETRE_PERIMETRE,
   FENETRE_VUE_ENSEMBLE,
@@ -93,6 +97,11 @@ export function Saisie() {
   /// sa table, qui viennent d'autres concessions. Remonte apres l'exercice du
   /// 08/09/2026.
   const [origine, setOrigine] = useState<Origine>('table');
+
+  /// L'EXPORT EN DEUX TEMPS. `dialogue` ouvre la selection ; `aImprimer` porte
+  /// les vendeurs retenus, et sa presence suffit a monter le planning.
+  const [dialogue, setDialogue] = useState(false);
+  const [aImprimer, setAImprimer] = useState<VendeurSaisie[] | null>(null);
 
   /// Les RDV en memoire, indexes par vendeur puis par case. Une Map par vendeur
   /// evite de re-filtrer 2 000 RDV a chaque frappe.
@@ -320,6 +329,52 @@ export function Saisie() {
     );
   }, [vendeursOrigine, recherche]);
 
+  /// L'IMPRESSION, ET POURQUOI ELLE PASSE PAR LE NAVIGATEUR.
+  ///
+  /// Aucune bibliotheque PDF : le navigateur sait deja mettre en pages, il
+  /// connait les polices de la charte et sa boite d'impression offre
+  /// « Enregistrer au format PDF » comme « Imprimer ». Or ce qu'on veut, c'est du
+  /// PAPIER AU MUR — une bibliotheque redessinerait tout a la main et ne saurait
+  /// pas imprimer directement.
+  ///
+  /// TROIS PRECAUTIONS, chacune payee d'une panne evitee :
+  ///
+  ///   1. on attend `document.fonts.ready`. Syncopate et Albert Sans viennent du
+  ///      reseau : imprimer avant leur chargement sort la planche dans la police
+  ///      de repli, avec des colonnes decalees ;
+  ///   2. on attend une IMAGE de plus apres les polices. Le navigateur doit avoir
+  ///      mis en pages le portail avant qu'on lui demande de l'imprimer ;
+  ///   3. on demonte sur `afterprint` et non apres l'appel. `window.print()` est
+  ///      BLOQUANT dans certains moteurs et rend la main tout de suite dans
+  ///      d'autres : demonter juste apres retirerait le document sous
+  ///      l'imprimante. `afterprint` se declenche aussi quand on ANNULE la boite,
+  ///      donc le nettoyage a lieu dans les deux cas.
+  useEffect(() => {
+    if (aImprimer === null) return;
+    let vivant = true;
+    const racine = document.documentElement;
+    racine.classList.add('impression-planning');
+
+    const fini = () => {
+      racine.classList.remove('impression-planning');
+      setAImprimer(null);
+    };
+    window.addEventListener('afterprint', fini);
+
+    void document.fonts.ready.then(() => {
+      if (!vivant) return;
+      requestAnimationFrame(() => {
+        if (vivant) window.print();
+      });
+    });
+
+    return () => {
+      vivant = false;
+      window.removeEventListener('afterprint', fini);
+      racine.classList.remove('impression-planning');
+    };
+  }, [aImprimer]);
+
   /// CHANGER D'ORIGINE DEPLACE LA SELECTION, il ne la laisse pas hors champ.
   ///
   /// Pendant une RECHERCHE on garde au contraire le vendeur retenu, curseur en
@@ -467,6 +522,45 @@ export function Saisie() {
         </div>
       )}
 
+      {dialogue && (
+        <DialogueExport
+          vendeurs={vendeursOrigine}
+          onAnnuler={() => setDialogue(false)}
+          onImprimer={(retenus) => {
+            setDialogue(false);
+            setAImprimer(retenus);
+          }}
+        />
+      )}
+
+      {/* LE PLANNING EST MONTE DANS UN PORTAIL SUR `document.body`, ET C'EST
+          INDISPENSABLE — pas un raffinement.
+
+          Il etait d'abord pose ici, dans l'ecran. Or l'impression masque
+          l'application par `html.impression-planning .application { display:none }`
+          et cet ecran EST dans `.application` : un ancetre en `display: none`
+          retire ses descendants du rendu, impression comprise. On aurait imprime
+          des PAGES BLANCHES, sans erreur ni avertissement.
+
+          Pas de fenetre a part pour autant : il faudrait y recopier la feuille de
+          style, donc entretenir deux verites sur l'apparence du document, dont une
+          qui derive. Le portail garde une seule feuille et sort le planning de la
+          branche masquee. */}
+      {aImprimer !== null &&
+        createPortal(
+          <div className="hors-champ" aria-hidden="true">
+            <PlanningImprimable
+              pages={paginer(aImprimer)}
+              jours={donnees.campagne.jours}
+              creneaux={donnees.campagne.creneaux}
+              rdvs={rdvsParVendeur}
+              campagne={{ libelle: donnees.campagne.libelle, jours: donnees.campagne.jours }}
+              perimetre={donnees.perimetre?.libelle ?? ''}
+            />
+          </div>,
+          document.body
+        )}
+
       <div className="saisie-corps">
         <aside className="liste-vendeurs" ref={curseur.conteneur}>
           {/* Le curseur est le PREMIER enfant : il doit peindre sous les lignes.
@@ -500,6 +594,24 @@ export function Saisie() {
                 },
               ]}
             />
+          )}
+
+          {/* LE BOUTON D'IMPRESSION N'EXISTE QUE SUR « MON EQUIPE ». C'est
+              l'encadrant qui suit son equipe au mur ; un chef de table qui
+              imprime « ma table » imprimerait des vendeurs d'autres concessions,
+              que personne ne suit chez lui.
+
+              Il est pose JUSTE SOUS le selecteur d'origine, la ou le choix vient
+              d'etre fait : le lien de cause a effet se voit. Son intitule dit
+              l'objet ET le geste — « Exporter » ne dit ni l'un ni l'autre. */}
+          {origineEffective === 'equipe' && vendeursOrigine.length > 0 && (
+            <button
+              type="button"
+              className="principal bouton-impression"
+              onClick={() => setDialogue(true)}
+            >
+              Imprimer les plannings de l’équipe
+            </button>
           )}
 
           {/* Le champ n'apparait qu'a partir de huit vendeurs : sur une table de
