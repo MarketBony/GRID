@@ -85,6 +85,46 @@ fenetre au lieu d'apparaitre tout de suite. Le critere de recette n.5 reste tenu
 un delai. **Sa propre saisie n'est pas concernee** : elle s'affiche en memoire, sans
 passer par la.
 
+### [CORRIGE LE 08/09/2026] La vue d'autorisation etait evaluee UNE FOIS PAR LIGNE
+
+Trouve APRES le retablissement, parce que le produit restait lent : « 10 secondes
+par onglet ». Mesure serveur au repos, perimetre de TROIS vendeurs —
+`perimetre_saisie` 333 ms, lecture de 49 RDV 538 ms. **Aucun rapport avec le
+volume.**
+
+`perimetre_saisie` appelait `utilisateur_courant()` sept fois et
+`peut_administrer()` une fois, **a nu**, dans le `WHERE` d'un `CROSS JOIN
+campagne x vendeur`. PostgreSQL les evaluait donc **par ligne du produit** :
+`loops=96` dans le plan, et `utilisateur_courant()` jusque dans un `Index Cond`.
+
+Les deux fonctions sont `STABLE` — leur valeur ne bouge pas pendant la requete —
+mais elles portent `SET search_path`, et **une fonction SQL avec `SET` ne peut pas
+etre inlinee**. Chaque evaluation est un vrai appel de fonction, avec sauvegarde et
+restauration du GUC. D'ou 211 ms de PLANIFICATION par appel, mesures separement.
+
+Le correctif est une sous-requete scalaire — `(SELECT relance.utilisateur_courant())`
+— que le planificateur sort de la boucle et evalue une fois en `InitPlan`.
+
+**Et c'etait deja la convention du projet** : les quinze politiques `*_lecture`
+l'ecrivent toutes ainsi. La vue etait le seul endroit a appeler la fonction a nu.
+Le defaut n'etait pas une regle manquante, c'etait **une exception a une regle
+existante** — le genre le plus difficile a voir, parce que tout le voisinage est
+correct.
+
+| Lecture, meme compte, meme serveur | avant | apres |
+|---|---|---|
+| `perimetre_saisie` (3 vendeurs) | 333 ms | **174 ms** |
+| `rdv` sous RLS (49 lignes) | 538 ms | **48 ms** |
+
+La lecture des RDV est **11 fois plus rapide**, et `peut_saisir()` lisant cette vue,
+l'ecriture en profite aussi.
+
+**Pourquoi on peut y toucher malgre l'interdit n.4** : la transformation ne peut pas
+changer le resultat — les deux fonctions sont `STABLE` et SANS ARGUMENT, donc une
+sous-requete scalaire rend exactement la meme valeur. Le corps est recopie a
+l'identique depuis la migration d'origine, commentaires compris. Et surtout,
+`test:rls` rend **89/89 avant et apres, sur les deux bases**.
+
 ### La lecon, pour la prochaine fois
 
 **Une diffusion a N destinataires qui declenche un rechargement chez chacun est
@@ -96,6 +136,19 @@ de voir ne doit rien declencher**.
 
 Corollaire d'instrumentation : quand tout attend en `ClientRead` et que `psql` repond
 vite, **ce n'est pas la base**. Chercher du cote du client — ici le pool de PostgREST.
+
+Second corollaire, appris dans la meme heure : **une fonction `STABLE` n'est pas une
+fonction gratuite.** Si elle porte `SET`, elle n'est pas inlinee, et un appel a nu
+dans un `WHERE` est evalue par ligne. Toute fonction d'autorisation citee dans une
+vue ou une politique s'ecrit `(SELECT f())`, sans exception — c'est la seule forme
+que le planificateur sort de la boucle.
+
+Troisieme : **le compte « avant / apres » d'une suite ne vaut rien pendant qu'on
+travaille.** `test:garde-fous` a annonce « residu 2 » sur Supabase ; verification
+faite, aucun objet de fixture ne restait (zero vendeur, campagne, table, site ou
+compte cree) et les deux lignes etaient de **vrais RDV saisis par des utilisateurs**
+pendant que la suite tournait. Un residu se cherche par la NATURE des lignes, pas
+par leur nombre.
 
 ## Couche liquid glass iOS — 04/09/2026
 

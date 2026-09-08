@@ -1170,11 +1170,40 @@ poste rechargeait tout pour le relire a l'identique.
 regroupement (8 s perimetre / 30 s vue d'ensemble) et gigue aleatoire pour disperser
 la meute. Front seul, **aucune migration, aucune ecriture**.
 
-**Il n'y avait aucun index a ajouter.** `perimetre_saisie` coute ~330 ms par appel
-dont 211 ms de PLANIFICATION — un `CROSS JOIN` campagne x vendeur avec quatre
-`EXISTS` par ligne — mais le plan utilise deja les bons index. Le defaut etait le
-nombre d'appels, pas leur cout. **Reste a faire** : cette vue est chere par
-construction et redevient le facteur limitant a la prochaine montee en charge.
+**Il n'y avait aucun index a ajouter.** Le plan utilisait deja les bons. Mais la
+vue elle-meme etait chere, et la cause a ete trouvee ensuite — voir ci-dessous.
+
+### Deuxieme temps : la vue appelait l'autorisation UNE FOIS PAR LIGNE
+
+Le service revenu, le produit restait lent — l'utilisateur a dit « 10 secondes par
+onglet ». Mesure serveur au repos, pour un perimetre de TROIS vendeurs :
+`perimetre_saisie` 333 ms, une lecture de 49 RDV 538 ms. **Ce n'est pas du volume.**
+
+`perimetre_saisie` appelait `utilisateur_courant()` **sept fois** et
+`peut_administrer()` **une fois**, a nu, dans le `WHERE` d'un `CROSS JOIN` : les
+fonctions etaient evaluees **par ligne du produit** (`loops=96` dans le plan,
+`utilisateur_courant()` jusque dans un `Index Cond`). Elles sont `STABLE`, mais
+elles portent `SET search_path` — et une fonction SQL avec `SET` **ne peut pas etre
+inlinee** : chaque evaluation est un vrai appel, avec sauvegarde et restauration du
+GUC.
+
+**Les quinze politiques `*_lecture` ecrivaient DEJA
+`(SELECT relance.utilisateur_courant())`.** La vue etait le seul endroit a appeler
+la fonction a nu : une exception a la convention du projet, pas une invention a
+faire. Migration `20260908160000_perimetre_saisie_appel_unique` — corps recopie a
+l'identique, seuls les appels enveloppes.
+
+| Lecture, meme compte, meme serveur | avant | apres |
+|---|---|---|
+| `perimetre_saisie` (3 vendeurs) | 333 ms | **174 ms** |
+| `rdv` sous RLS (49 lignes) | 538 ms | **48 ms** |
+| `rdv_agrege` (2 112 lignes) | 57 ms | 59 ms |
+
+La lecture des RDV — celle de la grille, la plus jouee du produit — est **11 fois
+plus rapide**. `peut_saisir()` LIT cette vue : l'ecriture d'un RDV en profite aussi.
+
+**89/89 sur `test:rls` avant et apres, sur les deux bases**, et `comparer` ne rend
+aucun ecart. C'est ce qui autorise a toucher a l'ossature de l'interdit n.4.
 
 Details, mesures et lecon d'instrumentation dans `BUGS-CONNUS.md`.
 
