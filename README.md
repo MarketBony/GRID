@@ -38,9 +38,16 @@ npm --prefix backend run migrate:deploy
 npm --prefix backend run seed          # affiche le mot de passe généré, à noter
 
 # 5. Le front. UN SEUL serveur : il n'y a plus rien à lancer à côté.
-npm run dev
-# http://localhost:3000/atelier.html — atelier de la couche visuelle,
-# les vrais composants et le vrai CSS, sans authentification                            # front sur 3000
+npm run dev                            # front sur 3000
+
+# Deux pages de mise au point, servies en developpement et JAMAIS dans `dist` :
+# `vite build` ne prend que `index.html` en entree.
+#
+#   /atelier.html        la couche visuelle — les vrais composants, le vrai CSS,
+#                        sans authentification. C'est la que se jugent le verre,
+#                        les ressorts et les etats de survol.
+#   /patron-export.html  le planning imprimable. Ctrl+P y donne l'apercu
+#                        d'impression REEL, en A4 paysage.
 ```
 
 Sans configuration Supabase, l'application affiche un écran **« Configuration
