@@ -150,9 +150,14 @@ oublié est discret au lieu d'être agressif.
 **Tout ce qui est cliquable réagit** : survol, appui, et `:focus-visible`. La saisie du module
 C se fait au clavier, donc le focus doit se voir.
 
-**Le fond est vivant.** Le dégradé tamisé vit dans `body::before` et `body::after`, deux
-couches animées à des périodes non multiples (38 s et 61 s) pour que la dérive ne se répète
-pas à l'œil. Animées en `transform` et non en `background-position` : la transformation est
+**Le fond est vivant.** Le dégradé tamisé vit sur **trois** couches — `body::before`
+(17 s), `body::after` (23 s) et `.application::before` (31 s), cette dernière parce que
+`body` n'a que deux pseudo-éléments et qu'un `div` de décor dans le DOM ne se justifie
+pas. Les trois périodes sont **premières entre elles**, donc la combinaison ne se répète
+qu'au bout de 17 × 23 × 31 ≈ 3,4 heures : l'œil ne peut pas y trouver de boucle.
+*(Ce paragraphe annonçait « deux couches, 38 s et 61 s ». Les deux chiffres étaient faux
+et la troisième couche manquait — relevé le 10/09/2026 en extrayant les valeurs réelles
+pour la charte.)* Animées en `transform` et non en `background-position` : la transformation est
 composée par le GPU, alors que repeindre trois dégradés radiaux plein écran à chaque image se
 voit pendant une saisie. `prefers-reduced-motion` la fige.
 
