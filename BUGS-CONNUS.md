@@ -10,6 +10,57 @@ verifie, pas seulement corrige de memoire.
 
 
 
+
+## [CORRIGE LE 10/09/2026] Le graphique « par jour » ignorait filtres ET critere
+
+Signale par l'utilisateur, capture d'ecran a l'appui : le graphique de gauche du
+tableau de bord ne bougeait pas quand on changeait de plaque, de site, ou de
+critere VN/VO.
+
+**La cause est un agregat calcule trop tot.** Le service produisait `parJour` une
+fois, sur la campagne entiere, et l'ecran l'affichait tel quel :
+
+```tsx
+barres={donnees.parJour.map((j) => ({ valeur: j.total, part: j.vn, … }))}
+```
+
+Deux commandes de la barre d'outils ne l'atteignaient donc pas — les menus
+plaque/site ajoutes le 08/09, et le segmente Général / VN / VO qui existait
+depuis le debut. **Le second est le plus genant** : deux segmentes cote a cote,
+dont l'un ne gouvernait que la moitie de l'ecran.
+
+### Ce que ce defaut apprend
+
+`totauxParJour(rdvs, jours, vendeurs)` est une fonction **pure**, correcte, et
+couverte par la suite. Elle a toujours accepte la liste des vendeurs a
+considerer. **Le defaut n'etait pas dans la regle, il etait dans l'APPEL** : on
+lui passait tous les vendeurs alors que l'ecran en affichait un sous-ensemble.
+
+C'est une classe de defaut que le dispositif du projet ne peut pas voir :
+
+- `test:agregats` verifie que la fonction est juste — elle l'etait ;
+- `tsc` verifie les types — ils etaient bons, `vendeurs` est bien un
+  `LigneVendeur[]` ;
+- le build ne sait rien de ce qu'un ecran devrait afficher.
+
+**Un agregat juste, appele avec le mauvais perimetre, produit un chiffre faux que
+rien ne signale.** Le seul garde-fou possible est un controle qui compare un
+sous-ensemble au tout — c'est ce qui a ete ajoute (voir `ETAT-PROJET.md`), et il
+inclut deliberement une assertion « le sous-ensemble rend MOINS que le groupe » :
+sans elle, un filtre qui ne filtre rien passerait au vert.
+
+### Le piege de verification que j'ai failli rapporter comme un bug
+
+Premier relevé au navigateur : le filtre plaque marchait (81 → 56) mais le
+critere « ne changeait rien ». **C'etait mon instrument.** L'atelier porte
+**cinq** contröles segmentes, dont un autre avec exactement les libelles
+Général / VN / VO ; mon selecteur non scope cliquait le premier de la page.
+
+Scope a la carte, tout concordait : 60 en VN, 21 en VO, **60 + 21 = 81**. La
+lecon vaut au-dela de ce cas : **sur une page d'atelier qui accumule les
+demonstrations, un selecteur de test doit etre scope au bloc**, sinon il mesure
+autre chose que ce qu'on croit.
+
 ## [CORRIGE LE 08/09/2026] L'impression aurait sorti des PAGES BLANCHES
 
 Le defaut le plus silencieux du lot : ni erreur, ni avertissement, ni typecheck en

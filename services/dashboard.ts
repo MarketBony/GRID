@@ -82,7 +82,27 @@ export interface Dashboard {
   /// Une seule forme, donc, et l'ecran n'a plus qu'a indexer. `classer` reste la
   /// source unique du departage des ex aequo.
   classements: Record<Axe, { global: Rang[]; vn: Rang[]; vo: Rang[] }>;
+
+  /// LE TOTAL PAR JOUR DE LA CAMPAGNE ENTIERE. L'ecran le RECALCULE des qu'un
+  /// filtre est actif — voir `vendeurs` et `rdvs` juste en dessous.
   parJour: TotalJour[];
+
+  /// LE JEU BRUT, pour que l'ecran puisse recalculer un agregat sur un
+  /// sous-ensemble sans second aller-retour.
+  ///
+  /// POURQUOI L'EXPOSER. Le graphique « par jour » ne suivait NI les filtres
+  /// plaque/site NI le critere VN/VO : il affichait un agregat calcule une fois
+  /// pour toute la campagne. Or `totauxParJour` est une fonction PURE qui prend
+  /// la liste des vendeurs a considerer — il suffisait de la rejouer avec le
+  /// sous-ensemble. Ces deux tableaux sont DEJA rapatries pour calculer les
+  /// totaux ; les rendre ne coute aucune requete, seulement de les garder en
+  /// memoire (~1 050 RDV et ~96 vendeurs sur septembre 2026).
+  ///
+  /// L'alternative aurait ete de recoder le comptage par jour dans l'ecran :
+  /// une seconde implementation de la meme regle, donc deux verites a
+  /// redemontrer. C'est exactement ce que l'interdit n.6 proscrit.
+  vendeurs: LigneVendeur[];
+  rdvs: LigneRdv[];
 }
 
 export interface Comparaison {
@@ -295,6 +315,8 @@ export async function chargerDashboard(campagneId: string): Promise<Dashboard> {
       ])
     ) as Dashboard['classements'],
     parJour: totauxParJour(rdvs, charge.jours, vendeurs),
+    vendeurs,
+    rdvs,
   };
 }
 

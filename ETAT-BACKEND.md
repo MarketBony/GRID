@@ -304,7 +304,7 @@ backend/
     tester-garde-fous.ts     39 invariants de la base, chacun doit REFUSER
     tester-rls.ts            89 controles des politiques ET des RPC — decor autonome
     tester-invariants.ts     10 controles code <-> base (interdit n.6)
-    tester-agregats.ts       33 controles des totaux, contre les 1107 RDV de juin
+    tester-agregats.ts       35 controles des totaux, contre les 1107 RDV de juin
     importer-rdv-juin.ts     charge les 1107 RDV de juin, et les recoupe au classeur
   src/                       LE SEUL CODE QUE LE NAVIGATEUR EXECUTE
     auth/roles.ts            listes de valeurs valides — PAS de referentiel metier

@@ -330,6 +330,42 @@ verifier(
   `${clf.map((j) => j.total).join(' / ')} (attendu 52 / 49 / 42 / 38 / 37)`
 );
 
+// ------------------------------------------- l'invariant du graphique par jour
+//
+// Le tableau de bord RECALCULE `totauxParJour` sur un SOUS-ENSEMBLE de vendeurs
+// des qu'un filtre plaque/site est actif — voir `pages/Dashboard.tsx`. Il
+// s'appuie donc sur une propriete qui n'etait epinglee nulle part : le total par
+// jour d'un sous-ensemble doit valoir le total de ce sous-ensemble, ni plus ni
+// moins.
+//
+// Ce controle existe parce que le graphique affichait pendant des semaines un
+// agregat calcule pour TOUTE la campagne : il ne suivait ni les filtres ni le
+// critere. Signale par l'utilisateur le 10/09/2026. Rien ne l'aurait vu.
+const plaqueCentre = vendeurs.filter((v) => v.plaqueId === 'CENTRE');
+const jourCentre = totauxParJour(rdvs, joursCampagne, plaqueCentre);
+const totalCentre = totauxPar('plaque', rdvs, plaqueCentre)[0]!;
+verifier(
+  'le total par jour d un SOUS-ENSEMBLE somme au total de ce sous-ensemble',
+  jourCentre.reduce((n, j) => n + j.total, 0) === totalCentre.total &&
+    jourCentre.reduce((n, j) => n + j.vn, 0) === totalCentre.vn &&
+    jourCentre.reduce((n, j) => n + j.vo, 0) === totalCentre.vo,
+  `CENTRE : ${jourCentre.reduce((n, j) => n + j.total, 0)} par jour contre ` +
+    `${totalCentre.total} au total · VN ${jourCentre.reduce((n, j) => n + j.vn, 0)}/${totalCentre.vn}` +
+    ` · VO ${jourCentre.reduce((n, j) => n + j.vo, 0)}/${totalCentre.vo}`
+);
+
+/// ET IL DOIT ETRE STRICTEMENT INFERIEUR AU GROUPE. Sans ce second controle, un
+/// filtre qui ne filtre RIEN passerait le premier — c'est exactement le defaut
+/// qu'on corrige : un graphique qui affiche le groupe entier quoi qu'on demande.
+verifier(
+  'un sous-ensemble rend MOINS que le groupe, sur chaque jour au moins une fois',
+  totalCentre.total < groupe.total &&
+    jourCentre.some((j, i) => j.total < parJourGroupe[i]!.total),
+  `CENTRE ${totalCentre.total} < groupe ${groupe.total} · ` +
+    `par jour ${jourCentre.map((j) => j.total).join('/')} contre ` +
+    `${parJourGroupe.map((j) => j.total).join('/')}`
+);
+
 // ---------------------------------------------------------------- classements
 const classementGlobal = classer(parSite, 'global');
 verifier(

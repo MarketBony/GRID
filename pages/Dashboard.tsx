@@ -10,6 +10,7 @@ import {
   type Totaux,
 } from '../services/dashboard';
 import { chargerCampagnes, type CampagneResume } from '../services/campagnes';
+import { totauxParJour } from '../backend/src/utils/agregats';
 import { chargerSaisie } from '../services/saisie';
 import { useReferentiels } from '../hooks/useReferentiels';
 import { useTempsReel } from '../hooks/useTempsReel';
@@ -240,6 +241,53 @@ export function Dashboard() {
   // l'ecran ouvert.
   const rangs: Rang[] = filtreActif ? tousLesRangs.filter((r) => retenue(r.cle)) : tousLesRangs;
 
+  /// LE GRAPHIQUE PAR JOUR SUIT LES FILTRES, ET C'EST UN RECALCUL.
+  ///
+  /// Il affichait `donnees.parJour` — un agregat calcule UNE FOIS par le service
+  /// sur toute la campagne — et ignorait donc les menus plaque/site ET le
+  /// critere VN/VO. Signale par l'utilisateur le 10/09/2026.
+  ///
+  /// On rejoue `totauxParJour`, la fonction PURE deja employee par le service et
+  /// couverte par `test:agregats`, sur le sous-ensemble de vendeurs retenu. Pas
+  /// de comptage par jour recode ici : ce serait une seconde implementation de
+  /// la meme regle, donc deux verites a redemontrer.
+  ///
+  /// LE FILTRE PORTE SUR LES VENDEURS, pas sur les lignes de classement. Une
+  /// ligne de classement appartient a l'axe courant (une table, une plaque) ;
+  /// `totauxParJour` veut savoir quels VENDEURS compter. Les deux gardes sont
+  /// les memes que pour le classement — un filtre site invisible a l'ecran ne
+  /// doit pas agir en douce quand on passe sur l'axe « Tables ».
+  const vendeursRetenus = filtreActif
+    ? donnees.vendeurs.filter((v) => {
+        if (filtrePlaqueSApplique && plaquesRetenues.length > 0
+            && !plaquesRetenues.includes(v.plaqueId)) return false;
+        if (filtreSiteSApplique && sitesRetenus.length > 0
+            && !sitesRetenus.includes(v.siteId)) return false;
+        return true;
+      })
+    : donnees.vendeurs;
+
+  const parJour = filtreActif
+    ? totauxParJour(donnees.rdvs, donnees.campagne.jours, vendeursRetenus)
+    : donnees.parJour;
+
+  /// LE CRITERE COMMANDE LA HAUTEUR DE LA BARRE. Sur « VN » ou « VO », la barre
+  /// vaut ce seau et non le total — sinon le segmente ne gouvernait que le
+  /// classement, et deux commandes voisines n'agissaient pas sur les memes
+  /// blocs.
+  ///
+  /// `part` — la surimpression qui montre la part VN dans le total — n'a de sens
+  /// qu'en « General ». Sur « VN » elle vaudrait la barre entiere, sur « VO »
+  /// zero : dans les deux cas elle n'apprend rien.
+  const barresParJour = parJour.map((j) => ({
+    cle: j.jour,
+    libelle: libelleJour(j.jour).replace(/ /, '\n'),
+    valeur: critere === 'vn' ? j.vn : critere === 'vo' ? j.vo : j.total,
+    part: critere === 'global' ? j.vn : undefined,
+    detail:
+      critere === 'vn' ? `${j.vn} VN` : critere === 'vo' ? `${j.vo} VO` : `${j.vn} VN · ${j.vo} VO`,
+  }));
+
   /// Les plaques, depuis les SESSIONS de la campagne : ce sont celles qui y
   /// participent, et non les quatre du referentiel.
   const plaquesDisponibles = donnees.sessions
@@ -423,17 +471,22 @@ export function Dashboard() {
         <div className="carte">
           <h3>
             Par jour
-            <span className="etiquette">{donnees.parJour.length} jours</span>
+            <span className="etiquette">{parJour.length} jours</span>
+            {critere !== 'global' && (
+              <span className="etiquette">{critere.toUpperCase()}</span>
+            )}
+            {/* L'ETIQUETTE DE FILTRE EST OBLIGATOIRE, pas decorative. Sans elle,
+                ce graphique afficherait des chiffres filtres a cote d'un bandeau
+                de KPI qui reste sur la campagne entiere : deux nombres qui ne
+                s'accordent pas sur le meme ecran, sans que rien ne l'explique.
+                C'est l'ecart 1107/1105 sous une autre forme. */}
+            {filtreActif && (
+              <span className="etiquette">
+                {vendeursRetenus.length} vendeurs sur {donnees.vendeurs.length}
+              </span>
+            )}
           </h3>
-          <BarresParJour
-            barres={donnees.parJour.map((j) => ({
-              cle: j.jour,
-              libelle: libelleJour(j.jour).replace(/ /, '\n'),
-              valeur: j.total,
-              part: j.vn,
-              detail: `${j.vn} VN · ${j.vo} VO`,
-            }))}
-          />
+          <BarresParJour barres={barresParJour} />
         </div>
 
         <div className="carte">

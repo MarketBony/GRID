@@ -1477,6 +1477,69 @@ ligne par ligne. Il a fallu remettre **les six proprietes**, pas seulement la ca
 Le selecteur global reste en place et est signale comme trop large : le restreindre
 demanderait d'auditer chaque libelle de l'application.
 
+## 10/09/2026 — Le graphique « par jour » ne suivait rien
+
+Signale par l'utilisateur : les menus plaque/site et le segmente VN/VO ne
+changeaient pas le graphique de gauche du tableau de bord.
+
+**Deux oublis, pas un.** Il affichait `donnees.parJour`, un agregat calcule **une
+seule fois** par le service sur la campagne entiere :
+
+- il ignorait les **filtres plaque/site**, ajoutes le 08/09 et branches
+  uniquement sur le tableau des totaux et le classement ;
+- il ignorait le **critere** : `valeur: j.total` en dur, donc le segmente
+  Général / VN / VO ne gouvernait que le classement. Deux commandes voisines
+  n'agissaient pas sur les memes blocs.
+
+### Le correctif — rejouer la fonction pure, pas recoder le comptage
+
+`totauxParJour` prend **en parametre** la liste des vendeurs a considerer. Il
+suffisait donc de la rejouer sur le sous-ensemble retenu. Pour cela le service
+expose maintenant `vendeurs` et `rdvs` dans sa charge utile : **ils etaient deja
+rapatries** pour calculer les totaux, les rendre ne coute aucune requete —
+seulement de les garder en memoire, soit ~1 050 RDV et ~96 vendeurs sur
+septembre 2026.
+
+L'alternative aurait ete de recoder le comptage par jour dans l'ecran : une
+seconde implementation de la meme regle, donc deux verites a redemontrer. C'est
+exactement ce que l'**interdit n.6** proscrit, et la fonction pure est couverte
+par `test:agregats`.
+
+**Le filtre porte sur les VENDEURS, pas sur les lignes de classement.** Une ligne
+de classement appartient a l'axe courant — une table, une plaque ;
+`totauxParJour` veut savoir quels vendeurs compter. Les deux gardes sont les
+memes que pour le classement : un filtre site invisible a l'ecran ne doit pas
+agir en douce quand on passe sur l'axe « Tables ».
+
+**Le critere commande la hauteur de la barre**, et la surimpression VN
+**disparait** hors « General » : sur « VN » elle vaudrait la barre entiere, sur
+« VO » zero. Dans les deux cas elle n'apprend rien.
+
+### Une etiquette qui n'est pas decorative
+
+Un filtre actif fait afficher « N vendeurs sur M » a cote du titre. **Sans elle,
+ce graphique montrerait des chiffres filtres a cote d'un bandeau de KPI qui
+reste sur la campagne entiere** : deux nombres qui ne s'accordent pas sur le meme
+ecran, sans que rien ne l'explique. C'est l'ecart 1107/1105 sous une autre forme.
+
+Le bandeau de KPI reste volontairement sur la campagne entiere : c'est le chiffre
+de tete, et « concessions a zero sur 18 » n'aurait aucun sens filtre.
+
+### L'invariant est desormais epingle
+
+`test:agregats` passe de 33 a **35 controles**. Le graphique s'appuie sur une
+propriete qui n'etait verifiee nulle part :
+
+- le total par jour d'un **sous-ensemble** somme au total de ce sous-ensemble,
+  total, VN et VO compris — mesure sur CENTRE en juin : 407 par jour contre 407
+  au total, VN 322/322, VO 85/85 ;
+- et il rend **strictement moins** que le groupe. Sans ce second controle, un
+  filtre qui ne filtre RIEN passerait le premier — c'est precisement le defaut
+  qu'on corrige.
+
+**Rien n'aurait vu ce defaut.** Les six suites verifiaient que `totauxParJour`
+est juste ; aucune ne verifiait que l'ecran l'appelle avec les bons arguments.
+
 ## CE QUI RESTE, au 04/09/2026
 
 **Tout est en ligne.** Le lot du 03/09 est sur `master`, la migration est appliquee sur

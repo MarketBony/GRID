@@ -515,6 +515,14 @@ l'urgence. Si une demande les enfreint, le dire et proposer l'alternative.
   table — ne compte pas, **sauf si elle a saisi des RDV**. Arbitré par l'utilisateur
   le 08/09/2026 après le premier exercice réel. La conséquence assumée est consignée
   dans `BUGS-CONNUS.md` sous « ACCEPTÉ » : **ne pas la « corriger »**
+- **Un agrégat juste, appelé avec le mauvais périmètre, produit un chiffre faux que
+  RIEN ne signale.** Le graphique « par jour » du tableau de bord recevait tous les
+  vendeurs alors que l'écran en affichait un sous-ensemble filtré : la fonction était
+  correcte et testée, l'appel était faux. `tsc` valide, la suite est verte, et le
+  chiffre est faux. Tout écran qui filtre doit **recalculer** ses agrégats sur le
+  sous-ensemble — en rejouant la fonction pure, jamais en recodant le comptage — et le
+  dire à l'utilisateur par une étiquette, sans quoi deux nombres se contredisent sur le
+  même écran
 - **« Ma table » et « mon équipe de vente » sont deux origines, pas deux valeurs.**
   Un vendeur de ma concession que j'ai placé dans ma table appartient aux deux, et
   doit apparaître dans les deux filtres. `VendeurSaisie` porte donc deux booléens

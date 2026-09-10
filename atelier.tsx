@@ -5,6 +5,8 @@ import { MenuMultiple } from './components/MenuMultiple';
 import { DialogueExport } from './components/DialogueExport';
 import { basculer, EnTeteTriable, type SensNaturel, type Tri } from './components/EnTeteTriable';
 import { GrilleVendeur } from './components/GrilleVendeur';
+import { BarresParJour } from './components/Graphiques';
+import { totauxParJour, type LigneRdv, type LigneVendeur } from './backend/src/utils/agregats';
 import type { RdvSaisie, VendeurSaisie } from './services/saisie';
 import { useIndicateurGlissant } from './hooks/useIndicateurGlissant';
 import './index.css';
@@ -123,6 +125,22 @@ const EQUIPE: VendeurSaisie[] = [
   },
 ];
 
+/// Jeu de demonstration du graphique par jour : deux plaques pour eprouver le
+/// filtre, et un melange VN/VO pour eprouver le critere.
+const V_JOUR: LigneVendeur[] = [
+  { id: 'a', nom: 'A', siteId: 's1', siteLibelle: 'S1', plaqueId: 'CENTRE', plaqueLibelle: 'CENTRE', tableId: null, tableLibelle: null, typeVehicule: 'VN' },
+  { id: 'b', nom: 'B', siteId: 's1', siteLibelle: 'S1', plaqueId: 'CENTRE', plaqueLibelle: 'CENTRE', tableId: null, tableLibelle: null, typeVehicule: 'VO' },
+  { id: 'c', nom: 'C', siteId: 's2', siteLibelle: 'S2', plaqueId: 'NORD', plaqueLibelle: 'NORD', tableId: null, tableLibelle: null, typeVehicule: 'VN' },
+];
+const JOURS_JOUR = ['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14'];
+const R_JOUR: LigneRdv[] = [];
+JOURS_JOUR.forEach((jour, i) => {
+  // Des volumes decroissants, comme une vraie campagne.
+  for (let n = 0; n < 9 - i; n++) R_JOUR.push({ vendeurId: 'a', typeVehicule: 'VN', marqueId: 'R', jour, creneauCode: 'c' });
+  for (let n = 0; n < 5 - Math.floor(i / 2); n++) R_JOUR.push({ vendeurId: 'b', typeVehicule: 'VO', marqueId: null, jour, creneauCode: 'c' });
+  for (let n = 0; n < 7 - i; n++) R_JOUR.push({ vendeurId: 'c', typeVehicule: 'VN', marqueId: 'R', jour, creneauCode: 'c' });
+});
+
 function Atelier() {
   const [sombre, setSombre] = useState(true);
   const [axe, setAxe] = useState<Axe>('site');
@@ -146,6 +164,8 @@ function Atelier() {
   const [plaquesRetenues, setPlaquesRetenues] = useState<string[]>([]);
   const [sitesRetenus, setSitesRetenus] = useState<string[]>([]);
   const [dialogueExport, setDialogueExport] = useState(false);
+  const [critereJour, setCritereJour] = useState<'global' | 'vn' | 'vo'>('global');
+  const [plaqueJour, setPlaqueJour] = useState<'toutes' | 'CENTRE'>('toutes');
   const basculerDansListe = (liste: string[], id: string) =>
     liste.includes(id) ? liste.filter((x) => x !== id) : [...liste, id];
   const ONGLETS = ['Saisie', 'Tableau de bord', 'Tables', 'Vendeurs', 'Campagnes', 'Comptes'];
@@ -421,6 +441,52 @@ function Atelier() {
               </div>
             )}
           </section>
+
+          {/* ------------------------------------ correctif du 10/09/2026 */}
+          <div className="carte">
+            <h3>
+              Par jour — suit le filtre ET le critere
+              <span className="etiquette">{critereJour === 'global' ? 'général' : critereJour.toUpperCase()}</span>
+              {plaqueJour !== 'toutes' && <span className="etiquette">{plaqueJour}</span>}
+            </h3>
+            <div className="barre-outils">
+              <Segmente
+                etiquette="Critère"
+                valeur={critereJour}
+                onChange={setCritereJour}
+                options={[
+                  { valeur: 'global' as const, libelle: 'Général' },
+                  { valeur: 'vn' as const, libelle: 'VN' },
+                  { valeur: 'vo' as const, libelle: 'VO' },
+                ]}
+              />
+              <Segmente
+                etiquette="Plaque"
+                valeur={plaqueJour}
+                onChange={setPlaqueJour}
+                options={[
+                  { valeur: 'toutes' as const, libelle: 'Toutes' },
+                  { valeur: 'CENTRE' as const, libelle: 'CENTRE' },
+                ]}
+              />
+            </div>
+            <BarresParJour
+              barres={totauxParJour(
+                R_JOUR,
+                JOURS_JOUR,
+                plaqueJour === 'toutes' ? V_JOUR : V_JOUR.filter((v) => v.plaqueId === plaqueJour)
+              ).map((j) => ({
+                cle: j.jour,
+                libelle: j.jour.slice(8) + '/09',
+                valeur: critereJour === 'vn' ? j.vn : critereJour === 'vo' ? j.vo : j.total,
+                part: critereJour === 'global' ? j.vn : undefined,
+                detail:
+                  critereJour === 'vn' ? `${j.vn} VN`
+                  : critereJour === 'vo' ? `${j.vo} VO`
+                  : `${j.vn} VN · ${j.vo} VO`,
+              }))}
+            />
+          </div>
 
           {/* ------------------------------------ nouveautes du 08/09/2026 */}
           <div className="carte">
