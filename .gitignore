@@ -40,3 +40,10 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Index graphify
+# 7,6 Mo regeneres a chaque commit par le hook post-commit, reconstructibles a
+# tout moment : rien de tout ca n'a sa place dans l'historique. Le dossier
+# contient en plus .graphify_python et .graphify_root, qui portent des chemins
+# absolus propres a cette machine.
+graphify-out/
