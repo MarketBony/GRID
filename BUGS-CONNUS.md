@@ -1,9 +1,42 @@
 # BUGS-CONNUS
 
-Mise a jour : 04/09/2026, apres le passage en liquid glass iOS.
+Mise a jour : 24/09/2026, releve de production apres la session de septembre.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
+
+---
+
+## [OUVERT — RELEVE LE 24/09/2026] Trois RDV de septembre poses dans la campagne de JUIN
+
+Juin compte **1 110** RDV actifs en production, contre les **1 107** du classeur et
+de l'import du 01/09. Les trois de trop :
+
+| id | cree le (UTC) | vendeur | case |
+|---|---|---|---|
+| 2607 | 08/09 16:02 | ARNAUD GALLAND | 11/06, 13:00-14:00 |
+| 2628 | 08/09 16:05 | MAGALI MICHEL | 11/06, 18:00-19:00 |
+| 2709 | 08/09 16:13 | REDWANE TOULOUSE | 12/06, 17:00-18:00 |
+
+Les trois viennent du **meme compte** (`cree_par = 9`), qui a pose 63 RDV dans
+septembre le meme jour. Ce sont presque surement des RDV de septembre saisis dans la
+mauvaise campagne. **Cause probable, non prouvee** : le choix de campagne survit
+dans l'onglet (`sessionStorage`, `contexts/CampagneContext.tsx`) — un passage sur
+juin pour consulter, et la saisie suivante y atterrit.
+
+**Pourquoi rien ne l'a refuse** : juin n'a jamais ete **cloturee**. Le trigger
+`rdv_campagne_ouverte` et la politique RLS refusent toute saisie dans une campagne
+cloturee — c'est exactement le cas qu'ils couvrent, mais ils ne jouent que si
+quelqu'un cloture.
+
+**Ce qui n'est PAS touche** : `test:agregats` reste vert, il travaille sur le classeur
+en memoire et non sur la base. C'est la base qui s'ecarte du classeur, pas le calcul.
+
+**A trancher par l'utilisateur**, rien n'a ete modifie :
+1. verifier avec le compte 9 que ces trois RDV sont bien de septembre ;
+2. les archiver dans juin (interdit n.1 : pas de suppression), et les ressaisir dans
+   septembre s'ils y manquent ;
+3. **cloturer juin**, pour que le cas ne puisse plus se reproduire.
 
 ---
 
@@ -1567,7 +1600,10 @@ comprise). Le conteneur Realtime a demarre avant elles et garde une liste perime
 Un redemarrage du projet (`POST /v1/projects/{ref}/restart`) le corrige. A ne pas
 confondre avec le defaut ci-dessus, qui lui persiste apres redemarrage.
 
-### [OUVERT] L'Edge Function `gerer-comptes` n'existe pas encore
+### [CORRIGE LE 01/09/2026] L'Edge Function `gerer-comptes` n'existait pas encore
+
+*Ecrite et deployee le jour meme (commit `d903b20`, version 3, `verify_jwt`) — voir
+`DEPLOIEMENT.md`. Cette entree etait restee marquee OUVERT jusqu'au 24/09.*
 
 `services/utilisateurs.ts` l'appelle deja pour **creer un compte**, **reinitialiser un
 mot de passe** et **supprimer une identite**. Ces trois actions echouent tant que la

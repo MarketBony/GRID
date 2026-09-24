@@ -5,27 +5,46 @@
 « relance » — le schema PostgreSQL, le prefixe des messages de trigger, le vocabulaire
 metier — est liste dans CLAUDE.md.
 
-Mise a jour : 01/09/2026, apres l'autonomie de `test:rls`.
+Mise a jour : 24/09/2026, apres la session de septembre et le branchement sur ECU.
 
 Ce fichier est la memoire globale du projet : ce qui est fait, ce qui reste, et les
 decisions prises. Pour la methode de travail, lire `CLAUDE.md`. Pour l'etat detaille de
-l'API, `ETAT-BACKEND.md`. Pour les defauts connus, `BUGS-CONNUS.md`.
+la base, `ETAT-BACKEND.md`. Pour les defauts connus, `BUGS-CONNUS.md`.
+
+**Les sections datees qui suivent sont un JOURNAL, et leur ordre dans le fichier n'est
+pas chronologique** — celles du 01/09 sont en tete, celles du 03/09 au 10/09 en fin de
+fichier. Se fier a la date du titre. Un « a faire » ecrit dans une section datee dit
+ce qui restait CE JOUR-LA. Ce qui reste
+aujourd'hui est dans « CE QUI RESTE », en fin de fichier, et nulle part ailleurs.
 
 ---
 
-## Ou en est le projet
+## Ou en est le projet — au 24/09/2026
 
-**J1 et J2 termines.** Socle local operationnel de bout en bout, plus les deux ecrans
-d'administration qui debloquent les donnees manquantes. Verifie dans le navigateur, pas
-seulement compile.
+**GRID a servi en conditions reelles.** La session de relance de septembre s'est
+saisie dans l'outil, et non dans l'Excel : c'etait le point de bascule, il est
+franchi. En production (`https://grid.bonyauto-mobile.workers.dev/`, releve du
+24/09/2026 sur Supabase) :
 
-Aucun commit git pour l'instant : le depot est initialise sur `master`, l'arbre est propre
-a committer mais le commit initial n'a pas ete fait.
+| Campagne | Jours | RDV actifs | Cloturee |
+|---|---|---|---|
+| Juin 2026 | 11/06 → 15/06 | **1 110** — 1 107 importes le 01/09, **+3 saisis le 08/09** | non |
+| Septembre 2026 | 10/09 → 14/09 | **1 053** — 317 · 264 · 251 · 124 · 97 par jour | non |
 
-**Rien a pousser sur GitHub avant J7.** Le pipeline GEARBOX est ecrit pour un projet en
-production, ou pousser signifie livrer. Ici seuls les commits locaux ont une utilite
-immediate : des points de retour. Le depot GitHub devient necessaire en J7, pour la deploy
-key du VPS et les workflows de sauvegarde.
+Les RDV de septembre ont ete poses du 08/09 08:23 au 10/09 15:25 (heure UTC). Les
+trois RDV tardifs de juin sont un defaut ouvert, voir `BUGS-CONNUS.md` en tete.
+
+**Une panne pendant la session, le 08/09** : ~25 postes, plus rien ne chargeait. Ce
+n'etait pas la base mais un effet de meute du temps reel, corrige le jour meme — voir
+la section du 08/09 ci-dessous et `INCIDENT-ET-DIMENSIONNEMENT.md`, ecrit pour etre
+transmis.
+
+**Dernier lot de code : 10/09/2026.** Rien n'a bouge dans le produit depuis.
+
+**Depuis le 24/09/2026, GRID est branche sur ECU**, le graphe de connaissance des
+projets Bony (`C:\Users\Operateur\Documents\ECU`). Le hook `post-commit` regenere
+`graphify-out/` a chaque commit ; `graphify-out/` est exclu de git. La section
+`## graphify` de `CLAUDE.md` dit comment s'en servir.
 
 ## 01/09/2026 — Les vendeurs sortis, et ce que le correctif a fait remonter
 
@@ -288,6 +307,9 @@ ne recoit rien**. Personne ne doit croire qu'on peut ecrire a ces adresses.
   charge utile complete et **sans nom de client**.
 
 ### Ce qui manque encore, et qui bloque un ecran
+
+*Resolu le meme jour* — commit `d903b20`, deployee en version 3, voir `DEPLOIEMENT.md`.
+Le paragraphe suivant est garde comme etat du matin du 01/09.
 
 **L'Edge Function `gerer-comptes` n'est PAS ecrite.** `services/utilisateurs.ts`
 l'appelle deja pour trois operations — creer un compte, reinitialiser un mot de passe,
@@ -1540,33 +1562,43 @@ propriete qui n'etait verifiee nulle part :
 **Rien n'aurait vu ce defaut.** Les six suites verifiaient que `totauxParJour`
 est juste ; aucune ne verifiait que l'ecran l'appelle avec les bons arguments.
 
-## CE QUI RESTE, au 04/09/2026
+## CE QUI RESTE, au 24/09/2026
 
-**Tout est en ligne.** Le lot du 03/09 est sur `master`, la migration est appliquee sur
-Supabase et les six suites y sont vertes : 39/39 · 89/89 · 10/10 · 27/27 · 20/20 ·
-19/19. `comparer` ne rend aucun ecart. **Le lot liquid glass du 04/09 ne touche ni la
-base ni le backend** — front seul.
+**Tout est en ligne**, et le dernier lot (10/09) est sur `master`. Le point de bascule
+— septembre se saisit dans l'outil ou dans l'Excel — est **franchi** : septembre s'est
+saisi dans GRID.
 
-Il ne reste que des gestes qui appartiennent a l'utilisateur.
+**Donnee a trancher, relevee le 24/09 :**
 
-| # | Sujet | Pourquoi maintenant |
+| # | Sujet | Etat |
 |---|---|---|
-| 1 | « Leaked Password Protection » (Supabase, *Authentication → Policies*) | Compare les mots de passe a HaveIBeenPwned. Un interrupteur |
-| 2 | Copie de sauvegarde **hors du depot** | Le dump hebdomadaire vit dans le depot ; si le depot disparait, tout disparait |
-| 3 | Rotation des trois secrets exposes en conversation | Jeton `sbp_` (compte entier, gearbox compris), cle `sb_secret_`, mot de passe de la base |
-| 4 | **Sept** RDV d'essai archives en septembre | Compte mesure le 03/09, et non deux comme annonce d'abord : cinq datent des sessions du 31/08 et du 02/09 (`CONTROLE NAVIGATEUR`, `CLIENT DEPUIS LA GRILLE`, `DEPUIS LE TERMINAL`, `TEST`, `TEST 2`), deux du 03/09 (`ESSAI PREMIER`, `ESSAI SECOND`). Tous **archives**, donc comptes nulle part : juin reste a 1107 et septembre a 0. L'interdit n.1 interdit de les supprimer autrement que par la porte de purge. A traiter seulement si leur presence gene |
-| 5 | L'ecran Vendeurs fait 8 990 px sans filtre | Les 19 cartes restent depliees. Les filtres et la barre collante retirent la douleur immediate ; des cartes repliables demanderaient un etat par site. A trancher |
-| 6 | Une ligne de la grille est 1 px plus haute des qu'elle contient un nom | Anterieur a l'empilement, mesure a 38,39 / 39,41 px. Le remede tient en une ligne mais deplace le centrage de chaque nom du module C |
+| 1 | **3 RDV poses dans la campagne de JUIN le 08/09** | Juin affiche 1 110 au lieu des 1 107 du classeur. Detail et cause probable dans `BUGS-CONNUS.md`, en tete. A archiver — pas a supprimer, interdit n.1 — sur decision de l'utilisateur |
+| 2 | **Aucune campagne n'est cloturee** | Juin comme septembre sont `cloturee = false`. Cloturer juin aurait refuse les trois RDV du n.1 (trigger `rdv_campagne_ouverte`, R-C.3). Cloturer septembre fige ses 1 053 RDV |
+
+**Gestes qui appartiennent a l'utilisateur** — en attente au 04/09, **statut non
+confirme au 24/09** :
+
+| # | Sujet | Pourquoi |
+|---|---|---|
+| 3 | « Leaked Password Protection » (Supabase, *Authentication → Policies*) | Compare les mots de passe a HaveIBeenPwned. Un interrupteur |
+| 4 | Copie de sauvegarde **hors du depot** | Le dump hebdomadaire vit dans le depot ; si le depot disparait, tout disparait |
+| 5 | Rotation des trois secrets exposes en conversation | Jeton `sbp_` (compte entier, gearbox compris), cle `sb_secret_`, mot de passe de la base |
+| 6 | Marques autorisees des vendeurs VN | Au 24/09, vendeurs actifs : **59 bi-marque, 6 mono-marque, 31 sans marque**. Le 03/09, les 72 VN etaient tous bi-marque par le seed : la donnee a donc commence d'etre fournie. Reste a savoir si les 59 bi-marque sont VRAIS ou encore le placeholder — tant qu'ils le sont, R-C.1 ne protege pas ces vendeurs |
+
+**Petits sujets, a trancher :**
+
+| # | Sujet | Etat |
+|---|---|---|
+| 7 | **Sept** RDV d'essai archives dans la campagne de septembre | `CONTROLE NAVIGATEUR`, `CLIENT DEPUIS LA GRILLE`, `DEPUIS LE TERMINAL`, `TEST`, `TEST 2` (31/08 et 02/09), `ESSAI PREMIER`, `ESSAI SECOND` (03/09). **Archives, donc comptes nulle part** — les 1 053 de septembre ne les incluent pas. Purge seulement si leur presence gene |
+| 8 | L'ecran Vendeurs fait 8 990 px sans filtre | Les cartes de site restent depliees. Des cartes repliables demanderaient un etat par site |
+| 9 | Une ligne de la grille est 1 px plus haute des qu'elle contient un nom | 38,39 / 39,41 px. Le remede tient en une ligne mais deplace le centrage de chaque nom du module C |
 
 **Deux ecarts assumes et documentes**, a ne pas « corriger » sans lire pourquoi :
 
 - les vues `perimetre_saisie` et `rdv_agrege` contournent la RLS (`SECURITY DEFINER`),
   signalees CRITICAL par Supabase. C'est delibere et compense — voir `ETAT-BACKEND.md` ;
 - les ports 5432/6543 sont bloques par intermittence depuis le poste du bureau. Mesurer
-  avant de conclure a une panne.
-
-**Point de bascule :** a J6 au soir, decision binaire sur les criteres de recette 3, 4
-et 5 — septembre se saisit dans l'outil, ou dans l'Excel intact.
+  avant de conclure a une panne — ils repondaient le 24/09.
 
 ## Documents devenus obsoletes
 
@@ -1574,7 +1606,8 @@ et 5 — septembre se saisit dans l'outil, ou dans l'Excel intact.
 |---|---|
 | `schema.sql` | Reference historique. Source de verite : `backend/prisma/schema.prisma` |
 | `seed_referentiels.sql` | Reference historique. Source de verite : `backend/prisma/seed.ts` |
-| `VIABILITE-FREEMIUM.md` | **Perime de bout en bout.** Il conclut sur Supabase Auth + Cloudflare Pages + crons GitHub : l'authentification est un JWT maison, l'hebergement est le VPS, et **Supabase a ete ecarte le 31/08/2026** — Postgres tourne sur le VPS. Ses V2 et V4 sont deja traites par les workflows de gearbox ; V3 (la region) n'a plus d'objet |
+| `VIABILITE-FREEMIUM.md` | **Perime sur les chiffres et les details.** Sa conclusion — Supabase Auth + hebergement statique — est bien celle qui a ete retenue, apres un detour par le VPS le 31/08 (abandonne le meme jour, voir `CLAUDE.md`). L'hebergement est Cloudflare **Workers**, pas Pages |
+| `PROMPT-SESSION-SUIVANTE.md` | Reecrit le 24/09/2026. L'ancienne version (03/09) preparait la session de septembre |
 
 `CAHIER-DES-CHARGES.md` et `MODELE-DONNEES.md` restent des references valides, aux
 arbitrages tranches pres consignes ci-dessus.
