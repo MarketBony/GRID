@@ -1,0 +1,15 @@
+{
+  "name": "GRID — Groupe Bony",
+  "short_name": "GRID",
+  "description": "Pilotage des campagnes de relance téléphonique du Groupe Bony.",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0e1f",
+  "theme_color": "#0a0e1f",
+  "icons": [
+    { "src": "/grid.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/grid.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

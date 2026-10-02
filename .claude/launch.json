@@ -24,6 +24,20 @@
       "port": 3100,
       "autoPort": false,
       "url": "http://localhost:3100"
+    },
+    {
+      "name": "apercu",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "preview",
+        "--",
+        "--port",
+        "4173",
+        "--strictPort"
+      ],
+      "port": 4173,
+      "autoPort": false
     }
   ]
 }

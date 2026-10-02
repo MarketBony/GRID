@@ -578,3 +578,13 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .ecran-entete h2 { font-family: var(--font-display); text-transform: uppercase; font-size: 17px; letter-spacing: .03em; }
 @media (max-width: 760px) { .v2 .page-ancienne { padding-top: 16px; } }
 }
+
+@layer v2 {
+.nouvelle-version {
+  position: fixed; z-index: 850; right: 18px; bottom: 18px; display: flex; align-items: center; gap: 10px;
+  padding: 8px 8px 8px 16px; border-radius: 99px; font-weight: 700; font-size: var(--fs-13);
+  animation: v2-volet-monte-droite 620ms var(--ressort-ample) both;
+}
+@keyframes v2-volet-monte-droite { from { transform: translateY(140%); } }
+@media (max-width: 760px) { .nouvelle-version { left: 14px; right: 14px; bottom: calc(96px + env(safe-area-inset-bottom)); } }
+}

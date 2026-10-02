@@ -1,15 +1,30 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Rempart } from './components/Rempart';
 import { Coquille, type Rubrique } from './components/coquille/Coquille';
 import { useSession } from './contexts/SessionContext';
 import { Connexion } from './pages/Connexion';
-import { Vendeurs } from './pages/Vendeurs';
-import { Campagne } from './pages/Campagne';
 import { Saisie } from './pages/Saisie';
-import { Tables } from './pages/Tables';
-import { Dashboard } from './pages/Dashboard';
-import { Suivi } from './pages/Suivi';
-import { ChoisirMotDePasse, Reglages } from './pages/Reglages';
+import { ChoisirMotDePasse } from './pages/Reglages';
+
+// LES RUBRIQUES SECONDAIRES SE CHARGENT A LA DEMANDE (lot 4, 03/10/2026). La
+// saisie est l'ecran d'accueil d'une seance : elle part dans le premier
+// chargement. Le tableau de bord (et ses graphiques), la preparation, le suivi et
+// les reglages ne coutent rien tant qu'on ne les ouvre pas.
+const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
+const Suivi = lazy(() => import('./pages/Suivi').then((m) => ({ default: m.Suivi })));
+const Tables = lazy(() => import('./pages/Tables').then((m) => ({ default: m.Tables })));
+const Vendeurs = lazy(() => import('./pages/Vendeurs').then((m) => ({ default: m.Vendeurs })));
+const Campagne = lazy(() => import('./pages/Campagne').then((m) => ({ default: m.Campagne })));
+const Reglages = lazy(() => import('./pages/Reglages').then((m) => ({ default: m.Reglages })));
+
+/// Ce qui s'affiche le temps d'aller chercher une rubrique : un squelette, pas
+/// un ecran vide qui se lirait comme une panne.
+const Attente = () => (
+  <div className="page">
+    <div className="skel" style={{ height: 40, width: 260 }} />
+    <div className="skel" style={{ height: 220 }} />
+  </div>
+);
 
 // ============================================================================
 // L'APPLICATION — coquille v2 (lot 4 de PLAN-GRID-V2.md).
@@ -96,6 +111,7 @@ export default function App() {
       {/* Une frontiere PAR RUBRIQUE : un ecran qui casse n'emporte pas la
           navigation avec lui. La cle force le remontage au changement. */}
       <Rempart nom={TOUTES[courante].libelle} key={courante}>
+        <Suspense fallback={<Attente />}>
         {courante === 'reglages' ? (
           <Reglages />
         ) : courante === 'suivi' ? (
@@ -109,6 +125,7 @@ export default function App() {
             {courante === 'campagnes' && droits.administre && <Campagne />}
           </div>
         )}
+        </Suspense>
       </Rempart>
     </Coquille>
   );

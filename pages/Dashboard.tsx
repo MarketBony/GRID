@@ -20,7 +20,6 @@ import {
   FENETRE_VUE_ENSEMBLE,
   useRechargementCoalesce,
 } from '../hooks/useRechargementCoalesce';
-import { exporterDashboard } from '../utils/exportExcel';
 import { libelleJour } from '../utils/grille';
 import { BandeauKpi, BarresHorizontales, BarresParJour } from '../components/Graphiques';
 import { Segmente } from '../components/Segmente';
@@ -201,6 +200,9 @@ export function Dashboard() {
       // saisie applique le portail, donc l'export contient exactement ce que ce
       // compte voit deja a l'ecran — ni plus, ni moins.
       const perimetre = await chargerSaisie(campagneId);
+      // CHARGE A LA DEMANDE (lot 4, 03/10/2026) : `xlsx-js-style` pese a lui seul
+      // une bonne part du bundle, pour un geste qu'on fait une fois par campagne.
+      const { exporterDashboard } = await import('../utils/exportExcel');
       exporterDashboard(donnees, perimetre, marques);
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Export impossible.');

@@ -63,6 +63,28 @@ function EcranConfiguration({ manquantes }: { manquantes: string[] }) {
 // les entrees animees de la premiere page joueraient quand meme.
 appliquerPreferenceAnimations();
 
+// LE SERVICE WORKER, en production seulement : en developpement il servirait des
+// fichiers perimes a Vite. Une nouvelle version S'ANNONCE (evenement
+// `grid:nouvelle-version`, ecoute par la coquille) ; elle ne recharge jamais la
+// page d'elle-meme — pas au milieu d'une saisie.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((enr) => {
+        enr.addEventListener('updatefound', () => {
+          const nouveau = enr.installing;
+          nouveau?.addEventListener('statechange', () => {
+            if (nouveau.state === 'installed' && navigator.serviceWorker.controller) {
+              window.dispatchEvent(new CustomEvent('grid:nouvelle-version', { detail: nouveau }));
+            }
+          });
+        });
+      })
+      .catch(() => undefined);
+  });
+}
+
 createRoot(racine).render(
   <StrictMode>
     <FournisseurTheme>

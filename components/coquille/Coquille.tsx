@@ -72,6 +72,18 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
   const [retractee, setRetractee] = useState(false);
   const [paletteOuverte, setPaletteOuverte] = useState(false);
   const [plusOuvert, setPlusOuvert] = useState(false);
+  /// Une nouvelle version de GRID est prete (service worker, `index.tsx`). On
+  /// l'ANNONCE ; c'est l'utilisateur qui recharge, jamais au milieu d'une saisie.
+  const [nouvelleVersion, setNouvelleVersion] = useState<ServiceWorker | null>(null);
+  useEffect(() => {
+    const surVersion = (e: Event) => setNouvelleVersion((e as CustomEvent<ServiceWorker>).detail);
+    window.addEventListener('grid:nouvelle-version', surVersion);
+    return () => window.removeEventListener('grid:nouvelle-version', surVersion);
+  }, []);
+  const recharger = () => {
+    navigator.serviceWorker?.addEventListener('controllerchange', () => window.location.reload(), { once: true });
+    nouvelleVersion?.postMessage('activer');
+  };
   const ile = useRef<HTMLElement | null>(null);
 
   const principales = rubriques.filter((r) => !r.secondaire);
@@ -219,6 +231,18 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
       <main className="contenu-v2" style={{ viewTransitionName: 'contenu-v2' } as React.CSSProperties}>
         {children}
       </main>
+
+      {nouvelleVersion && (
+        <div className="nouvelle-version verre fort" role="status">
+          Une nouvelle version de GRID est prête.
+          <button type="button" className="btn primary sm" onClick={recharger}>
+            Recharger
+          </button>
+          <button type="button" className="icon-btn" onClick={() => setNouvelleVersion(null)} aria-label="Plus tard">
+            <Icone nom="fermer" petite />
+          </button>
+        </div>
+      )}
 
       {paletteOuverte && <Palette entrees={entrees} fermer={() => setPaletteOuverte(false)} />}
 
