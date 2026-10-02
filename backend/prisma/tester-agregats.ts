@@ -479,6 +479,16 @@ const jeuMobilisation: LigneVendeur[] = [
 const rdvMobilisation: LigneRdv[] = [rdvDe('surTable'), rdvDe('surTable'), rdvDe('reserveQuiSaisit')];
 const mobilises = mobilisation(rdvMobilisation, jeuMobilisation);
 
+// L'ecran Effectifs (03/10/2026) : un JEU A PART, pour ne pas deplacer les
+// controles ci-dessus, qui comptent les entrees de `jeuMobilisation`.
+const jeuEffectifs: LigneVendeur[] = [
+  ...jeuMobilisation,
+  { ...v('absentParSite', 'P2', null), mobilise: false },
+  { ...v('absentQuiSaisit', 'P2', null), mobilise: false },
+  { ...v('reserveMobilisee', 'P1', null), mobilise: true },
+];
+const mobilisesEffectifs = mobilisation([...rdvMobilisation, rdvDe('absentQuiSaisit')], jeuEffectifs);
+
 verifier(
   'sur une table : compte, meme a 0 RDV',
   mobilises.has('surTable'),
@@ -493,6 +503,21 @@ verifier(
   'en reserve mais AYANT SAISI : compte',
   mobilises.has('reserveQuiSaisit'),
   'ses RDV sont au numerateur, il doit etre au denominateur'
+);
+verifier(
+  'effectifs : un vendeur declare absent ne compte pas',
+  !mobilisesEffectifs.has('absentParSite'),
+  'mobilise = false, aucun RDV'
+);
+verifier(
+  'effectifs : declare absent mais AYANT des RDV, il compte',
+  mobilisesEffectifs.has('absentQuiSaisit'),
+  'meme regle que la reserve : au numerateur, donc au denominateur'
+);
+verifier(
+  'effectifs : un reserviste declare mobilise compte, meme sans RDV',
+  mobilisesEffectifs.has('reserveMobilisee'),
+  'mobilise = true'
 );
 verifier(
   'plaque sans aucune table : tout le monde compte',

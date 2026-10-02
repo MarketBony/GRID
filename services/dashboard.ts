@@ -142,6 +142,8 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
     sessions: unknown[];
     vendeurs: unknown[];
     affectations: unknown[];
+    /// Les exceptions de l'ecran Effectifs (lot 2) : absent / mobilise d'office.
+    mobilisations?: { vendeur_id: number; mobilise: boolean }[];
     rdvs: { id: number; vendeur_id: number; type_vehicule: string; marque_id: number | null; jour: string; creneau_code: string; source?: string }[];
     nb_rdvs: number;
   };
@@ -200,6 +202,7 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
 
   const siteVersPlaque: Record<string, string> = {};
   const vendeurVersSite: Record<string, string> = {};
+  const mobilisationDe = new Map((brut.mobilisations ?? []).map((m) => [m.vendeur_id, m.mobilise]));
   const lignesV = (verifier(vendeurs) as unknown as LigneV[]).filter((v) =>
     // LA PRESENCE PENDANT LA CAMPAGNE, et non « aujourd'hui ». Sans ce filtre,
     // la moyenne RDV/vendeur d'une campagne passee change des qu'un vendeur part —
@@ -227,6 +230,7 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
       tableId: table?.id ?? null,
       tableLibelle: table?.libelle ?? null,
       typeVehicule: v.type_vehicule as LigneVendeur['typeVehicule'],
+      mobilise: mobilisationDe.get(v.id) ?? null,
     };
   });
 

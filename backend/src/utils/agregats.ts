@@ -71,6 +71,10 @@ export interface LigneVendeur {
   tableId: string | null;
   tableLibelle: string | null;
   typeVehicule: TypeVehicule;
+  /// L'EXCEPTION POSEE A L'ECRAN EFFECTIFS pour cette campagne (table
+  /// `mobilisation`, lot 2 de PLAN-GRID-V2.md) : `false` = absent de la seance,
+  /// `true` = mobilise d'office, absent = la regle par defaut ci-dessous.
+  mobilise?: boolean | null;
 }
 
 export const AXES = ['vendeur', 'site', 'plaque', 'table', 'groupe'] as const;
@@ -193,6 +197,18 @@ export function mobilisation(rdvs: LigneRdv[], vendeurs: LigneVendeur[]): Set<st
 
   const mobilises = new Set<string>();
   for (const v of vendeurs) {
+    // L'EXCEPTION D'ABORD (03/10/2026). Un vendeur declare ABSENT sort de
+    // l'effectif — sauf s'il a des RDV : meme raison que pour la reserve, ses RDV
+    // sont au numerateur, il doit etre au denominateur. Un vendeur declare
+    // MOBILISE compte, table ou pas.
+    if (v.mobilise === false) {
+      if (aSaisi.has(v.id)) mobilises.add(v.id);
+      continue;
+    }
+    if (v.mobilise === true) {
+      mobilises.add(v.id);
+      continue;
+    }
     const sansTableSurLaPlaque = !plaquesParTable.has(v.plaqueId);
     if (sansTableSurLaPlaque || v.tableId !== null || aSaisi.has(v.id)) mobilises.add(v.id);
   }
