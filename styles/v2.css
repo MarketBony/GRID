@@ -538,3 +538,43 @@ html.animations-reduites .v2 *, html.animations-reduites .fond-vivant i { animat
 @layer v2 {
 .bascule-absents { display: flex; align-items: center; gap: 10px; padding: 6px 4px 10px; font-size: var(--fs-12); font-weight: 600; color: var(--text-2); cursor: pointer; }
 }
+
+@layer v2 {
+/* ------------------------------------------------------------------ LE PONT
+   Les ecrans pas encore portes lisent les jetons de l'ancienne feuille
+   (`--bg-panel`, `--text-main`…). Redefinis ICI, dans la coquille v2, ils
+   prennent tous d'un coup la palette, le verre et la typographie de la v2 — sans
+   une ligne de leur CSS a toucher. Chaque ecran porte ensuite pour de bon
+   perdra simplement ce pont. Le fond vivant de la v2 remplace celui de
+   l'ancienne feuille : ses lavis sont neutralises. */
+.v2 {
+  --bg-main: transparent;
+  --bg-panel: var(--box-bg);
+  --bg-input: var(--ctl-bg);
+  --border-color: var(--line-2);
+  --text-main: var(--text);
+  --text-muted: var(--text-2);
+  --glass-bg: var(--box-bg);
+  --glass-bg-strong: var(--glass-strong);
+  --glass-border: var(--box-line);
+  --glass-menu-bg: var(--glass-strong);
+  --glass-menu-border: var(--line-2);
+  --panel-glass-bg: var(--box-bg);
+  --panel-glass-border: var(--box-line);
+  --wash-1: transparent; --wash-2: transparent; --wash-3: transparent;
+  --succes: var(--ok); --attention: var(--warn); --erreur: var(--danger);
+  --bony-gradient: var(--bony-grad);
+  --bony-gradient-hover: var(--bony-grad);
+  --rayon: var(--r-lg);
+  --rayon-petit: var(--r-sm);
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+/* Les lavis animes de l'ancienne feuille vivent sur `body::before/::after` et
+   `.application::before` : sous la coquille v2, seul le fond vivant v2 reste. */
+body:has(.v2)::before, body:has(.v2)::after { display: none; }
+.v2 .page-ancienne { padding-top: 92px; }
+.v2 .page-ancienne > .ecran { padding: 0; }
+.v2 .ecran-entete h2 { font-family: var(--font-display); text-transform: uppercase; font-size: 17px; letter-spacing: .03em; }
+@media (max-width: 760px) { .v2 .page-ancienne { padding-top: 16px; } }
+}
