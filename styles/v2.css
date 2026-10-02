@@ -460,3 +460,64 @@ html.animations-reduites .v2 *, html.animations-reduites .fond-vivant i { animat
 .aide-v2 { margin: 0; color: var(--text-3); font-size: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .annonce-grille { margin-left: auto; padding: 3px 10px; border-radius: 99px; color: var(--text); background: var(--ctl-bg-h); font-weight: 700; animation: v2-entre 420ms var(--ressort-vif) both; }
 }
+
+@layer v2 {
+/* ------------------------------------------------------------------ SUIVI DES RDV (lot 6) */
+.v2 .bandeau-v2 { padding: 10px 14px; border-radius: 12px; font-weight: 600; background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line); }
+.v2 .bandeau-v2.erreur { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent); }
+.v2 .suivi-filtres { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.v2 .recherche-v2 { flex: 1; min-width: 200px; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 99px; color: var(--text-3); background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); transition: box-shadow var(--t-med) var(--ressort-vif); }
+.v2 .recherche-v2:focus-within { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--focus); }
+.v2 .recherche-v2 input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: 600 var(--fs-13) var(--font-ui); color: var(--text); }
+.v2 .suivi-jour { display: flex; flex-direction: column; gap: 8px; }
+.v2 .suivi-jour > h2 { margin: 6px 2px 0; }
+
+.v2 .suivi-ligne {
+  display: grid; grid-template-columns: minmax(180px, 1.3fr) minmax(110px, .6fr) auto; align-items: center; gap: 10px 14px;
+  padding: 12px 14px; transition: box-shadow 400ms var(--ressort-vif), opacity 300ms, transform 600ms var(--ressort-vif);
+}
+/* Un liseré a gauche dit l'issue d'un coup d'oeil — la couleur porte du sens
+   (regle v2.1 de Gearbox). */
+.v2 .suivi-ligne[data-issue='commande'] { box-shadow: inset 3px 0 0 var(--ok), inset 0 0 0 1px var(--box-line); }
+.v2 .suivi-ligne[data-issue='offre_en_cours'] { box-shadow: inset 3px 0 0 var(--info), inset 0 0 0 1px var(--box-line); }
+.v2 .suivi-ligne[data-issue='annule'] { box-shadow: inset 3px 0 0 var(--danger), inset 0 0 0 1px var(--box-line); }
+.v2 .suivi-ligne[data-issue='clos_sans_suite'] { box-shadow: inset 3px 0 0 var(--text-3), inset 0 0 0 1px var(--box-line); }
+/* Qualifiee dans la vue « a traiter », la ligne s'en va en glissant. */
+.v2 .suivi-ligne.sortant { opacity: 0; transform: translateX(28px) scale(.98); }
+.v2 .suivi-ligne .client { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 800; font-size: var(--fs-14); }
+.v2 .suivi-ligne .meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 3px; color: var(--text-3); font-size: 12px; font-weight: 600; }
+.v2 .suivi-ligne .modele { height: 32px; }
+
+.v2 .issues { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+.v2 .issue {
+  height: 30px; padding: 0 11px; border: 0; border-radius: 99px; cursor: pointer;
+  font: 700 12px var(--font-ui); color: var(--text-2); background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: transform 620ms var(--ressort-ample), background-color 250ms, color 250ms, box-shadow 250ms;
+}
+.v2 .issue:hover:not(:disabled) { color: var(--text); background: var(--ctl-bg-h); }
+.v2 .issue:active:not(:disabled) { transform: scale(.92); transition-duration: 90ms; }
+.v2 .issue:disabled { cursor: default; opacity: .6; }
+.v2 .issue[aria-pressed='true'] { color: #fff; box-shadow: none; animation: v2-allume 520ms var(--ressort-ample); }
+.v2 .issue[aria-pressed='true'][data-i='commande'] { background: var(--ok); }
+.v2 .issue[aria-pressed='true'][data-i='offre_en_cours'] { background: var(--info); }
+.v2 .issue[aria-pressed='true'][data-i='annule'] { background: var(--danger); }
+.v2 .issue[aria-pressed='true'][data-i='clos_sans_suite'] { background: var(--text-3); }
+@keyframes v2-allume { 0% { transform: scale(.85); } }
+
+/* D21 : DIAC / STOCK / CS en bascules COMPACTES, discretes au repos. */
+.v2 .avantages { grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; gap: 4px; animation: v2-entre 420ms var(--ressort-vif) both; }
+.v2 .avantage {
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border: 0; border-radius: 7px; cursor: pointer;
+  font: 800 11px var(--font-ui); letter-spacing: .04em; color: var(--text-3); background: transparent; box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: color 200ms, background-color 200ms, box-shadow 200ms, transform 560ms var(--ressort-ample);
+}
+.v2 .avantage:hover:not(:disabled) { color: var(--text); }
+.v2 .avantage[aria-pressed='true'] { color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 45%, transparent); }
+.v2 .avantage:active:not(:disabled) { transform: scale(.9); transition-duration: 90ms; }
+.v2 .seche { margin-left: 6px; font-size: 11.5px; font-weight: 800; color: var(--text-3); animation: v2-entre 400ms var(--ressort-vif) both; }
+
+@media (max-width: 760px) {
+  .v2 .suivi-ligne { grid-template-columns: 1fr; }
+  .v2 .issues, .v2 .avantages { justify-content: flex-start; }
+}
+}

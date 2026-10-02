@@ -8,6 +8,7 @@ import { Campagne } from './pages/Campagne';
 import { Saisie } from './pages/Saisie';
 import { Tables } from './pages/Tables';
 import { Dashboard } from './pages/Dashboard';
+import { Suivi } from './pages/Suivi';
 import { ChoisirMotDePasse, Reglages } from './pages/Reglages';
 
 // ============================================================================
@@ -26,10 +27,12 @@ import { ChoisirMotDePasse, Reglages } from './pages/Reglages';
 // lecture et chaque ecriture sont revalidees par la RLS (interdit n.5).
 // ============================================================================
 
-type Id = 'saisie' | 'tableau' | 'effectifs' | 'vendeurs' | 'campagnes' | 'reglages';
+type Id = 'saisie' | 'suivi' | 'tableau' | 'effectifs' | 'vendeurs' | 'campagnes' | 'reglages';
 
 const TOUTES: Record<Id, Rubrique> = {
   saisie: { id: 'saisie', libelle: 'Saisie', icone: 'saisie' },
+  // Le suivi des RDV pris, en concession (lot 6). Memes personnes, meme perimetre.
+  suivi: { id: 'suivi', libelle: 'Suivi des RDV', court: 'Suivi', icone: 'suivi' },
   tableau: { id: 'tableau', libelle: 'Tableau de bord', court: 'Tableau', icone: 'tableau' },
   // « Effectifs » et non plus « Tables » (D12) : c'est la gestion des vendeurs
   // presents a chaque session, en mode table comme en mode site.
@@ -71,7 +74,7 @@ export default function App() {
   }
 
   const ids: Id[] = [
-    ...(droits.lecteur && !droits.administre ? [] : (['saisie'] as Id[])),
+    ...(droits.lecteur && !droits.administre ? [] : (['saisie', 'suivi'] as Id[])),
     'tableau',
     ...(droits.administre ? (['effectifs', 'vendeurs', 'campagnes'] as Id[]) : []),
     'reglages',
@@ -95,6 +98,8 @@ export default function App() {
       <Rempart nom={TOUTES[courante].libelle} key={courante}>
         {courante === 'reglages' ? (
           <Reglages />
+        ) : courante === 'suivi' ? (
+          <Suivi />
         ) : (
           <div className="page page-ancienne">
             {courante === 'saisie' && <Saisie />}
