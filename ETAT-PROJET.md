@@ -39,7 +39,8 @@ n'etait pas la base mais un effet de meute du temps reel, corrige le jour meme �
 la section du 08/09 ci-dessous et `INCIDENT-ET-DIMENSIONNEMENT.md`, ecrit pour etre
 transmis.
 
-**Dernier lot de code : 10/09/2026.** Rien n'a bouge dans le produit depuis.
+**Lot suivant : 02/10/2026**, la creation de campagne — voir sa section, en fin de
+fichier. Juin et septembre ont ete cloturees par l'utilisateur.
 
 **Depuis le 24/09/2026, GRID est branche sur ECU**, le graphe de connaissance des
 projets Bony (`C:\Users\Operateur\Documents\ECU`). Le hook `post-commit` regenere
@@ -1562,36 +1563,70 @@ propriete qui n'etait verifiee nulle part :
 **Rien n'aurait vu ce defaut.** Les six suites verifiaient que `totauxParJour`
 est juste ; aucune ne verifiait que l'ecran l'appelle avec les bons arguments.
 
-## CE QUI RESTE, au 24/09/2026
+## 02/10/2026 — On ne pouvait pas creer de campagne
 
-**Tout est en ligne**, et le dernier lot (10/09) est sur `master`. Le point de bascule
-— septembre se saisit dans l'outil ou dans l'Excel — est **franchi** : septembre s'est
-saisi dans GRID.
+Signale par l'utilisateur pour la session d'octobre, qui a lieu le **06/10/2026**.
+**F-A4.1 n'avait jamais ete code** : les deux campagnes en base venaient du seed, et
+l'ecran Campagnes ne savait que modifier et cloturer. Le manque n'est apparu qu'une
+fois juin et septembre cloturees — il n'y avait jusque-la rien a creer.
 
-**Donnee a trancher, relevee le 24/09 :**
+**Le lot :**
+- `relance.campagne_creer` — une transaction : la campagne, un jour par date du debut
+  a la fin, les creneaux et le mode par plaque recopies d'une campagne modele (detail
+  dans `ETAT-BACKEND.md`) ;
+- `creerCampagne` dans `services/campagnes.ts` ;
+- un bouton « Nouvelle campagne » sur l'ecran Campagnes. Le formulaire demande
+  libelle, debut et fin, et **annonce la campagne modele** — la plus recente — dont
+  creneaux et modes seront repris. Les jours s'ajustent ensuite dans le meme ecran ;
+- `test:rls` 89 -> **97**.
+
+**Decision de l'utilisateur** : la nouvelle campagne reprend « la meme chose qu'en
+septembre et juin ». Les tables, elles, se recomposent dans l'onglet Tables comme
+pour septembre — **F-A4.4 (dupliquer avec les tables) n'est pas fait**.
+
+**Ce qui a tourne, en local** : migration appliquee ; `test:rls` 97/97,
+`test:garde-fous` 39/39, `test:invariants` 10/10, `test:import` 19/19,
+`test:agregats` 35/35, `test:repartition` 20/20 ; `tsc` front et backend propres.
+
+**Ce qui n'a PAS tourne au moment du commit** : rien sur Supabase. Le front de
+developpement attaque Supabase en direct (`.env`), donc le test au navigateur exige
+d'abord la migration en production.
+
+**Correction non demandee, declaree** : `CLAUDE.md`, `README.md`, `ETAT-BACKEND.md`
+et `DEPLOIEMENT.md` annoncaient `test:agregats` a **27** tests ; la suite en rend
+**35** depuis le lot du 10/09. Compteurs remis a jour avec celui de `test:rls`.
+
+## CE QUI RESTE, au 02/10/2026
+
+**Tout est en ligne** jusqu'au lot du 10/09. Le lot du 02/10 (creation de campagne)
+est en cours de livraison — voir la section ci-dessus.
+
+**Avant la session du 06/10 :**
 
 | # | Sujet | Etat |
 |---|---|---|
-| 1 | **3 RDV poses dans la campagne de JUIN le 08/09** | Juin affiche 1 110 au lieu des 1 107 du classeur. Detail et cause probable dans `BUGS-CONNUS.md`, en tete. A archiver — pas a supprimer, interdit n.1 — sur decision de l'utilisateur |
-| 2 | **Aucune campagne n'est cloturee** | Juin comme septembre sont `cloturee = false`. Cloturer juin aurait refuse les trois RDV du n.1 (trigger `rdv_campagne_ouverte`, R-C.3). Cloturer septembre fige ses 1 053 RDV |
+| 1 | Creer la campagne d'octobre | Des que `campagne_creer` est en production. Puis verifier ses jours, et composer les tables de CENTRE et SUD |
+
+Les trois RDV de septembre poses dans juin restent ou ils sont, sur decision de
+l'utilisateur. Juin et septembre sont **cloturees** depuis.
 
 **Gestes qui appartiennent a l'utilisateur** — en attente au 04/09, **statut non
 confirme au 24/09** :
 
 | # | Sujet | Pourquoi |
 |---|---|---|
-| 3 | « Leaked Password Protection » (Supabase, *Authentication → Policies*) | Compare les mots de passe a HaveIBeenPwned. Un interrupteur |
-| 4 | Copie de sauvegarde **hors du depot** | Le dump hebdomadaire vit dans le depot ; si le depot disparait, tout disparait |
-| 5 | Rotation des trois secrets exposes en conversation | Jeton `sbp_` (compte entier, gearbox compris), cle `sb_secret_`, mot de passe de la base |
-| 6 | Marques autorisees des vendeurs VN | Au 24/09, vendeurs actifs : **59 bi-marque, 6 mono-marque, 31 sans marque**. Le 03/09, les 72 VN etaient tous bi-marque par le seed : la donnee a donc commence d'etre fournie. Reste a savoir si les 59 bi-marque sont VRAIS ou encore le placeholder — tant qu'ils le sont, R-C.1 ne protege pas ces vendeurs |
+| 2 | « Leaked Password Protection » (Supabase, *Authentication → Policies*) | Compare les mots de passe a HaveIBeenPwned. Un interrupteur |
+| 3 | Copie de sauvegarde **hors du depot** | Le dump hebdomadaire vit dans le depot ; si le depot disparait, tout disparait |
+| 4 | Rotation des trois secrets exposes en conversation | Jeton `sbp_` (compte entier, gearbox compris), cle `sb_secret_`, mot de passe de la base |
+| 5 | Marques autorisees des vendeurs VN | Au 24/09, vendeurs actifs : **59 bi-marque, 6 mono-marque, 31 sans marque**. Le 03/09, les 72 VN etaient tous bi-marque par le seed : la donnee a donc commence d'etre fournie. Reste a savoir si les 59 bi-marque sont VRAIS ou encore le placeholder — tant qu'ils le sont, R-C.1 ne protege pas ces vendeurs |
 
 **Petits sujets, a trancher :**
 
 | # | Sujet | Etat |
 |---|---|---|
-| 7 | **Sept** RDV d'essai archives dans la campagne de septembre | `CONTROLE NAVIGATEUR`, `CLIENT DEPUIS LA GRILLE`, `DEPUIS LE TERMINAL`, `TEST`, `TEST 2` (31/08 et 02/09), `ESSAI PREMIER`, `ESSAI SECOND` (03/09). **Archives, donc comptes nulle part** — les 1 053 de septembre ne les incluent pas. Purge seulement si leur presence gene |
-| 8 | L'ecran Vendeurs fait 8 990 px sans filtre | Les cartes de site restent depliees. Des cartes repliables demanderaient un etat par site |
-| 9 | Une ligne de la grille est 1 px plus haute des qu'elle contient un nom | 38,39 / 39,41 px. Le remede tient en une ligne mais deplace le centrage de chaque nom du module C |
+| 6 | **Sept** RDV d'essai archives dans la campagne de septembre | `CONTROLE NAVIGATEUR`, `CLIENT DEPUIS LA GRILLE`, `DEPUIS LE TERMINAL`, `TEST`, `TEST 2` (31/08 et 02/09), `ESSAI PREMIER`, `ESSAI SECOND` (03/09). **Archives, donc comptes nulle part** — les 1 053 de septembre ne les incluent pas. Purge seulement si leur presence gene |
+| 7 | L'ecran Vendeurs fait 8 990 px sans filtre | Les cartes de site restent depliees. Des cartes repliables demanderaient un etat par site |
+| 8 | Une ligne de la grille est 1 px plus haute des qu'elle contient un nom | 38,39 / 39,41 px. Le remede tient en une ligne mais deplace le centrage de chaque nom du module C |
 
 **Deux ecarts assumes et documentes**, a ne pas « corriger » sans lire pourquoi :
 

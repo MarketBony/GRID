@@ -136,7 +136,7 @@ npm --prefix backend run seed
 
 # 5. Les suites, SUR SUPABASE. Une suite verte en local ne dit rien de la production.
 npm --prefix backend run test:garde-fous   # 39/39
-npm --prefix backend run test:rls          # 89/89
+npm --prefix backend run test:rls          # 97/97
 npm --prefix backend run test:invariants   # 10/10
 ```
 

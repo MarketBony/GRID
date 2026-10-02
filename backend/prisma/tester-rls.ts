@@ -1406,6 +1406,92 @@ async function main() {
     }
   );
 
+  // --- CREER UNE CAMPAGNE (F-A4.1) ---
+  //
+  // Le modele est `campagne1` du decor : un creneau, une session `par_table` sur
+  // PLAQUE RLS. Les mesures portent sur PLAQUE RLS SEULE, jamais sur le nombre
+  // total de sessions creees — il dependrait des plaques reelles de la base, et
+  // une suite de securite ne depend pas des donnees de production.
+  const creerCampagne = (libelle: string) =>
+    rpc("relance.campagne_creer($1, DATE '2026-05-04', DATE '2026-05-06', $2)", () => [
+      libelle,
+      decor.campagne1.id,
+    ]);
+  const idCree = async (tx: Tx, libelle: string): Promise<bigint> => {
+    const [l] = await tx.$queryRawUnsafe<{ id: bigint }[]>(
+      "SELECT relance.campagne_creer($1, DATE '2026-05-04', DATE '2026-05-06', $2) AS id",
+      libelle,
+      decor.campagne1.id
+    );
+    return l.id;
+  };
+
+  await doitRefuser(
+    'RPC  anon ne peut pas creer de campagne',
+    'anonyme',
+    DROIT_INSUFFISANT,
+    creerCampagne('CAMPAGNE RLS REFUS')
+  );
+  await doitRefuser(
+    'RPC  un encadrant ne peut pas creer de campagne',
+    { login: ENCADRANT },
+    ERREUR_METIER,
+    creerCampagne('CAMPAGNE RLS REFUS')
+  );
+  await doitRefuser(
+    'RPC  un lecteur ne peut pas creer de campagne',
+    { login: LECTEUR },
+    ERREUR_METIER,
+    creerCampagne('CAMPAGNE RLS REFUS')
+  );
+  await doitAccepter(
+    'RPC  direction cree une campagne (referentiel)',
+    { login: DIRECTION },
+    creerCampagne('CAMPAGNE RLS DIRECTION')
+  );
+  await doitValoir(
+    'RPC  campagne creee : un jour par date, du debut a la fin',
+    { login: ADMIN },
+    3,
+    async (tx) => {
+      const id = await idCree(tx, 'CAMPAGNE RLS JOURS');
+      return nombre(tx, `SELECT count(*) AS n FROM relance.campagne_jour WHERE campagne_id = ${id}`);
+    }
+  );
+  await doitValoir(
+    'RPC  campagne creee : les creneaux du modele sont repris',
+    { login: ADMIN },
+    1,
+    async (tx) => {
+      const id = await idCree(tx, 'CAMPAGNE RLS CRENEAUX');
+      return nombre(
+        tx,
+        `SELECT count(*) AS n FROM relance.campagne_creneau
+          WHERE campagne_id = ${id} AND code = '${CRENEAU}'`
+      );
+    }
+  );
+  await doitValoir(
+    'RPC  campagne creee : le mode de chaque plaque est repris du modele',
+    { login: ADMIN },
+    1,
+    async (tx) => {
+      const id = await idCree(tx, 'CAMPAGNE RLS MODES');
+      return nombre(
+        tx,
+        `SELECT count(*) AS n FROM relance.session_plaque sp
+           JOIN relance.plaque p ON p.id = sp.plaque_id
+          WHERE sp.campagne_id = ${id} AND p.libelle = 'PLAQUE RLS' AND sp.mode = 'par_table'`
+      );
+    }
+  );
+  await doitRefuser(
+    'RPC  deux campagnes ne portent pas le meme libelle',
+    { login: ADMIN },
+    ERREUR_METIER,
+    creerCampagne('CAMPAGNE RLS 2')
+  );
+
   // --- LE DERNIER ADMINISTRATEUR ---
   //
   // Le degrader rendrait l'application inadministrable : plus personne ne pourrait

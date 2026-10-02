@@ -12,7 +12,7 @@ Cible : opérationnel pour la campagne de **septembre 2026**. En ligne sur
 navigateur attaque Supabase en direct — PostgREST pour les lectures et les écritures
 simples, 13 fonctions `security definer` pour ce qui doit être transactionnel.
 L'autorisation est portée par la **RLS**, et elle n'a aucun filet derrière elle : d'où
-`test:rls`, 89 contrôles dans les deux sens.
+`test:rls`, 97 contrôles dans les deux sens.
 
 Seule exception : une Edge Function `gerer-comptes`, parce que créer une identité exige
 la clé `service_role`, qui ne doit jamais se trouver dans le navigateur.
@@ -76,9 +76,9 @@ une suite verte en local ne dit rien de la production.
 
 ```bash
 npm --prefix backend run test:garde-fous   # 33 invariants de la base, chacun doit REFUSER
-npm --prefix backend run test:rls          # 89 contrôles des politiques ET des RPC
+npm --prefix backend run test:rls          # 97 contrôles des politiques ET des RPC
 npm --prefix backend run test:invariants   # 10 contrôles code <-> base (interdit n°6)
-npm --prefix backend run test:agregats     # 27 tests des totaux, contre les 1107 RDV de juin
+npm --prefix backend run test:agregats     # 35 tests des totaux, contre les 1107 RDV de juin
 npm --prefix backend run test:repartition  # 20 tests de la répartition graine 42
 npm --prefix backend run test:import       # 19 tests du parseur, fonctions pures
 

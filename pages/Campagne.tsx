@@ -3,6 +3,7 @@ import { ErreurApi } from '../services/api';
 import {
   chargerCampagne,
   chargerCampagnes,
+  creerCampagne,
   enregistrerCreneaux,
   enregistrerJours,
   modifierCampagne,
@@ -52,6 +53,9 @@ export function Campagne() {
   const [nouveauJour, setNouveauJour] = useState('');
   const [nouveauCreneau, setNouveauCreneau] = useState('');
 
+  const [listeChargee, setListeChargee] = useState(false);
+  const [creation, setCreation] = useState(false);
+
   const recharger = useCallback(async (id: string) => {
     setDetail(await chargerCampagne(id));
   }, []);
@@ -60,6 +64,7 @@ export function Campagne() {
     chargerCampagnes()
       .then((cs) => {
         setListe(cs);
+        setListeChargee(true);
         const retenue = choisirDansListe(cs, idCourant, (l) => l[0]);
         if (retenue) setIdCourant(retenue);
       })
@@ -70,7 +75,49 @@ export function Campagne() {
     if (idCourant) recharger(idCourant).catch((e) => setMessage(String(e)));
   }, [idCourant, recharger]);
 
-  if (!detail) return <div className="attente">Chargement de la campagne...</div>;
+  // F-A4.1. Le modele est la campagne la plus RECENTE — `chargerCampagnes` trie
+  // par date de debut decroissante. Ce que l'ecran annonce est donc exactement ce
+  // que la base recopiera : l'identifiant part tel quel dans l'appel.
+  const modele = liste[0] ?? null;
+
+  const apresCreation = async (id: string, libelle: string) => {
+    const cs = await chargerCampagnes();
+    setListe(cs);
+    setCreation(false);
+    setIdCourant(id);
+    setMessage(null);
+    setSucces(`Campagne « ${libelle} » creee. Verifier ses jours avant la session.`);
+  };
+
+  const formulaireCreation =
+    creation && modele ? (
+      <FormulaireCreation
+        modele={modele}
+        onAnnuler={() => setCreation(false)}
+        onCreee={(id, libelle) => void apresCreation(id, libelle)}
+      />
+    ) : null;
+
+  if (!detail) {
+    // Le seul ecran sans campagne a montrer est celui d'une base vide : le seed
+    // en pose toujours deux, mais rien ne le garantit en production.
+    if (listeChargee && liste.length === 0) {
+      return (
+        <section className="ecran">
+          <header className="ecran-entete">
+            <div>
+              <h2>Campagnes</h2>
+            </div>
+          </header>
+          <div className="erreur-bloc">
+            Aucune campagne en base. La creation reprend les creneaux d'une campagne existante :
+            il en faut une premiere, posee par le seed.
+          </div>
+        </section>
+      );
+    }
+    return <div className="attente">Chargement de la campagne...</div>;
+  }
 
   const figee = detail.cloturee;
 
@@ -198,18 +245,33 @@ export function Campagne() {
         <div>
           <h2>Campagnes</h2>
         </div>
-        <select value={idCourant ?? ''} onChange={(e) => setIdCourant(e.target.value)}>
-          {liste.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.libelle}
-              {c.cloturee ? ' (cloturee)' : ''}
-            </option>
-          ))}
-        </select>
+        <div className="selecteurs">
+          <select value={idCourant ?? ''} onChange={(e) => setIdCourant(e.target.value)}>
+            {liste.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.libelle}
+                {c.cloturee ? ' (cloturee)' : ''}
+              </option>
+            ))}
+          </select>
+          {!creation && (
+            <button
+              type="button"
+              onClick={() => {
+                setMessage(null);
+                setSucces(null);
+                setCreation(true);
+              }}
+            >
+              Nouvelle campagne
+            </button>
+          )}
+        </div>
       </header>
 
       {message && <div className="erreur-bloc">{message}</div>}
       {succes && <div className="succes-bloc">{succes}</div>}
+      {formulaireCreation}
       {figee && (
         <div className="erreur-bloc">
           Campagne cloturee : ses jours, ses creneaux et ses RDV sont figes. C'est ce qui garantit
@@ -432,6 +494,79 @@ export function Campagne() {
         </button>
       </div>
     </section>
+  );
+}
+
+// ---------------------------------------------------------------- F-A4.1
+
+function FormulaireCreation({
+  modele,
+  onAnnuler,
+  onCreee,
+}: {
+  modele: CampagneResume;
+  onAnnuler: () => void;
+  onCreee: (id: string, libelle: string) => void;
+}) {
+  const [libelle, setLibelle] = useState('');
+  const [debut, setDebut] = useState('');
+  const [fin, setFin] = useState('');
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  const pret = libelle.trim() !== '' && debut !== '' && fin !== '' && fin >= debut && !enCours;
+
+  const creer = async () => {
+    setEnCours(true);
+    setErreur(null);
+    try {
+      const id = await creerCampagne(libelle.trim(), debut, fin, modele.id);
+      onCreee(id, libelle.trim());
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : 'Creation impossible.');
+      setEnCours(false);
+    }
+  };
+
+  return (
+    <div className="carte">
+      <h3>Nouvelle campagne</h3>
+      {erreur && <div className="erreur-bloc">{erreur}</div>}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (pret) void creer();
+        }}
+      >
+        <div className="champs">
+          <label>
+            Libelle
+            <input value={libelle} onChange={(e) => setLibelle(e.target.value)} autoFocus />
+          </label>
+          <label>
+            Debut
+            <input type="date" value={debut} onChange={(e) => setDebut(e.target.value)} />
+          </label>
+          <label>
+            Fin
+            <input type="date" value={fin} min={debut || undefined} onChange={(e) => setFin(e.target.value)} />
+          </label>
+        </div>
+        <p className="note">
+          Un jour par date, du debut a la fin — a ajuster ensuite si la campagne a des trous.
+          Creneaux et mode par plaque repris de « {modele.libelle} ». Les tables se composent
+          ensuite dans l'onglet Tables.
+        </p>
+        <div className="ajout">
+          <button type="submit" className="principal" disabled={!pret}>
+            {enCours ? 'Creation...' : 'Creer la campagne'}
+          </button>
+          <button type="button" className="secondaire" onClick={onAnnuler} disabled={enCours}>
+            Annuler
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

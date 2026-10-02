@@ -157,6 +157,24 @@ export async function chargerCampagne(id: string): Promise<CampagneDetail> {
   };
 }
 
+/// F-A4.1. Une seule transaction, en base : la campagne, un jour par date du
+/// debut a la fin, les creneaux et le mode par plaque repris de `modeleId`.
+/// Rend l'identifiant de la campagne creee.
+export async function creerCampagne(
+  libelle: string,
+  dateDebut: string,
+  dateFin: string,
+  modeleId: string
+): Promise<string> {
+  const reponse = await supabase.rpc('campagne_creer', {
+    p_libelle: libelle,
+    p_debut: dateDebut,
+    p_fin: dateFin,
+    p_modele_id: Number(modeleId),
+  });
+  return txt(verifier(reponse) as unknown as number);
+}
+
 export async function modifierCampagne(
   id: string,
   champs: Partial<Pick<CampagneResume, 'libelle' | 'dateDebut' | 'dateFin' | 'cloturee'>>

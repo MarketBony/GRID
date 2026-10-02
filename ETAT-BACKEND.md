@@ -1,8 +1,31 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 03/09/2026, apres la revocation des droits sur les fonctions de trigger.
+Mise a jour : 02/10/2026, apres l'ajout de `campagne_creer`.
 
 ---
+
+## 02/10/2026 — `relance.campagne_creer` : la creation de campagne existe enfin
+
+`20261002090000_campagne_creer`. F-A4.1 n'avait jamais ete ecrit : les deux
+campagnes en base venaient du seed, et l'ecran ne savait que modifier.
+
+| | |
+|---|---|
+| Signature | `campagne_creer(p_libelle text, p_debut date, p_fin date, p_modele_id bigint) RETURNS bigint` |
+| Garde | `exiger_administration()` — `admin` et `direction`, comme les politiques d'INSERT de `campagne` |
+| Droits | `REVOKE ... FROM PUBLIC, anon` puis `GRANT EXECUTE TO authenticated` |
+| Ecrit, en UNE transaction | la campagne ; un `campagne_jour` par date de `p_debut` a `p_fin` ; les creneaux du modele ; une `session_plaque` par plaque non archivee, mode et effectif cible repris du modele (`par_site` si la plaque n'y avait pas de session) |
+| Refuse | libelle vide ou deja pris, fin avant debut, plus de 31 jours, modele introuvable ou archive, modele sans creneau |
+| Ne reprend PAS | les tables : elles se recomposent a chaque campagne (module B) |
+
+Le modele est choisi par l'APPELANT. L'ecran passe la campagne la plus recente et
+affiche son nom : ce qui est annonce est ce qui est recopie, il n'y a pas de seconde
+regle de choix cachee dans la fonction.
+
+`test:rls` : **89 -> 97**. Refus pour `anon`, un encadrant et un lecteur ; acceptation
+pour `direction` ; trois mesures du contenu recopie (jours, creneaux, mode), toutes
+sur la plaque du decor et jamais sur le nombre de plaques reelles ; refus d'un
+libelle deja pris.
 
 ## 03/09/2026 — Aucune fonction de trigger n'est plus appelable
 
@@ -254,7 +277,7 @@ appelable avec la seule cle publique, sans aucun jeton. Les gardes internes
 | Suite | Contrôles | Base |
 |---|---|---|
 | `test:garde-fous` | 39 | les deux |
-| `test:rls` | **89** — politiques, colonnes, RPC, droits des fonctions, les deux portes de purge | les deux |
+| `test:rls` | **97** — politiques, colonnes, RPC, droits des fonctions, les deux portes de purge | les deux |
 | `test:agregats` | 27 | en memoire |
 | `test:repartition` | 20 | en memoire |
 | `test:import` | 19 | en memoire |
@@ -302,7 +325,7 @@ backend/
     mot-de-passe.ts          change un mot de passe, ou liste les comptes
     comparer-bases.ts        diff local <-> Supabase, objet par objet
     tester-garde-fous.ts     39 invariants de la base, chacun doit REFUSER
-    tester-rls.ts            89 controles des politiques ET des RPC — decor autonome
+    tester-rls.ts            97 controles des politiques ET des RPC — decor autonome
     tester-invariants.ts     10 controles code <-> base (interdit n.6)
     tester-agregats.ts       35 controles des totaux, contre les 1107 RDV de juin
     importer-rdv-juin.ts     charge les 1107 RDV de juin, et les recoupe au classeur
@@ -478,7 +501,7 @@ npm --prefix backend run test:repartition
 # Parseur d'import (19) — fonction pure, aucun prerequis
 npm --prefix backend run test:import
 
-# Politiques RLS et RPC (89) — les DEUX sens sur chaque palier
+# Politiques RLS et RPC (97) — les DEUX sens sur chaque palier
 npm --prefix backend run test:rls
 
 # Invariants code <-> base (10) — interdit n.6. Voir la section Invariants.

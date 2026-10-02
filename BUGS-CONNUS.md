@@ -1,13 +1,32 @@
 # BUGS-CONNUS
 
-Mise a jour : 24/09/2026, releve de production apres la session de septembre.
+Mise a jour : 02/10/2026, creation de campagne.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
 
 ---
 
-## [OUVERT — RELEVE LE 24/09/2026] Trois RDV de septembre poses dans la campagne de JUIN
+## [CORRIGE LE 02/10/2026] Impossible de creer une campagne — la fonction n'avait jamais existe
+
+Constate par l'utilisateur le 02/10, pour la session du 06/10. Ce n'etait pas une
+panne : **F-A4.1 n'avait jamais ete code.** Les politiques d'INSERT etaient la depuis
+le 31/08, mais ni le service ni l'ecran ne savaient creer — les deux campagnes en
+base venaient du seed. Le manque a tenu un mois parce qu'il n'y avait rien a creer :
+juin et septembre existaient deja.
+
+Correctif : `relance.campagne_creer` (voir `ETAT-BACKEND.md`) et un bouton
+« Nouvelle campagne » sur l'ecran Campagnes.
+
+**Ce que ce defaut apprend.** Le cahier des charges listait F-A4.1 a F-A4.6 ; la
+recette a verifie ce qui EXISTAIT (modifier les jours en moins de 30 s, cloturer),
+jamais ce qui manquait. Un critere de recette ne couvre que ce qu'il nomme. **F-A4.4
+— dupliquer une campagne avec ses tables — n'existe toujours pas.**
+
+## [CLOS LE 02/10/2026 — sans suite] Trois RDV de septembre poses dans la campagne de JUIN
+
+*Arbitre par l'utilisateur le 02/10 : les trois RDV restent ou ils sont. Juin et
+septembre sont cloturees depuis, ce qui ferme la cause.*
 
 Juin compte **1 110** RDV actifs en production, contre les **1 107** du classeur et
 de l'import du 01/09. Les trois de trop :
