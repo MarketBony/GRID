@@ -1,8 +1,41 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 02/10/2026, apres l'ajout de `campagne_creer`.
+Mise a jour : 03/10/2026, lots 1 et 2 de `PLAN-GRID-V2.md`.
 
 ---
+
+## 03/10/2026 — Robustesse de seance (`20261002204318_robustesse_seance`)
+
+Additive : l'ancien front fonctionne dessus, ce qui garde ouverte la voie du
+`wrangler rollback` sans toucher a la base.
+
+| Objet | Role |
+|---|---|
+| `rdv.cle_client uuid unique` (nullable) | Idempotence de la file d'attente locale des poses : une requete rejouee ne cree pas de second RDV |
+| `rdv_lecture` reecrite | `(campagne_id, vendeur_id) IN (SELECT … FROM perimetre_saisie)` : sous-requete NON correlee, evaluee une fois. 117 ms -> ~10 ms pour un chef de table. Meme resultat par construction |
+| `charger_saisie(campagne) RETURNS jsonb` | L'ecran de saisie en UN appel (il en fallait 11). `SECURITY INVOKER` : chaque table lue sous la RLS de l'appelant. Formes identiques a PostgREST |
+| `charger_tableau(campagne) RETURNS jsonb` | Le tableau de bord en un appel (il en fallait 7, plus la pagination). Rend `nb_rdvs` : le front verifie toujours le volume |
+| `rdv_poser(…, p_cle uuid) RETURNS jsonb` | Un RDV = un aller-retour. `INSERT … ON CONFLICT (cle_client) DO NOTHING` puis relecture. `SECURITY INVOKER` : `rdv_creation` et les triggers s'appliquent |
+| `diffuser_tables()` + 4 triggers | L'evenement `tables` (ecoute par trois ecrans, jamais emis jusqu'ici). Par INSTRUCTION, table de transition : un message par campagne. Poses seulement la ou `realtime.send` existe — declares dans `comparer` |
+
+## 03/10/2026 — Suivi, effectifs, journal (`20261002213103_suivi_effectifs_comptes`)
+
+| Objet | Role |
+|---|---|
+| `rdv.source` (`relance` \| `showroom`, CHECK) | Le trafic naturel se saisit dans GRID mais **n'entre dans aucun total du phoning** : `duPhoning()` dans `agregats.ts`, source unique |
+| `rdv_suivi` | Une ligne par RDV suivi : `issue` (NULL = a traiter), `diac`/`stock`/`cs` (CHECK : commande seulement), `modele`, `commentaire`. « Seche » deduite, jamais stockee. Politiques : lecture = RDV lisible ; ecriture = `peut_saisir` + campagne ouverte (le suivi se ferme avec la campagne) |
+| `mobilisation` | Exceptions de l'ecran Effectifs (`mobilise` bool), une ligne par (campagne, vendeur). Lecture : tout compte actif ; ecriture : `peut_administrer()` |
+| `journal_compte` | Reinitialisation, changement de mot de passe, desactivation, reactivation. Alimente par fonctions `security definer` et un trigger sur `utilisateur.actif`. Lecture : admin |
+| `utilisateur.doit_changer_mdp` | Pose par `compte_reinitialise`, retire par `mot_de_passe_choisi` |
+| `rdv_agrege` | Gagne `source`. **Son filtre « compte actif » est conserve**, ecrit en sous-requete scalaire — une premiere ecriture l'avait perdu, `test:rls` l'a attrape |
+| `charger_suivi`, `suivi_enregistrer`, `rdv_poser_showroom` | Le suivi en un appel ; qualifier ; poser un RDV de trafic naturel (meme chemin que `rdv_poser`) |
+| `vendeur_purger`, `utilisateur_purger` | Connaissent les nouvelles tables, dans la meme porte |
+
+Suites : `test:rls` 97 -> **116**, `test:invariants` 10 -> **13** (`SOURCES_RDV`,
+`ISSUES_SUIVI`, `ACTIONS_JOURNAL`), `test:agregats` 35 -> **36**. Nouvelle suite
+**`test:suivi`** (23) : les indicateurs de `utils/suivi.ts` contre le fichier de
+suivi tenu a la main (`SUIVI_RDV_PHONING_BONY_3.xlsx`). Ses RDV sont FICTIFS de
+l'aveu de l'utilisateur : le test eprouve le CALCUL, il n'importe rien en base.
 
 ## 02/10/2026 — `relance.campagne_creer` : la creation de campagne existe enfin
 
