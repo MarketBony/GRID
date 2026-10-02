@@ -1,56 +1,66 @@
 # Prompt de reprise — session suivante
 
-*Réécrit le 24/09/2026, après la session de septembre et le branchement sur ECU.
-La version du 03/09 préparait la session de septembre ; elle est dans l'historique git.*
-
-Copier le bloc ci-dessous tel quel au démarrage de la session suivante.
+*Réécrit le 02/10/2026, après la livraison de la création de campagne. Les versions
+précédentes sont dans l'historique git.*
 
 ---
 
-Reprise du projet GRID. Lis `CLAUDE.md`, puis dans `ETAT-PROJET.md` les deux
-sections **« Où en est le projet »** (en tête) et **« CE QUI RESTE »** (en fin de
-fichier), et la première entrée de `BUGS-CONNUS.md`. Pour tout le reste, interroge
-d'abord le graphe (`graphify query "…"`) avant de lire des fichiers.
+## Où on en est, au 02/10/2026 au soir
 
-Contexte en trois phrases : GRID est **en ligne** sur
-`https://grid.bonyauto-mobile.workers.dev/` — front statique sur Cloudflare Workers,
-navigateur attaquant Supabase en direct, **la RLS est la seule barrière
-d'autorisation**. La session de septembre s'y est saisie : 1 053 RDV, malgré une
-panne le 08/09 (effet de meute du temps réel, corrigé le jour même). Dernier lot de
-code le 10/09.
+- GRID est **en ligne** : `https://grid.bonyauto-mobile.workers.dev/`. Le front est
+  statique sur Cloudflare Workers, le navigateur attaque Supabase en direct, et
+  **la RLS est la seule barrière d'autorisation**.
+- Juin (1 110 RDV) et septembre (1 053 RDV) sont **clôturées** par l'utilisateur. Les
+  3 RDV de septembre saisis dans juin restent où ils sont : c'est arbitré.
+- **Session phoning d'octobre le 06/10/2026.** Le bouton « Nouvelle campagne »
+  (`relance.campagne_creer`) est en production depuis le 02/10 et vérifié de bout en
+  bout sur Supabase. Détail : `ETAT-PROJET.md`, section du 02/10.
+- `master` = `origin/master`. Les branches `chore/docs-reprise-24-09` et
+  `feat/creer-campagne` sont fusionnées.
 
----
+## Ce qui reste, dans l'ordre
 
-## Ce qui appartient à l'utilisateur
+1. **Créer « Octobre 2026 »**. C'est la première utilisation réelle du bouton.
+   Libellé et dates à demander à l'utilisateur. Puis vérifier les jours et composer
+   les tables de CENTRE et SUD (onglet Tables).
+2. **`test:garde-fous` 34/39 sur Supabase** (39/39 en local). La suite s'appuie sur la
+   vraie campagne de juin, désormais clôturée. Remède : des données d'essai créées
+   dans la transaction de chaque contrôle, comme `poserDecor` dans `tester-rls.ts`.
+   Voir `BUGS-CONNUS.md`, en tête. À faire **après** la session du 06/10.
+3. **F-A4.4** — dupliquer une campagne avec ses tables : pas fait.
+4. L'utilisateur a annoncé un **« gros chantier »** pour GRID (« nouvelle
+   dimension »). Il n'est pas encore décrit : le lui demander.
+5. Les gestes qui appartiennent à l'utilisateur : `ETAT-PROJET.md`, « CE QUI RESTE ».
 
-Liste tenue à jour dans `ETAT-PROJET.md`, « CE QUI RESTE » — ne pas la recopier ici.
-En tête : trois RDV de septembre saisis dans la campagne de juin, et aucune campagne
-clôturée.
+## Méthode — ce qui n'est pas dans CLAUDE.md
+
+- **ECU / graphify.** GRID est branché sur ECU, le graphe de connaissance des projets
+  Bony (`C:\Users\Operateur\Documents\ECU`, mode d'emploi `NOUVEAU-PROJET-BONY.md`).
+  - Avant de grepper ou de lire des fichiers, interroger le graphe :
+    `graphify query "…"`, `graphify explain "Symbole"`. Il faut d'abord
+    `$env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"`.
+  - Le hook `post-commit` régénère `graphify-out/` (exclu de git).
+  - **Ne jamais commiter dans le dépôt ECU** depuis GRID.
+  - Une passe documents (`/graphify .`) coûte environ 20 000 tokens par fichier :
+    donner le coût et demander avant de la lancer.
+- **Le front de développement (`npm run dev`) attaque Supabase EN PRODUCTION**
+  (`.env`), pas la base locale. Une migration doit donc être en production avant
+  tout test au navigateur. Et une campagne ne se supprime pas (interdit n°1) :
+  jamais de campagne « test » en production.
+- **Les ports 5432/6543 sont de nouveau bloqués depuis le bureau** (mesuré le 02/10 :
+  seul le 443 passe). Les migrations et les suites sur Supabase se jouent en partage
+  de connexion 4G. Aucun jeton `sbp_` n'est stocké sur le poste.
+- **`origin/master` avance sans nous** : le bot de sauvegarde y pousse un dump chaque
+  semaine. Faire un `git fetch` avant de fusionner dans `master`.
+- **PowerShell 5.1** : `git commit -F -` avec un here-string échoue. Écrire le
+  message dans un fichier temporaire, depuis le shell Bash.
+- **psql** : `C:\Program Files\PostgreSQL\17\bin\psql.exe` (absent du PATH Bash).
+  Retirer `?schema=relance` de `DIRECT_URL` avant de le passer à psql.
 
 ## Ce qu'il ne faut PAS « corriger »
 
-1. **Les vues `perimetre_saisie` et `rdv_agrege` contournent la RLS**
-   (`SECURITY DEFINER`), signalées **CRITICAL** par Supabase. C'est délibéré et
-   compensé — détail dans `ETAT-BACKEND.md`.
-2. **L'effectif compte la réserve seulement si elle a saisi** — arbitré par
-   l'utilisateur le 08/09, consigné « ACCEPTÉ » dans `BUGS-CONNUS.md`.
-3. **Le décor de `test:rls` est posé par 2 instructions et non 1** : des triggers
-   `BEFORE` lisent d'autres tables du décor, et une CTE modifiante ne voit pas ce
-   qu'une branche voisine vient d'insérer.
-
-## Cinq leçons à ne pas réapprendre
-
-- **Une diffusion à N destinataires qui déclenche un rechargement chez chacun est
-  quadratique.** Deux onglets en développement ne la montrent pas ; 25 postes en
-  session l'ont mise à terre. Toute réaction à un événement diffusé se regroupe et se
-  disperse (`hooks/useRechargementCoalesce.ts`).
-- **Une fonction d'autorisation citée dans une vue ou une politique s'écrit
-  `(SELECT f())`.** Une fonction `STABLE` avec `SET` n'est pas inlinée : appelée à nu,
-  elle est évaluée par ligne.
-- **Une lecture paginée porte un ordre stable.** `LIMIT/OFFSET` sans `ORDER BY` rend
-  le bon *nombre* de lignes et pas les *bonnes*.
-- **Une suite de sécurité ne dépend pas des données de production.** Les fixtures se
-  **créent**, elles ne se **choisissent** pas.
-- **Un pilote de navigateur n'est pas un utilisateur.** Il n'envoie pas les touches
-  comme un clavier, et son volet masqué ne mesure pas le mouvement. Un défaut
-  d'ergonomie trouvé par automatisation se confirme à la main.
+1. Les vues `perimetre_saisie` et `rdv_agrege` en `SECURITY DEFINER`, signalées
+   CRITICAL par Supabase : c'est délibéré (voir `ETAT-BACKEND.md`).
+2. L'effectif ne compte la réserve que si elle a saisi : « ACCEPTÉ » dans
+   `BUGS-CONNUS.md`.
+3. Le décor de `test:rls` posé en 2 instructions et non en 1.
