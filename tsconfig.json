@@ -38,6 +38,7 @@
     "lib/**/*",
     "utils/**/*",
     "backend/src/utils/agregats.ts",
+    "backend/src/utils/suivi.ts",
     "backend/src/utils/repartition.ts",
     "backend/src/utils/tri.ts",
     "backend/src/utils/importMarques.ts",
