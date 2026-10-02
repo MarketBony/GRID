@@ -402,3 +402,61 @@ html.animations-reduites .v2 *, html.animations-reduites .fond-vivant i { animat
 .v2 .interrupteur-v2:checked { background: var(--ok); }
 .v2 .interrupteur-v2:checked::after { transform: translateX(16px); }
 }
+
+@layer v2 {
+/* ------------------------------------------------------------------ GRILLE UNIQUE (D20)
+   Une grille par vendeur, toutes marques ; la marque d'un RDV est une pastille. */
+.grille-v2 { display: flex; flex-direction: column; gap: 12px; outline: none; min-width: 0; }
+.grille-v2:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--r-lg); }
+.grille-outils { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.grille-v2 .express {
+  flex: 1; min-width: 240px; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 12px;
+  color: var(--text-3); background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: box-shadow var(--t-med) var(--ressort-vif);
+}
+.grille-v2 .express:focus-within { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--focus); }
+.grille-v2 .express input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: 600 var(--fs-13) var(--font-ui); color: var(--text); }
+.grille-v2 .seg > button { display: inline-flex; align-items: center; gap: 6px; }
+
+.point-marque { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--text-3); box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--surface-1) 70%, transparent); }
+.point-marque.renault { background: var(--brand-renault); }
+.point-marque.dacia { background: var(--brand-dacia); }
+.point-marque.alpine { background: var(--brand-alpine); }
+
+.grille-defile { overflow-x: auto; min-width: 0; }
+.tableau-v2 { width: 100%; min-width: 620px; border-collapse: separate; border-spacing: 5px; table-layout: fixed; }
+.tableau-v2 thead th { font-size: 11.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); text-align: center; padding: 2px 4px; }
+.tableau-v2 thead th.aujourdhui { color: var(--accent); }
+.tableau-v2 th.creneau { width: 86px; font-size: 12px; font-weight: 700; color: var(--text-3); text-align: right; padding-right: 6px; white-space: nowrap; }
+.tableau-v2 thead th:first-child { width: 86px; }
+
+.case-v2 {
+  position: relative; height: 40px; padding: 4px 8px; border-radius: 10px; cursor: text; vertical-align: middle;
+  background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: background-color var(--t-fast), box-shadow var(--t-med) var(--ressort-vif), transform 620ms var(--ressort-ample);
+}
+.case-v2:hover:not(.figee) { background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
+.case-v2.aujourdhui { background: color-mix(in srgb, var(--accent) 6%, var(--ctl-bg)); }
+.case-v2.remplie { background: color-mix(in srgb, var(--accent) 15%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent); }
+.case-v2.active { box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 4px var(--focus); }
+.case-v2.figee { cursor: default; opacity: .85; }
+.case-v2 .rdv { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 700; font-size: 12.5px; line-height: 1.25; }
+.case-v2 .rdv .client { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.case-v2.multiple .rdv { font-size: 11.5px; }
+.case-v2 input { width: 100%; border: 0; outline: 0; background: none; font: 700 12.5px var(--font-ui); color: var(--text); }
+/* La case qui RECOIT un RDV se pose : un rebond et une lueur Bony, composes par
+   le GPU (transform + box-shadow d'une seule case). */
+.case-v2.posee { animation: v2-pose 720ms var(--ressort-ample); }
+@keyframes v2-pose {
+  0% { transform: scale(.86); box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 0 rgba(247, 86, 50, .7); }
+  60% { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 10px rgba(247, 86, 50, 0); }
+}
+/* En attente d'envoi : la file la renverra seule. Une pulsation d'opacite, un
+   liseré pointille — pas une alerte. */
+.case-v2.en-attente { outline: 1px dashed var(--text-3); outline-offset: -3px; }
+.case-v2.en-attente .rdv { animation: v2-attente 1.4s ease-in-out infinite; }
+@keyframes v2-attente { 50% { opacity: .45; } }
+
+.aide-v2 { margin: 0; color: var(--text-3); font-size: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.annonce-grille { margin-left: auto; padding: 3px 10px; border-radius: 99px; color: var(--text); background: var(--ctl-bg-h); font-weight: 700; animation: v2-entre 420ms var(--ressort-vif) both; }
+}

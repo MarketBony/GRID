@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { GrilleVendeur } from '../components/GrilleVendeur';
+import { GrilleUnique } from '../components/saisie/GrilleUnique';
 import { cleRdv } from '../utils/grille';
 import { cleTri } from '../backend/src/utils/tri';
 import { useTempsReel } from '../hooks/useTempsReel';
@@ -854,13 +854,12 @@ export function Saisie() {
 
         <div className="zone-grille">
           {vendeur ? (
-            <GrilleVendeur
+            <GrilleUnique
               vendeur={vendeur}
               jours={donnees.campagne.jours}
               creneaux={donnees.campagne.creneaux}
               rdvs={rdvsParVendeur.get(vendeur.id) ?? new Map()}
               figee={figee}
-              enregistrement={enregistrement}
               onPoser={poser}
               onModifier={modifier}
               onArchiver={archiver}
