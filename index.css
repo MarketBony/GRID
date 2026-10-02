@@ -614,6 +614,14 @@ button.secondaire:hover:not(:disabled) {
   color: var(--bony-orange);
 }
 
+/* Un lien ARME, qui attend son second clic : il change de couleur pour que le
+   geste se lise comme une question, pas comme un lien ordinaire. */
+.lien.danger,
+.lien.danger:hover {
+  color: var(--erreur);
+  font-weight: 600;
+}
+
 button.retirer {
   font: inherit;
   font-size: 0.85rem;
@@ -1551,6 +1559,20 @@ tr.sorti td {
 
 .tableau-grille .case.remplie .client {
   font-weight: 600;
+}
+
+/* EN ATTENTE D'ENVOI (lot 1 de PLAN-GRID-V2.md). Le RDV est a l'ecran, la file
+   d'attente le renverra seule : on le dit par une pulsation d'opacite — composee
+   par le GPU, aucun repeint — et un liseré pointillé, pas par une alerte. */
+.tableau-grille .case.en-attente .client {
+  animation: case-en-attente 1.4s ease-in-out infinite;
+}
+.tableau-grille .case.en-attente {
+  outline: 1px dashed var(--text-muted);
+  outline-offset: -3px;
+}
+@keyframes case-en-attente {
+  50% { opacity: 0.45; }
 }
 
 /* ---------------------------------------------------------------- DEUX RDV

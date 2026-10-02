@@ -1,4 +1,4 @@
-import { ErreurApi, supabase, txt, txtOuNull, verifier, toutesLesLignes } from './supabase';
+import { ErreurApi, supabase, txt, txtOuNull, verifier } from './supabase';
 import { comparerLibelle, trierPar } from '../backend/src/utils/tri';
 
 // ============================================================================
@@ -56,6 +56,10 @@ export interface RdvSaisie {
   typeVehicule: string;
   client: string;
   commentaire: string | null;
+  /// Pose a l'ecran, pas encore accepte par la base. Son `id` est alors
+  /// provisoire (`attente-<cle>`) : il ne se modifie ni ne s'archive avant
+  /// d'avoir recu le sien. Voir la file d'attente de `pages/Saisie.tsx`.
+  enAttente?: boolean;
 }
 
 export interface PerimetreSaisie {
@@ -89,95 +93,50 @@ const AUCUN_PERIMETRE =
   "appartiennent chacune a une campagne. Etre chef de table en juin n'en donne donc aucun " +
   'en septembre, alors qu\'un encadrement de site suit d\'une campagne a l\'autre.';
 
+/// Ce que rend `relance.charger_saisie` : les memes formes que les lectures
+/// PostgREST qu'elle remplace, a l'identique — d'ou des noms en `snake_case`.
+interface ChargeSaisie {
+  campagne: { id: number; libelle: string; cloturee: boolean } | null;
+  jours: { jour: string; ordre: number }[];
+  creneaux: { code: string; libelle: string; ordre: number }[];
+  vendeurs: unknown[];
+  rdvs: LigneRdv[];
+  tables: unknown[];
+  encadrements: { site_id: number }[];
+  roles_campagne: { role: string; site_id: number | null; plaque_id: number | null }[];
+}
+
 export async function chargerSaisie(campagneId: string): Promise<PerimetreSaisie> {
-  const id = Number(campagneId);
+  // UN SEUL APPEL — lot 1 de PLAN-GRID-V2.md (03/10/2026). Il en fallait onze, en
+  // trois vagues, dont le perimetre resolu trois fois. `charger_saisie` est
+  // SECURITY INVOKER : chaque table y est lue sous la RLS de l'appelant, donc ce
+  // compte voit exactement ce que voyaient les onze lectures. `test:rls` le prouve.
+  const brut = verifier(
+    await supabase.rpc('charger_saisie', { p_campagne_id: Number(campagneId) })
+  ) as unknown as ChargeSaisie;
 
-  const [campagne, jours, creneaux, perimetre] = await Promise.all([
-    supabase.from('campagne').select('id, libelle, cloturee').eq('id', id).single(),
-    supabase.from('campagne_jour').select('jour, ordre').eq('campagne_id', id).order('ordre'),
-    supabase
-      .from('campagne_creneau')
-      .select('code, libelle, ordre')
-      .eq('campagne_id', id)
-      .order('ordre'),
-    supabase.from('perimetre_saisie').select('vendeur_id').eq('campagne_id', id),
-  ]);
-
-  const c = verifier(campagne);
+  const c = brut.campagne;
+  if (!c) throw new ErreurApi('Campagne introuvable.', 404);
   const entete = {
     id: txt(c.id),
     libelle: c.libelle,
     cloturee: c.cloturee,
-    jours: verifier(jours).map((j) => ({ jour: j.jour as string, ordre: j.ordre })),
-    creneaux: verifier(creneaux).map((cr) => ({
-      code: cr.code,
-      libelle: cr.libelle,
-      ordre: cr.ordre,
-    })),
+    jours: brut.jours.map((j) => ({ jour: j.jour, ordre: j.ordre })),
+    creneaux: brut.creneaux.map((cr) => ({ code: cr.code, libelle: cr.libelle, ordre: cr.ordre })),
   };
-
-  const ids = verifier(perimetre).map((p) => p.vendeur_id as number);
 
   // CE N'EST PAS UNE ERREUR, c'est le cas d'un chef de table de juin qui ouvre
   // septembre. On le dit, avec la raison — un ecran vide sans explication est le
   // pire mode d'echec de cette architecture.
-  if (ids.length === 0) {
+  if (brut.vendeurs.length === 0) {
     return { campagne: entete, perimetre: null, vendeurs: [], rdvs: [], message: AUCUN_PERIMETRE };
   }
 
-  // UN SEUL APPEL POUR MON IDENTIFIANT. Il servait trois fois dans cette vague, et
-  // `monId()` est un aller-retour reseau : trois requetes de plus a chaque
-  // chargement de la saisie, sur l'ecran le plus joue du produit.
-  const moi = await monId();
-
-  const [vendeurs, rdvs, tables, encadrements, rolesCampagne] = await Promise.all([
-    supabase
-      .from('vendeur')
-      .select(
-        'id, nom, type_vehicule, site(id, code, libelle, plaque_id), vendeur_marque(marque(id, libelle, ordre))'
-      )
-      .in('id', ids),
-    // Les RDV de CE perimetre. La politique de `rdv` les restreindrait de toute
-    // facon, mais filtrer ici evite de rapatrier puis jeter.
-    toutesLesLignes<LigneRdv>((de, a) =>
-      supabase
-        .from('rdv')
-        .select(
-          'id, vendeur_id, jour, creneau_code, marque_id, type_vehicule, client, commentaire',
-          { count: 'exact' }
-        )
-        .eq('campagne_id', id)
-        .in('vendeur_id', ids)
-        .is('archive_le', null)
-        .range(de, a),
-      'id'
-    ),
-    // Les tables auxquelles ces vendeurs appartiennent, pour intituler le
-    // perimetre. Filtrees sur les tables que J'ANIME : c'est ce qui distingue
-    // « ma table » de « une table ou se trouvent mes vendeurs ».
-    supabase
-      .from('table_phoning')
-      .select(
-        'id, libelle, session_plaque!inner(campagne_id, plaque(id, libelle)), affectation(vendeur_id, archive_le)'
-      )
-      .eq('chef_utilisateur_id', moi)
-      .eq('session_plaque.campagne_id', id)
-      .is('archive_le', null),
-    // MON EQUIPE DE VENTE — l'encadrement DURABLE d'un site, hors campagne.
-    supabase
-      .from('encadrement_site')
-      .select('site_id')
-      .eq('utilisateur_id', moi)
-      .is('archive_le', null),
-    // Et l'encadrement DE CAMPAGNE : chef de site, chef de plaque. Deux portees
-    // differentes dans une seule table, on trie a l'arrivee.
-    supabase
-      .from('role_campagne')
-      .select('role, site_id, plaque_id')
-      .eq('utilisateur_id', moi)
-      .eq('campagne_id', id)
-      .is('archive_le', null),
-  ]);
+  const vendeurs = { data: brut.vendeurs, error: null };
+  const rdvs = brut.rdvs;
+  const tables = { data: brut.tables, error: null };
+  const encadrements = { data: brut.encadrements, error: null };
+  const rolesCampagne = { data: brut.roles_campagne, error: null };
 
   type LigneVendeur = {
     id: number;
@@ -286,11 +245,6 @@ const versRdv = (r: LigneRdv): RdvSaisie => ({
   commentaire: r.commentaire,
 });
 
-async function monId(): Promise<number> {
-  const { data } = await supabase.rpc('utilisateur_courant');
-  return (data as number | null) ?? -1;
-}
-
 /// Intitule du perimetre affiche en tete de la liste.
 ///
 /// **Les tables sont un supplement, pas le mode normal.** Le perimetre par defaut
@@ -332,72 +286,57 @@ function decrirePerimetre(
   };
 }
 
+
 // ---------------------------------------------------------------- ecriture
 //
-// Les RDV s'ecrivent EN DIRECT, sans passer par une fonction : ce sont des lignes
-// independantes, donc rien a rendre atomique. Les politiques `rdv_creation` et
-// `rdv_modification` verifient le perimetre ET l'ouverture de la campagne, et les
-// six triggers verifient le reste (marque autorisee, coherence VN/VO, jour et
-// creneau de la campagne).
+// UN RDV = UN ALLER-RETOUR (lot 1 de PLAN-GRID-V2.md, 03/10/2026). Il en fallait
+// trois — relire le type du vendeur, inserer, recompter — et quatre pour archiver.
+// Le type est deja en memoire (`VendeurSaisie.typeVehicule`), et les compteurs se
+// recalculent a l'ecran depuis les RDV en memoire : ni l'un ni l'autre ne
+// justifiait un trajet vers la base pendant une seance.
 //
-// `cree_par` N'EST PAS ENVOYE : le trigger `rdv_tracabilite` l'impose a partir de
-// `auth.uid()`. C'est le navigateur qui compose la requete, il pourrait y ecrire
-// n'importe quel identifiant — une attribution declarative ne vaudrait rien le
-// jour ou un RDV est conteste.
+// `rdv_poser` est SECURITY INVOKER : la politique `rdv_creation` (perimetre +
+// campagne ouverte) et les triggers (marque autorisee, coherence VN/VO, jour et
+// creneau de la campagne) s'appliquent comme avant. `cree_par` n'est toujours PAS
+// envoye : `rdv_tracabilite` l'impose a partir de `auth.uid()`.
+//
+// LA CLE D'IDEMPOTENCE est generee ICI, une fois par RDV tape, et reutilisee a
+// chaque nouvelle tentative de la file d'attente : une requete arrivee en base
+// dont la reponse s'est perdue ne cree pas de second RDV.
 
 const SELECT_RDV =
   'id, vendeur_id, jour, creneau_code, marque_id, type_vehicule, client, commentaire';
 
-async function compteurs(vendeurId: string, campagneId: string): Promise<Compteurs> {
-  const reponse = await supabase
-    .from('rdv')
-    .select('marque_id')
-    .eq('campagne_id', Number(campagneId))
-    .eq('vendeur_id', Number(vendeurId))
-    .is('archive_le', null);
-
-  const lignes = verifier(reponse) as { marque_id: number | null }[];
-  const parMarque: Record<string, number> = {};
-  for (const l of lignes) {
-    const cle = l.marque_id === null ? 'sansMarque' : txt(l.marque_id);
-    parMarque[cle] = (parMarque[cle] ?? 0) + 1;
-  }
-  return { vendeurId, total: lignes.length, parMarque };
-}
+export const nouvelleCle = (): string =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : // Repli pour un navigateur sans `randomUUID` (contexte non securise) : un
+      // uuid v4 tire de `getRandomValues`, meme format, meme entropie.
+      '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) =>
+        (Number(c) ^ (crypto.getRandomValues(new Uint8Array(1))[0]! & (15 >> (Number(c) / 4)))).toString(16)
+      );
 
 export async function poserRdv(corps: {
   campagneId: string;
   vendeurId: string;
+  typeVehicule: 'VN' | 'VO';
   jour: string;
   creneauCode: string;
   marqueId: string | null;
   client: string;
-}): Promise<{ rdv: RdvSaisie; compteurs: Compteurs }> {
-  // `type_vehicule` est STOCKE sur le RDV bien qu'il soit deductible du vendeur :
-  // si un vendeur change de metier, le deriver ferait bouger les totaux VN/VO
-  // d'une campagne DEJA CLOTUREE. Un trigger impose l'egalite a l'ecriture, donc
-  // les deux ne peuvent pas diverger — on le lit ici pour la fournir.
-  const v = verifier(
-    await supabase.from('vendeur').select('type_vehicule').eq('id', Number(corps.vendeurId)).single()
-  ) as { type_vehicule: string } | null;
-  if (!v) throw new ErreurApi('Vendeur introuvable.', 404);
-
-  const reponse = await supabase
-    .from('rdv')
-    .insert({
-      campagne_id: Number(corps.campagneId),
-      vendeur_id: Number(corps.vendeurId),
-      jour: corps.jour,
-      creneau_code: corps.creneauCode,
-      marque_id: corps.marqueId ? Number(corps.marqueId) : null,
-      type_vehicule: v.type_vehicule,
-      client: corps.client,
-    })
-    .select(SELECT_RDV)
-    .single();
-
-  const rdv = versRdv(verifier(reponse) as unknown as LigneRdv);
-  return { rdv, compteurs: await compteurs(corps.vendeurId, corps.campagneId) };
+  cle: string;
+}): Promise<{ rdv: RdvSaisie }> {
+  const reponse = await supabase.rpc('rdv_poser', {
+    p_campagne_id: Number(corps.campagneId),
+    p_vendeur_id: Number(corps.vendeurId),
+    p_jour: corps.jour,
+    p_creneau_code: corps.creneauCode,
+    p_marque_id: corps.marqueId ? Number(corps.marqueId) : null,
+    p_type_vehicule: corps.typeVehicule,
+    p_client: corps.client,
+    p_cle: corps.cle,
+  });
+  return { rdv: versRdv(verifier(reponse) as unknown as LigneRdv) };
 }
 
 export async function modifierRdv(id: string, client: string): Promise<{ rdv: RdvSaisie }> {
@@ -413,36 +352,19 @@ export async function modifierRdv(id: string, client: string): Promise<{ rdv: Rd
 /// INTERDIT N.1 : retirer un RDV est un `update` de `archive_le`, jamais un
 /// `DELETE` — aucun droit `DELETE` n'est accorde sur `rdv`, a personne. Le RDV
 /// sort des totaux, jamais de l'historique, et on sait qui l'a retire.
-export async function archiverRdv(
-  id: string
-): Promise<{ archive?: boolean; dejaArchive?: boolean; compteurs: Compteurs }> {
-  const avant = verifier(
-    await supabase
-      .from('rdv')
-      .select('id, campagne_id, vendeur_id, archive_le')
-      .eq('id', Number(id))
-      .single()
-  ) as { campagne_id: number; vendeur_id: number; archive_le: string | null };
-
-  if (avant.archive_le) {
-    return {
-      dejaArchive: true,
-      compteurs: await compteurs(txt(avant.vendeur_id), txt(avant.campagne_id)),
-    };
-  }
-
+///
+/// UNE SEULE REQUETE : le filtre `archive_le is null` rend l'operation
+/// idempotente. Zero ligne touchee veut dire « deja archive » — ce que la
+/// relecture prealable de l'ancienne version etablissait en un trajet de plus.
+export async function archiverRdv(id: string): Promise<{ archive: boolean }> {
   // `archive_par` est pose par le trigger de tracabilite, pas par le client.
-  verifier(
+  const lignes = verifier(
     await supabase
       .from('rdv')
       .update({ archive_le: new Date().toISOString() })
       .eq('id', Number(id))
+      .is('archive_le', null)
       .select('id')
-      .single()
-  );
-
-  return {
-    archive: true,
-    compteurs: await compteurs(txt(avant.vendeur_id), txt(avant.campagne_id)),
-  };
+  ) as { id: number }[];
+  return { archive: lignes.length > 0 };
 }

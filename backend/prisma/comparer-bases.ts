@@ -89,6 +89,20 @@ const ATTENDUS: { objet: string; ou: 'reference' | 'cible'; motif: string }[] = 
       'Sur un PostgreSQL nu il echouerait a chaque ecriture de RDV — donc pendant le seed ' +
       'et pendant les suites. Voir la migration 20260831220000.',
   },
+  // Les quatre triggers de diffusion des tables (03/10/2026) : meme motif, meme
+  // condition de pose. Voir la migration 20261002204318_robustesse_seance.
+  ...[
+    'affectation.affectation_diffusion_ajout',
+    'affectation.affectation_diffusion_modif',
+    'table_phoning.table_phoning_diffusion_ajout',
+    'table_phoning.table_phoning_diffusion_modif',
+  ].map((objet) => ({
+    objet,
+    ou: 'cible' as const,
+    motif:
+      "trigger de diffusion temps reel des tables : pose seulement la ou `realtime.send` existe. " +
+      'Voir la migration 20261002204318_robustesse_seance.',
+  })),
 ];
 
 const inventaire = async (client: PrismaClient) => {

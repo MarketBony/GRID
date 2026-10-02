@@ -1,16 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GrilleVendeur } from '../components/GrilleVendeur';
 import { cleRdv } from '../utils/grille';
 import { cleTri } from '../backend/src/utils/tri';
 import { useTempsReel } from '../hooks/useTempsReel';
 import { PanneauxLive } from '../components/PanneauxLive';
-import { chargerDashboard, type Dashboard } from '../services/dashboard';
+import { appliquerRdv, chargerDashboard, type Dashboard, type EvenementRdv } from '../services/dashboard';
+import {
+  delaiAvantEssai,
+  ecrireFile,
+  estPassagere,
+  lireFile,
+  type PoseEnAttente,
+} from '../services/fileAttente';
 import { chargerCampagnes, type CampagneResume } from '../services/campagnes';
 import {
   archiverRdv,
   chargerSaisie,
   modifierRdv,
+  nouvelleCle,
   poserRdv,
   type PerimetreSaisie,
   type RdvSaisie,
@@ -56,9 +64,10 @@ import {
 /// sous les doigts du chef. Comparaison NUMERIQUE, parce que les identifiants sont
 /// transportes en chaines et que « 10 » vient avant « 9 » en ordre lexical.
 function inserer(liste: RdvSaisie[] | undefined, rdv: RdvSaisie): RdvSaisie[] {
-  return [...(liste ?? []).filter((r) => r.id !== rdv.id), rdv].sort(
-    (a, b) => Number(a.id) - Number(b.id)
-  );
+  // Un RDV EN ATTENTE n'a pas encore d'identifiant numerique : il se range apres
+  // les RDV acceptes, ce qui est aussi son ordre d'arrivee.
+  const rang = (r: RdvSaisie) => (r.enAttente ? Number.POSITIVE_INFINITY : Number(r.id));
+  return [...(liste ?? []).filter((r) => r.id !== rdv.id), rdv].sort((a, b) => rang(a) - rang(b));
 }
 
 /// Retire UN RDV de la liste d'une case, par identifiant.
@@ -165,26 +174,90 @@ export function Saisie() {
       });
   }, []);
 
+  /// LA FILE D'ATTENTE des poses non encore acceptees par la base — voir
+  /// `services/fileAttente.ts`. Une ref et non un etat : elle ne se dessine pas,
+  /// ce sont les RDV provisoires qu'elle porte qui se dessinent.
+  const file = useRef<PoseEnAttente[]>([]);
+  const minuteurFile = useRef<number | null>(null);
+
+  /// Les RDV provisoires de la file, sous la forme de la grille. Remis par-dessus
+  /// chaque rechargement : sans cela, une resynchronisation effacerait de l'ecran
+  /// un RDV tape et pas encore parti — exactement la perte que la file empeche.
+  const provisoires = useCallback(
+    (): RdvSaisie[] =>
+      file.current.map((p) => ({
+        id: `attente-${p.cle}`,
+        vendeurId: p.corps.vendeurId,
+        jour: p.corps.jour,
+        creneauCode: p.corps.creneauCode,
+        marqueId: p.corps.marqueId,
+        typeVehicule: p.corps.typeVehicule,
+        client: p.corps.client,
+        commentaire: null,
+        enAttente: true,
+      })),
+    []
+  );
+
   const recharger = useCallback(
     async (id: string) => {
       const d = await chargerSaisie(id);
       setDonnees(d);
-      indexer(d.rdvs);
+      indexer([...d.rdvs, ...provisoires()]);
       setVendeurId((actuel) =>
         actuel && d.vendeurs.some((v) => v.id === actuel) ? actuel : (d.vendeurs[0]?.id ?? null)
       );
     },
-    [indexer]
+    [indexer, provisoires]
   );
 
   useEffect(() => {
     if (!campagneId) return;
+    // Une file laissee par un onglet ferme ou un navigateur tombe en pleine
+    // seance : on la reprend, et elle repart des que l'ecran est charge.
+    file.current = lireFile(campagneId);
     setChargement(true);
     recharger(campagneId)
+      .then(() => {
+        if (file.current.length > 0) programmerFile(0);
+      })
       .catch((e) => setErreur(e instanceof Error ? e.message : 'Chargement impossible.'))
       .finally(() => setChargement(false));
     rechargerVueDEnsemble(campagneId);
   }, [campagneId, recharger, rechargerVueDEnsemble]);
+
+  /// LA RESYNCHRONISATION DE SECURITE. La vue d'ensemble vit desormais de
+  /// messages appliques en memoire : un message perdu (reseau coupe une seconde)
+  /// laisserait un ecart jusqu'a la fin de la seance. Toutes les ~5 minutes, avec
+  /// un decalage aleatoire par poste — sans lui, 25 postes ouverts a 9 h se
+  /// resynchroniseraient ensemble, la meute du 08/09 en plus petit —, on relit
+  /// tout. Une requete par poste et par ecran toutes les 5 minutes, c'est ~600
+  /// requetes/heure pour toute la salle.
+  useEffect(() => {
+    if (!campagneId) return;
+    const periode = 5 * 60_000 + Math.random() * 60_000;
+    const t = window.setInterval(() => {
+      void recharger(campagneId).catch(() => undefined);
+      rechargerVueDEnsemble(campagneId);
+    }, periode);
+    return () => window.clearInterval(t);
+  }, [campagneId, recharger, rechargerVueDEnsemble]);
+
+  /// La vue d'ensemble courante, lue par les gestionnaires d'evenements sans les
+  /// reconstruire a chaque rendu.
+  const dashboardRef = useRef<Dashboard | null>(null);
+  dashboardRef.current = dashboard;
+
+  /// Applique un changement de RDV a la vue d'ensemble, EN MEMOIRE. Si ce n'est
+  /// pas possible sans risque (`appliquerRdv` rend `null`), on retombe sur le
+  /// rechargement regroupe, comme avant.
+  const appliquerVue = (e: EvenementRdv) => {
+    const d = dashboardRef.current;
+    if (!d) return;
+    const suivant = appliquerRdv(d, e);
+    if (suivant) setDashboard(suivant);
+    else majVueDEnsemble();
+  };
 
   // Temps reel : un autre chef saisit, nos compteurs bougent. On recharge plutot
   // que de patcher a l'aveugle — la charge utile ne porte PAS le nom du client
@@ -215,7 +288,10 @@ export function Saisie() {
 
   useTempsReel(campagneId, {
     'rdv:modifie': (charge) => {
-      majVueDEnsemble();
+      // LA VUE D'ENSEMBLE NE SE RECHARGE PLUS : le message porte tout ce qu'elle
+      // compte, il s'applique en memoire (lot 1, 03/10/2026). C'etait ~17 000
+      // requetes/heure pour une salle de 25 postes.
+      appliquerVue((charge ?? {}) as EvenementRdv);
       const { vendeurId: concerne } = (charge ?? {}) as { vendeurId?: string };
       // Sans `vendeurId` on ne sait pas trancher : on recharge, comme avant.
       if (!concerne || (donnees?.vendeurs ?? []).some((v) => v.id === concerne)) {
@@ -225,6 +301,12 @@ export function Saisie() {
     // Un administrateur recompose une table pendant la session : mon perimetre
     // peut changer sous mes pieds, donc AUCUN filtre ne s'applique ici.
     'tables:modifiees': () => {
+      majPerimetre();
+      majVueDEnsemble();
+    },
+    // Le canal revient apres une coupure : des messages ont pu se perdre pendant
+    // qu'il etait tombe. On relit, regroupe et disperse comme le reste.
+    reconnecte: () => {
       majPerimetre();
       majVueDEnsemble();
     },
@@ -403,6 +485,12 @@ export function Saisie() {
 
   // ---------------------------------------------------------------- actions
 
+  /// PLUS DE RECHARGEMENT COMPLET SUR ECHEC (lot 1, 03/10/2026). L'ancienne
+  /// version relisait tout le perimetre a chaque ecriture refusee : quand la base
+  /// sature, chaque echec ajoutait une lecture couteuse, et la saturation
+  /// s'entretenait elle-meme. L'etat local reste juste sans relecture : une pose
+  /// refusee est retiree de l'ecran ici, une pose passagerement en echec reste en
+  /// file, et la resynchronisation periodique rattrape le reste.
   const avecEnregistrement = async (action: () => Promise<void>) => {
     setErreur(null);
     setEnregistrement(true);
@@ -410,60 +498,135 @@ export function Saisie() {
       await action();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Enregistrement impossible.');
-      // En cas d'echec on relit : l'ecran doit montrer la base, pas un etat local
-      // optimiste qui n'a pas ete accepte.
-      if (campagneId) await recharger(campagneId).catch(() => undefined);
     } finally {
       setEnregistrement(false);
     }
   };
 
-  const poser = (section: SectionVendeur, creneauCode: string, jour: string, client: string) =>
-    avecEnregistrement(async () => {
-      if (!campagneId || !vendeurId) return;
-      const { rdv } = await poserRdv({
+  const retirerDeLIndex = (r: Pick<RdvSaisie, 'id' | 'vendeurId' | 'marqueId' | 'creneauCode' | 'jour'>) => {
+    setRdvs((index) => {
+      const suivant = new Map(index);
+      const pour = new Map(suivant.get(r.vendeurId) ?? []);
+      const cle = cleRdv(r.marqueId, r.creneauCode, r.jour);
+      const reste = retirer(pour.get(cle), r.id);
+      // La cle disparait quand la case se vide : `GrilleVendeur` compte sur une
+      // liste jamais vide quand la cle existe, et `remplie` en depend.
+      if (reste.length === 0) pour.delete(cle);
+      else pour.set(cle, reste);
+      suivant.set(r.vendeurId, pour);
+      return suivant;
+    });
+  };
+
+  /// Mes propres ecritures dans la vue d'ensemble. Le temps reel ne me renvoie
+  /// pas mon evenement — voulu, ca evite un scintillement pendant la frappe —, on
+  /// l'applique donc ici, EN MEMOIRE. Jusqu'au 03/10, c'etait un rechargement
+  /// complet du tableau apres chaque RDV : ~1 800 requetes/heure par salle.
+  const vueApresEcriture = (r: RdvSaisie, archive: boolean) =>
+    appliquerVue({
+      id: r.id,
+      vendeurId: r.vendeurId,
+      jour: r.jour,
+      creneauCode: r.creneauCode,
+      marqueId: r.marqueId,
+      typeVehicule: r.typeVehicule,
+      archive,
+    });
+
+  // ------------------------------------------------ la file d'attente des poses
+
+  const enregistrerFile = () => {
+    if (campagneId) ecrireFile(campagneId, file.current);
+  };
+
+  /// Programme le prochain passage de la file. Un seul minuteur a la fois : la
+  /// file part EN SERIE, dans l'ordre de saisie — ce qui garde l'ordre des RDV
+  /// d'une meme case, et n'envoie pas une rafale a une base deja debordee.
+  const programmerFile = (delai: number) => {
+    if (minuteurFile.current !== null) return;
+    minuteurFile.current = window.setTimeout(() => {
+      minuteurFile.current = null;
+      void viderFile();
+    }, delai);
+  };
+
+  const viderFile = async () => {
+    while (file.current.length > 0) {
+      const p = file.current[0]!;
+      try {
+        const { rdv } = await poserRdv(p.corps);
+        file.current = file.current.slice(1);
+        enregistrerFile();
+        // Le provisoire cede la place au RDV accepte, a la meme case.
+        retirerDeLIndex({ ...p.corps, id: `attente-${p.cle}` });
+        appliquer(rdv);
+        vueApresEcriture(rdv, false);
+      } catch (e) {
+        if (estPassagere(e)) {
+          // La base ne repond pas : on garde TOUT, et on revient plus tard.
+          p.essais += 1;
+          enregistrerFile();
+          programmerFile(delaiAvantEssai(p.essais));
+          return;
+        }
+        // Refus METIER : le rejouer ne changerait rien. Le RDV quitte l'ecran et
+        // l'utilisateur le sait, avec le nom du client pour le retrouver.
+        file.current = file.current.slice(1);
+        enregistrerFile();
+        retirerDeLIndex({ ...p.corps, id: `attente-${p.cle}` });
+        const raison = e instanceof Error ? e.message : 'Enregistrement impossible.';
+        setErreur(`${p.corps.client} : ${raison}`);
+      }
+    }
+  };
+
+  /// POSER = afficher tout de suite, envoyer ensuite. La case se remplit a la
+  /// frappe, le curseur avance, et la file s'occupe du reseau : le chef n'attend
+  /// plus jamais la base pour passer au RDV suivant.
+  const poser = async (section: SectionVendeur, creneauCode: string, jour: string, client: string) => {
+    if (!campagneId || !vendeurId || !vendeur) return;
+    setErreur(null);
+    const pose: PoseEnAttente = {
+      cle: nouvelleCle(),
+      essais: 0,
+      corps: {
         campagneId,
         vendeurId,
+        typeVehicule: vendeur.typeVehicule,
         jour,
         creneauCode,
         marqueId: section.marqueId,
         client,
-      });
-      appliquer(rdv);
-      rafraichirVue();
-    });
+        cle: '',
+      },
+    };
+    pose.corps.cle = pose.cle;
+    file.current = [...file.current, pose];
+    enregistrerFile();
+    appliquer(provisoires().find((r) => r.id === `attente-${pose.cle}`)!);
+    if (minuteurFile.current === null) void viderFile();
+  };
+
+  const encoreEnAttente = (r: RdvSaisie) => {
+    if (!r.enAttente) return false;
+    setErreur(`${r.client} est encore en cours d'envoi : réessayer dans un instant.`);
+    return true;
+  };
 
   const modifier = (r: RdvSaisie, client: string) =>
     avecEnregistrement(async () => {
+      if (encoreEnAttente(r)) return;
       const { rdv } = await modifierRdv(r.id, client);
       appliquer(rdv);
     });
 
   const archiver = (r: RdvSaisie) =>
     avecEnregistrement(async () => {
+      if (encoreEnAttente(r)) return;
       await archiverRdv(r.id);
-      rafraichirVue();
-      setRdvs((index) => {
-        const suivant = new Map(index);
-        const pour = new Map(suivant.get(r.vendeurId) ?? []);
-        const cle = cleRdv(r.marqueId, r.creneauCode, r.jour);
-        const reste = retirer(pour.get(cle), r.id);
-        // La cle disparait quand la case se vide : `GrilleVendeur` compte sur une
-        // liste jamais vide quand la cle existe, et `remplie` en depend.
-        if (reste.length === 0) pour.delete(cle);
-        else pour.set(cle, reste);
-        suivant.set(r.vendeurId, pour);
-        return suivant;
-      });
+      retirerDeLIndex(r);
+      vueApresEcriture(r, true);
     });
-
-  /// Apres MA propre ecriture, la vue d'ensemble est perimee : mes RDV comptent
-  /// dans le classement des concessions. Le temps reel ne me renvoie pas mon
-  /// propre evenement — c'est voulu, ca eviterait un scintillement pendant la
-  /// frappe — donc c'est ici qu'il faut la rafraichir.
-  const rafraichirVue = () => {
-    if (campagneId) rechargerVueDEnsemble(campagneId);
-  };
 
   const appliquer = (rdv: RdvSaisie) => {
     setRdvs((index) => {

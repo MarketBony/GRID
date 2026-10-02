@@ -1629,6 +1629,79 @@ async function main() {
     }
   );
 
+  // --- ROBUSTESSE DE SEANCE (03/10/2026) : un ecran = un appel, un RDV = un appel ---
+  //
+  // `charger_saisie`, `charger_tableau` et `rdv_poser` sont SECURITY INVOKER : elles
+  // ne doivent ouvrir AUCUN droit que les lectures PostgREST n'ouvraient pas. On
+  // le prouve dans les deux sens, comme pour le reste.
+  const saisieDe = (tx: Tx, partie: string) =>
+    nombre(
+      tx,
+      `SELECT jsonb_array_length(relance.charger_saisie(${decor.campagne1.id}) -> '${partie}') AS n`
+    );
+  const poser = (tx: Tx, vendeur: bigint, cle: string) =>
+    tx.$queryRawUnsafe(
+      `SELECT relance.rdv_poser($1, $2, $3::date, $4, NULL, 'VO', 'CLIENT RPC', $5::uuid)`,
+      decor.campagne1.id,
+      vendeur,
+      decor.campagne1.jours[0],
+      decor.campagne1.creneau,
+      cle
+    );
+  const CLE = '00000000-0000-4000-8000-000000000042';
+
+  await doitValoir(
+    'RPC  charger_saisie rend au chef les vendeurs de SA table, pas plus',
+    { login: CHEF },
+    () => decor.membresDeLaTable.length,
+    (tx) => saisieDe(tx, 'vendeurs')
+  );
+  await doitValoir('RPC  charger_saisie ne rend RIEN a un lecteur', { login: LECTEUR }, 0, (tx) =>
+    saisieDe(tx, 'vendeurs')
+  );
+  await doitValoir(
+    'RPC  charger_saisie ne rend pas les RDV hors perimetre',
+    { login: CHEF },
+    0,
+    (tx) =>
+      nombre(
+        tx,
+        `SELECT count(*) AS n FROM jsonb_array_elements(relance.charger_saisie(${decor.campagne1.id}) -> 'rdvs') e
+          WHERE (e ->> 'vendeur_id')::bigint = ${decor.vendeurHorsPerimetre.id}`
+      ),
+    async (tx) => {
+      await tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1), select: { id: true } });
+    }
+  );
+  await doitRefuser('RPC  charger_tableau refusee a anon', 'anonyme', DROIT_INSUFFISANT, (tx) =>
+    tx.$queryRawUnsafe(`SELECT relance.charger_tableau(${decor.campagne1.id})`)
+  );
+  await doitValoir(
+    'RPC  rdv_poser pose un RDV dans la table du chef',
+    { login: CHEF },
+    1,
+    async (tx) => {
+      await poser(tx, decor.vendeurDeSaTable.id, CLE);
+      return nombre(tx, `SELECT count(*) AS n FROM relance.rdv WHERE cle_client = '${CLE}'`);
+    }
+  );
+  await doitValoir(
+    'RPC  rdv_poser rejouee avec la meme cle ne cree PAS de doublon',
+    { login: CHEF },
+    1,
+    async (tx) => {
+      await poser(tx, decor.vendeurDeSaTable.id, CLE);
+      await poser(tx, decor.vendeurDeSaTable.id, CLE);
+      return nombre(tx, `SELECT count(*) AS n FROM relance.rdv WHERE cle_client = '${CLE}'`);
+    }
+  );
+  await doitRefuser(
+    'RPC  rdv_poser refusee hors perimetre',
+    { login: CHEF },
+    DROIT_INSUFFISANT,
+    (tx) => poser(tx, decor.vendeurHorsPerimetre.id, CLE)
+  );
+
   // ------------------------------------------------------------------ rapport
 
   const largeur = Math.max(...resultats.map((r) => r.nom.length));

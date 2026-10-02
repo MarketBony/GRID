@@ -254,6 +254,7 @@ function LigneCompte({
   onSupprimer: () => void;
 }) {
   const palier = compte.rolesGlobaux[0] ?? '';
+  const [arme, setArme] = useState(false);
 
   return (
     <tr className={compte.actif ? '' : 'sorti'}>
@@ -322,8 +323,25 @@ function LigneCompte({
         )}
       </td>
       <td className="colonne-actions">
-        <button type="button" className="lien" onClick={onReinitialiser} disabled={occupe}>
-          mot de passe
+        {/* EN DEUX CLICS (03/10/2026). C'etait un lien en un clic, sans
+            confirmation : un clic de travers remplacait le mot de passe d'un
+            collegue, et le nouveau ne s'affichait que chez celui qui avait clique.
+            Le second clic nomme la personne ; sans lui, le bouton se desarme seul. */}
+        <button
+          type="button"
+          className={arme ? 'lien danger' : 'lien'}
+          onClick={() => {
+            if (!arme) {
+              setArme(true);
+              window.setTimeout(() => setArme(false), 5000);
+              return;
+            }
+            setArme(false);
+            onReinitialiser();
+          }}
+          disabled={occupe}
+        >
+          {arme ? `remplacer le mot de passe de ${compte.nom} ?` : 'mot de passe'}
         </button>
         <button type="button" className="lien" onClick={onBasculerActif} disabled={occupe}>
           {compte.actif ? 'désactiver' : 'réactiver'}

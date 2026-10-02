@@ -1,4 +1,4 @@
-import { supabase, txt, txtOuNull, verifier, toutesLesLignes } from './supabase';
+import { ErreurApi, supabase, txt, txtOuNull, verifier } from './supabase';
 import {
   AXES,
   classer,
@@ -102,8 +102,13 @@ export interface Dashboard {
   /// une seconde implementation de la meme regle, donc deux verites a
   /// redemontrer. C'est exactement ce que l'interdit n.6 proscrit.
   vendeurs: LigneVendeur[];
-  rdvs: LigneRdv[];
+  rdvs: LigneRdvTableau[];
 }
+
+/// Une ligne de `rdv_agrege` telle que la garde le tableau : la forme des
+/// fonctions pures, plus l identifiant, sans lequel un archivage ou un evenement
+/// rejoue ne pourrait pas etre applique en memoire.
+export type LigneRdvTableau = LigneRdv & { id: string };
 
 export interface Comparaison {
   axe: Axe;
@@ -117,7 +122,7 @@ interface Charge {
   jours: string[];
   sessions: Dashboard['sessions'];
   vendeurs: LigneVendeur[];
-  rdvs: LigneRdv[];
+  rdvs: LigneRdvTableau[];
   rattachements: Dashboard['rattachements'];
 }
 
@@ -125,31 +130,26 @@ interface Charge {
 async function chargerCampagne(campagneId: string): Promise<Charge> {
   const id = Number(campagneId);
 
-  const [campagne, jours, sessions, vendeurs, affectations] = await Promise.all([
-    supabase
-      .from('campagne')
-      .select('id, libelle, date_debut, date_fin, cloturee')
-      .eq('id', id)
-      .single(),
-    supabase.from('campagne_jour').select('jour').eq('campagne_id', id).order('ordre'),
-    supabase
-      .from('session_plaque')
-      .select('id, mode, effectif_cible_table, plaque(id, libelle, ordre)')
-      .eq('campagne_id', id)
-      .is('archive_le', null),
-    // LE RATTACHEMENT PLAQUE VIENT D'UNE JOINTURE sur `site.plaque_id`, jamais
-    // d'une derivation : le rattachement d'un site a une plaque est MODIFIABLE,
-    // c'est un piege herite du fichier source.
-    supabase
-      .from('vendeur')
-      .select('id, nom, type_vehicule, date_entree, date_sortie, site(id, libelle, plaque(id, libelle))')
-      .is('archive_le', null),
-    supabase
-      .from('affectation')
-      .select('vendeur_id, table_phoning!inner(id, libelle, session_plaque!inner(campagne_id, plaque_id))')
-      .is('archive_le', null)
-      .eq('table_phoning.session_plaque.campagne_id', id),
-  ]);
+  // UN SEUL APPEL — lot 1 de PLAN-GRID-V2.md (03/10/2026). Il en fallait six, plus
+  // la lecture paginee de `rdv_agrege`. `charger_tableau` est SECURITY INVOKER et
+  // rend les MEMES formes que ces lectures : le code ci-dessous n'a change que de
+  // source. LE RATTACHEMENT PLAQUE vient toujours d'une jointure sur
+  // `site.plaque_id`, faite en base, jamais d'une derivation.
+  const brut = verifier(await supabase.rpc('charger_tableau', { p_campagne_id: id })) as unknown as {
+    campagne: unknown;
+    jours: string[];
+    sessions: unknown[];
+    vendeurs: unknown[];
+    affectations: unknown[];
+    rdvs: { id: number; vendeur_id: number; type_vehicule: string; marque_id: number | null; jour: string; creneau_code: string }[];
+    nb_rdvs: number;
+  };
+  if (!brut.campagne) throw new ErreurApi('Campagne introuvable.', 404);
+  const campagne = { data: brut.campagne, error: null };
+  const jours = { data: brut.jours.map((jour) => ({ jour })), error: null };
+  const sessions = { data: brut.sessions, error: null };
+  const vendeurs = { data: brut.vendeurs, error: null };
+  const affectations = { data: brut.affectations, error: null };
 
   const c = verifier(campagne) as {
     id: number;
@@ -229,30 +229,22 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
     };
   });
 
-  // LA LECTURE PAGINEE, ORDONNEE ET VERIFIEE.
+  // LA LECTURE ORDONNEE ET VERIFIEE. Jusqu'au 03/10/2026 elle etait paginee par
+  // `toutesLesLignes`, ordonnee sur `id` — sans ordre, deux pages se recouvraient
+  // et les totaux etaient faux avec le bon nombre de lignes (constate le
+  // 01/09/2026 sur les 1107 RDV de juin). `charger_tableau` ordonne en base.
   //
-  // Trois choses, et il en faut trois. `toutesLesLignes` ORDONNE sur `id` — sans
-  // ordre, deux pages d'une meme requete peuvent se recouvrir et le tableau de
-  // bord affiche des totaux faux avec le bon nombre de lignes (constate le
-  // 01/09/2026 sur les 1107 RDV de juin). Elle compare ensuite le nombre rapatrie
-  // au `count` exact et LEVE en cas d'ecart : la limite de PostgREST tronque sans
-  // erreur. Un total faux affiche comme un total juste serait exactement le
-  // defaut que ce produit remplace.
-  const rdvs = await toutesLesLignes<{
-    vendeur_id: number;
-    type_vehicule: string;
-    marque_id: number | null;
-    jour: string;
-    creneau_code: string;
-  }>((de, a) =>
-    supabase
-      .from('rdv_agrege')
-      .select('vendeur_id, type_vehicule, marque_id, jour, creneau_code', { count: 'exact' })
-      .eq('campagne_id', id)
-      .is('archive_le', null)
-      .range(de, a),
-    'id'
-  );
+  // Le jsonb d'une fonction n'est pas tronque par la limite de lignes de
+  // PostgREST, mais le controle de volume reste : il ne coute rien, et un total
+  // faux affiche comme juste est le defaut que ce produit remplace.
+  const rdvs = brut.rdvs;
+  if (rdvs.length !== Number(brut.nb_rdvs)) {
+    throw new ErreurApi(
+      `Lecture incomplete : ${rdvs.length} RDV recuperes sur ${brut.nb_rdvs} annonces. ` +
+        'Les totaux seraient faux — aucun chiffre ne sera affiche.',
+      500
+    );
+  }
 
   return {
     campagne: {
@@ -275,6 +267,7 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
       })),
     vendeurs: lignesVendeur,
     rdvs: rdvs.map((r) => ({
+      id: txt(r.id),
       vendeurId: txt(r.vendeur_id),
       typeVehicule: r.type_vehicule as LigneRdv['typeVehicule'],
       marqueId: txtOuNull(r.marque_id),
@@ -286,7 +279,70 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
 }
 
 export async function chargerDashboard(campagneId: string): Promise<Dashboard> {
-  const charge = await chargerCampagne(campagneId);
+  return assembler(await chargerCampagne(campagneId));
+}
+
+/// Un RDV pose, modifie ou archive ailleurs, tel que le diffuse `diffuser_rdv()`.
+/// La charge utile porte TOUS les champs de `rdv_agrege` — et jamais le client.
+export interface EvenementRdv {
+  id?: string;
+  vendeurId?: string;
+  jour?: string;
+  creneauCode?: string;
+  marqueId?: string | null;
+  typeVehicule?: string;
+  archive?: boolean;
+}
+
+/// APPLIQUE UN EVENEMENT EN MEMOIRE — lot 1 de PLAN-GRID-V2.md (03/10/2026).
+///
+/// C'est LA mesure qui fait tenir une seance. Chaque poste rechargeait la vue
+/// d'ensemble (7 requetes, plus de 1 000 lignes) a chaque RDV du groupe, regroupe
+/// par fenetres de 30 s : ~17 000 requetes/heure pour 25 postes. Or le message
+/// temps reel contient deja tout ce que la vue d'ensemble compte. On met donc a
+/// jour la liste des RDV, et on REJOUE LES MEMES FONCTIONS PURES (`assembler`) :
+/// aucun comptage n'est recode ici, interdit n.6 — `test:agregats` couvre ce
+/// chemin comme l'autre.
+///
+/// Rend `null` quand l'evenement ne peut pas etre applique sans risque — charge
+/// incomplete, vendeur inconnu de ce chargement (cree depuis) — : l'appelant
+/// recharge alors, comme avant. Un chiffre faux affiche comme juste serait pire
+/// qu'une requete de plus.
+export function appliquerRdv(d: Dashboard, e: EvenementRdv): Dashboard | null {
+  if (!e.id || !e.vendeurId || !e.jour || !e.creneauCode || !e.typeVehicule) return null;
+  const autres = d.rdvs.filter((r) => r.id !== e.id);
+  if (e.archive) {
+    if (autres.length === d.rdvs.length) return d;
+    return assembler({ ...chargeDe(d), rdvs: autres });
+  }
+  if (!d.vendeurs.some((v) => v.id === e.vendeurId)) return null;
+  const ligne: LigneRdvTableau = {
+    id: e.id,
+    vendeurId: e.vendeurId,
+    typeVehicule: e.typeVehicule as LigneRdv['typeVehicule'],
+    marqueId: e.marqueId ?? null,
+    jour: e.jour,
+    creneauCode: e.creneauCode,
+  };
+  return assembler({ ...chargeDe(d), rdvs: [...autres, ligne] });
+}
+
+const chargeDe = (d: Dashboard): Charge => ({
+  campagne: {
+    id: d.campagne.id,
+    libelle: d.campagne.libelle,
+    dateDebut: d.campagne.dateDebut,
+    dateFin: d.campagne.dateFin,
+    cloturee: d.campagne.cloturee,
+  },
+  jours: d.campagne.jours,
+  sessions: d.sessions,
+  vendeurs: d.vendeurs,
+  rdvs: d.rdvs,
+  rattachements: d.rattachements,
+});
+
+function assembler(charge: Charge): Dashboard {
   const { vendeurs, rdvs } = charge;
 
   const totaux = Object.fromEntries(

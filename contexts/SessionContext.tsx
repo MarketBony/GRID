@@ -45,7 +45,11 @@ export function FournisseurSession({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((evenement) => {
       if (evenement === 'SIGNED_OUT') setSession(null);
-      if (evenement === 'SIGNED_IN' || evenement === 'TOKEN_REFRESHED') void rafraichir();
+      // `TOKEN_REFRESHED` NE RECHARGE PLUS LES DROITS (03/10/2026). Un jeton
+      // renouvele ne change ni le compte ni ses roles ; recharger coutait cinq
+      // requetes par poste et par heure, et supabase-js renouvelle aussi au retour
+      // sur l'onglet. Une connexion, elle, change tout : on recharge.
+      if (evenement === 'SIGNED_IN') void rafraichir();
     });
     return () => data.subscription.unsubscribe();
   }, [rafraichir]);

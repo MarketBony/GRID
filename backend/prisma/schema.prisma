@@ -555,6 +555,14 @@ model Rdv {
   client       String
   commentaire  String?
 
+  /// CLE D'IDEMPOTENCE, generee par le NAVIGATEUR (uuid) au moment ou le RDV est
+  /// tape. Une ecriture qui echoue part dans la file d'attente locale et repart
+  /// plus tard : sans cette cle, une requete arrivee en base mais dont la reponse
+  /// s'est perdue serait rejouee, et le RDV compte deux fois. `rdv_poser` fait
+  /// `ON CONFLICT (cle_client) DO NOTHING`. Nullable : les RDV anterieurs au
+  /// 03/10/2026 n'en ont pas, et les NULL ne se heurtent pas entre eux.
+  cleClient String? @unique @map("cle_client") @db.Uuid
+
   creeLe     DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
   creePar    BigInt?   @map("cree_par")
   modifieLe  DateTime? @map("modifie_le") @db.Timestamptz(6)

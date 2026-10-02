@@ -380,6 +380,9 @@ export function GrilleVendeur({
                       className={[
                         'case',
                         lesRdv.length > 0 ? 'remplie' : '',
+                        // Posé à l'écran, pas encore accepté par la base : la file
+                        // d'attente le renverra seule. Il se VOIT, sans alarmer.
+                        lesRdv.some((r) => r.enAttente) ? 'en-attente' : '',
                         estActive ? 'active' : '',
                         figee ? 'figee' : '',
                       ]

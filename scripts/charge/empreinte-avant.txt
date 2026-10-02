@@ -1,0 +1,49 @@
+== campagne 1
+      objet       |  n   |               md5                
+------------------+------+----------------------------------
+ affectation      |   48 | 64e919a6db76f32a0abf9ec908658b43
+ campagne         |    1 | bfc8f88849d26de92bbed0ebad6353d1
+ campagne_creneau |   11 | 1503c6d85f99c3e9d1625bf9e2448f10
+ campagne_jour    |    5 | edb1db30d48488d0e52b3810c323c410
+ rdv              | 1110 | 03074a22165bfb003a954306d6d41031
+ role_campagne    |    0 | -
+ session_plaque   |    4 | 85c7bdb62754f66c9e572282a6bc93e0
+ table_phoning    |    8 | 4472f57634a697b1afaf0258740b2e85
+(8 lignes)
+
+== campagne 2
+      objet       |  n   |               md5                
+------------------+------+----------------------------------
+ affectation      |  109 | b6678673793a7ee743c54591714f587a
+ campagne         |    1 | fdf5f43ede7bc1871dc32fb4e0fce8cd
+ campagne_creneau |   11 | 4d7f0c4dfa08b7bb8b4f4f5a36674cf0
+ campagne_jour    |    5 | fa29ffb5a759e4ca99bb2e434221d66a
+ rdv              | 1250 | 2c1842b8c232a34a2ae7e2f8f7c0880b
+ role_campagne    |    2 | 252ec565697e85fccb1ffeb3ec8a3115
+ session_plaque   |    4 | 055aaed0e90f866ce8c3b167692f1966
+ table_phoning    |    8 | 2c9bd94119220d6aa9b86d093a732049
+(8 lignes)
+
+== campagne 933
+      objet       | n  |               md5                
+------------------+----+----------------------------------
+ affectation      |  0 | -
+ campagne         |  1 | c38d3d38d668890fdf9228ce10077757
+ campagne_creneau | 11 | c6ca944c6a4cbf0b9b3894842083d7cd
+ campagne_jour    |  5 | 4e1ea24e9bd4e8d10918a348b6741613
+ rdv              |  0 | -
+ role_campagne    |  0 | -
+ session_plaque   |  4 | 42e5ffe6de5563252fa161ffbbae5070
+ table_phoning    |  0 | -
+(8 lignes)
+
+                objet                 |  n  |               md5                
+--------------------------------------+-----+----------------------------------
+ encadrement_site                     |  29 | 098f23a03a1cada38d0c5a18d02d201a
+ role_global                          |  15 | 714c67e36eceff1a2ff92f085617df54
+ utilisateur (login, actif, auth_uid) |  35 | dac0edf7ca3c9811298f3cc3b4d97136
+ vendeur (hors CHARGE)                | 114 | a4c746a70d7bac4e39884035dc56e3c5
+ vendeur_marque (hors CHARGE)         | 148 | fc1593f058c665e353c4bec4a1354e75
+ vendeurs CHARGE restants             |   0 | -
+(6 lignes)
+

@@ -156,6 +156,26 @@ async function compteCourant(): Promise<Utilisateur | null> {
   };
 }
 
+/// Traduit une erreur de Supabase Auth en un message qui dit CE QUI S'EST PASSE.
+/// Quatre cas, et seul le premier met en cause le mot de passe.
+function messageConnexion(erreur: { status?: number; code?: string; name?: string; message?: string }): string {
+  const code = erreur.code ?? '';
+  const statut = erreur.status ?? 0;
+  if (code === 'invalid_credentials' || (statut === 400 && /invalid/i.test(erreur.message ?? ''))) {
+    return 'Identifiant ou mot de passe incorrect.';
+  }
+  if (statut === 429 || /rate.?limit/i.test(code + (erreur.message ?? ''))) {
+    return 'Trop de connexions en même temps depuis ce réseau. Patienter une minute, puis réessayer — le mot de passe n’est pas en cause.';
+  }
+  if (statut === 0 || erreur.name === 'AuthRetryableFetchError' || /fetch|network/i.test(erreur.message ?? '')) {
+    return 'Le service ne répond pas (réseau ou serveur). Réessayer dans un instant — le mot de passe n’est pas en cause.';
+  }
+  if (statut >= 500) {
+    return 'Le service de connexion est momentanément indisponible. Réessayer dans un instant — le mot de passe n’est pas en cause.';
+  }
+  return 'Identifiant ou mot de passe incorrect.';
+}
+
 export async function connexion(loginId: string, motDePasse: string): Promise<Session> {
   const { error } = await supabase.auth.signInWithPassword({
     email: adresseDeSynthese(loginId),
@@ -165,7 +185,15 @@ export async function connexion(loginId: string, motDePasse: string): Promise<Se
   if (error) {
     // Le message brut de Supabase est en anglais et parle d'e-mail, alors que
     // l'ecran demande un identifiant. On ne le montre pas tel quel.
-    throw new ErreurApi('Identifiant ou mot de passe incorrect.', 401, error);
+    //
+    // MAIS ON NE DIT « MOT DE PASSE INCORRECT » QUE QUAND C'EST LE CAS (03/10/2026).
+    // Toute erreur s'affichait ainsi — y compris le service d'authentification
+    // affame du 08/09, un reseau coupe ou une limite de debit. L'utilisateur
+    // retapait un mot de passe juste, concluait qu'il avait change, et la
+    // reinitialisation demandee a un administrateur faisait le reste : c'est
+    // l'explication la plus probable des « mots de passe qui se reinitialisent
+    // tout seuls ».
+    throw new ErreurApi(messageConnexion(error), error.status ?? 401, error);
   }
 
   const session = await sessionCourante();

@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AXES,
+  appliquerRdv,
   chargerComparaison,
   chargerDashboard,
   type Axe,
   type Comparaison,
   type Dashboard as DonneesDashboard,
+  type EvenementRdv,
   type Rang,
   type Totaux,
 } from '../services/dashboard';
@@ -139,10 +141,37 @@ export function Dashboard() {
     if (campagneId) void recharger(campagneId).catch(() => undefined);
   }, FENETRE_VUE_ENSEMBLE);
 
+  // LE MESSAGE S'APPLIQUE EN MEMOIRE depuis le 03/10/2026 (lot 1 de
+  // PLAN-GRID-V2.md) : il porte tout ce que le tableau compte. Un ecran collectif
+  // ouvert pendant une seance ne coute plus une requete par fenetre de 30 s. Le
+  // rechargement regroupe ne sert plus qu'aux cas que la memoire ne sait pas
+  // trancher (vendeur cree depuis le chargement) et aux tables recomposees.
+  const donneesRef = useRef<DonneesDashboard | null>(null);
+  donneesRef.current = donnees;
+
   useTempsReel(campagneId, {
-    'rdv:modifie': majTableau,
+    'rdv:modifie': (charge) => {
+      const d = donneesRef.current;
+      if (!d) return;
+      const suivant = appliquerRdv(d, (charge ?? {}) as EvenementRdv);
+      if (suivant) setDonnees(suivant);
+      else majTableau();
+    },
     'tables:modifiees': majTableau,
+    reconnecte: majTableau,
   });
+
+  // Resynchronisation de securite, toutes les ~5 minutes, decalee au hasard par
+  // poste : elle rattrape un message perdu sans jamais faire repartir les ecrans
+  // ensemble. Meme regle que l'ecran de saisie.
+  useEffect(() => {
+    if (!campagneId) return;
+    const t = window.setInterval(
+      () => void recharger(campagneId).catch(() => undefined),
+      5 * 60_000 + Math.random() * 60_000
+    );
+    return () => window.clearInterval(t);
+  }, [campagneId, recharger]);
 
   const lancerComparaison = (autreId: string) => {
     setComparaisonAvec(autreId);

@@ -59,6 +59,7 @@ export function useTempsReel(
       await supabase.realtime.setAuth(jeton);
 
       const moi = (await supabase.rpc('utilisateur_courant')).data as number | null;
+      let dejaAbonne = false;
 
       // LE NOM DU CANAL NE CONTIENT PAS DE DEUX-POINTS : Supabase Realtime le
       // reserve a son propre adressage (`realtime:<sujet>`), et un sujet qui en
@@ -76,7 +77,19 @@ export function useTempsReel(
           if (moi !== null && charge.auteur === String(moi)) return;
           ref.current['rdv:modifie']?.(charge);
         })
+        // Une table composee ou recomposee — emis par `diffuser_tables()` depuis le
+        // 03/10/2026. Trois ecrans l'ecoutaient deja ; rien ne l'emettait.
+        .on('broadcast', { event: 'tables' }, (message) => {
+          ref.current['tables:modifiees']?.(message.payload ?? {});
+        })
         .subscribe((etat, erreur) => {
+          // LE RETOUR APRES UNE COUPURE. Pendant que le canal etait tombe, des
+          // messages se sont perdus : l'ecran l'apprend, et se resynchronise.
+          // Le premier abonnement n'est pas une reconnexion — rien n'a ete manque.
+          if (etat === 'SUBSCRIBED') {
+            if (dejaAbonne) ref.current['reconnecte']?.(null);
+            dejaAbonne = true;
+          }
           // Un echec doit se VOIR quelque part. Il ne remonte pas a l'ecran — le
           // temps reel est un confort, la saisie fonctionne sans lui — mais le
           // silence complet a deja masque une panne sur ce projet.
