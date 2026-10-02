@@ -305,7 +305,12 @@ AS $fn$
     'roles_campagne', coalesce((SELECT jsonb_agg(jsonb_build_object('role', rc.role, 'site_id', rc.site_id, 'plaque_id', rc.plaque_id))
         FROM relance.role_campagne rc
        WHERE rc.utilisateur_id = (SELECT id FROM moi) AND rc.campagne_id = p_campagne_id
-         AND rc.archive_le IS NULL), '[]'::jsonb)
+         AND rc.archive_le IS NULL), '[]'::jsonb),
+    -- D11 : un vendeur declare ABSENT a l'ecran Effectifs sort de la grille de
+    -- saisie (il reste accessible par un filtre). Seules les exceptions sont rendues.
+    'mobilisations', coalesce((SELECT jsonb_agg(jsonb_build_object('vendeur_id', mo.vendeur_id, 'mobilise', mo.mobilise))
+        FROM relance.mobilisation mo
+       WHERE mo.campagne_id = p_campagne_id AND mo.vendeur_id IN (SELECT vendeur_id FROM ids)), '[]'::jsonb)
   );
 $fn$;
 
