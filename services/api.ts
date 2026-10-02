@@ -142,7 +142,7 @@ async function compteCourant(): Promise<Utilisateur | null> {
   // nommees, et c'est une contrainte permanente sur cette table.
   const reponse = await supabase
     .from('utilisateur')
-    .select('id, login_id, nom, actif')
+    .select('id, login_id, nom, actif, doit_changer_mdp')
     .eq('id', id as number)
     .maybeSingle();
 
@@ -153,7 +153,32 @@ async function compteCourant(): Promise<Utilisateur | null> {
     loginId: ligne.login_id,
     nom: ligne.nom,
     actif: ligne.actif,
+    doitChangerMdp: ligne.doit_changer_mdp === true,
   };
+}
+
+/// CHANGER SON PROPRE MOT DE PASSE — sans Edge Function : Supabase Auth laisse un
+/// compte connecte changer le sien. Puis la base retire l'obligation de le
+/// choisir et consigne le geste au journal (`mot_de_passe_choisi`).
+///
+/// 12 caracteres au moins : c'est le reglage du projet Supabase, on le dit avant
+/// qu'il refuse.
+export async function changerMonMotDePasse(nouveau: string): Promise<void> {
+  if (nouveau.length < 12) {
+    throw new ErreurApi('Le mot de passe doit faire au moins 12 caractères.', 400);
+  }
+  const { error } = await supabase.auth.updateUser({ password: nouveau });
+  if (error) {
+    const memeQueAvant = /different|same/i.test(error.message ?? '');
+    throw new ErreurApi(
+      memeQueAvant
+        ? 'Ce mot de passe est celui que vous avez déjà : en choisir un autre.'
+        : 'Le mot de passe n’a pas pu être changé. Réessayer dans un instant.',
+      error.status ?? 400,
+      error
+    );
+  }
+  verifier(await supabase.rpc('mot_de_passe_choisi'));
 }
 
 /// Traduit une erreur de Supabase Auth en un message qui dit CE QUI S'EST PASSE.

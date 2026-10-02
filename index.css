@@ -1,3 +1,10 @@
+/* COUCHES (03/10/2026, lot 3 de PLAN-GRID-V2.md). Cette feuille entiere vit dans la
+   couche `ancien` ; la DA v2 (`styles/v2.css`) dans la couche `v2`, declaree apres :
+   elle l'emporte quelle que soit la specificite. Cette feuille disparaitra quand le
+   dernier ecran sera porte. */
+@layer ancien, v2;
+
+@layer ancien {
 /* ============================================================================
    CHARTE BONY — reprise de GEARBOX (`gearbox3backup/index.html`).
 
@@ -4746,3 +4753,5 @@ html.dark .option-menu.cochee {
     transition: none;
   }
 }
+
+} /* @layer ancien */

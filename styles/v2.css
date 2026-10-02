@@ -1,0 +1,404 @@
+/* =============================================================================
+   GRID v2 — LA COUCHE VISUELLE (lot 3 de PLAN-GRID-V2.md)
+
+   La DA de Gearbox OS (maquette v2, direction « nocturne », matiere « liquid »),
+   SANS son moteur : jetons, matiere, primitives et mouvement. Les classes portent
+   les MEMES NOMS que Gearbox (.btn, .seg, .chip, .card, .kpi, .tbl, .sheet…) —
+   porter un ecran d'un projet a l'autre ne demande aucune traduction.
+
+   COHABITATION. L'ancien `index.css` vit dans la couche `ancien`, cette feuille
+   dans la couche `v2`, declaree APRES : une regle d'ici l'emporte sur une regle
+   de l'ancien quelle que soit sa specificite. Les ecrans pas encore portes
+   gardent leurs classes, qui ne croisent celles-ci qu'en un point (`.kpi`).
+   Quand le dernier ecran sera porte, `index.css` disparaitra.
+
+   REGLES (CLAUDE.md, « couche visuelle ») : le degrade s'OBTIENT (.principal /
+   .btn.primary), une selection SE DEPLACE (un seul element mobile par groupe),
+   on n'anime que `transform` et `opacity`, et chaque valeur n'est declaree
+   qu'une fois.
+   ============================================================================= */
+
+@layer v2 {
+
+/* ------------------------------------------------------------------ JETONS */
+:root {
+  --bony-orange: #f75632;
+  --bony-violet: #8f12ab;
+  --bony-blue: #293f74;
+  --bony-grad: linear-gradient(135deg, #ff6a3d, #a52fce);
+  --brand-renault: #ffcc33;
+  --brand-dacia: #6a7551;
+  --brand-alpine: #0055a4;
+
+  --font-ui: 'Albert Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Syncopate', var(--font-ui);
+
+  --r-xs: 6px; --r-sm: 10px; --r-md: 13px; --r-lg: 16px; --r-xl: 22px; --r-2xl: 28px;
+  --fs-11: 11px; --fs-12: 12.5px; --fs-13: 13.5px; --fs-14: 14px; --fs-16: 16px;
+  --fs-18: 18px; --fs-22: 22px; --fs-28: 28px;
+  --t-fast: 150ms; --t-med: 260ms; --t-slow: 440ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+
+  /* THEME CLAIR — le verre reste du verre : voile blanc translucide, liseré lumineux. */
+  --bg: #e4e2ea;
+  --surface-0: #f1f0f5; --surface-1: #ffffff; --surface-2: #f4f3f8; --surface-3: #e9e7f0; --surface-4: #dddae6;
+  --line: rgba(20, 16, 30, .11); --line-2: rgba(20, 16, 30, .17); --line-3: rgba(20, 16, 30, .26);
+  --text: #120f19; --text-2: #4a4556; --text-3: #746f84;
+  --accent: var(--bony-orange);
+  --focus: rgba(247, 86, 50, .45);
+  --ok: #17a862; --warn: #d98a00; --danger: #e5383e; --info: #2f6fe0;
+  --sel: rgba(247, 86, 50, .13);
+  --chrome-bg: rgba(250, 249, 253, .62);
+  --glass-strong: rgba(250, 249, 253, .86);
+  --glass-blur: 14px; --glass-sat: 1.8;
+  --rim-hi: rgba(255, 255, 255, .85); --rim-lo: rgba(255, 255, 255, .2);
+  --ctl-bg: rgba(255, 255, 255, .55); --ctl-bg-h: rgba(255, 255, 255, .85);
+  --ctl-line: rgba(20, 16, 30, .1); --ctl-line-h: rgba(20, 16, 30, .18);
+  --box-bg: rgba(255, 255, 255, .5); --box-line: rgba(20, 16, 30, .08);
+  --ombre: 0 18px 50px -22px rgba(20, 16, 30, .35);
+  --ombre-contact: 0 1px 2px rgba(20, 16, 30, .08);
+  --lueur-a: rgba(247, 86, 50, .36); --lueur-b: rgba(143, 18, 171, .3); --lueur-c: rgba(41, 63, 116, .26);
+  color-scheme: light;
+}
+
+/* THEME SOMBRE — classe `dark` sur <html>, posee par `contexts/ThemeContext.tsx`. */
+html.dark {
+  --bg: #0a0e1f;
+  --surface-0: #0e1328; --surface-1: #121831; --surface-2: #19213f; --surface-3: #232c4f; --surface-4: #2d375e;
+  --line: rgba(170, 185, 255, .1); --line-2: rgba(170, 185, 255, .17); --line-3: rgba(170, 185, 255, .26);
+  --text: #f3f4fb; --text-2: #bcc2df; --text-3: #8189ae;
+  --focus: rgba(247, 86, 50, .55);
+  --ok: #3ed487; --warn: #ffb02e; --danger: #ff6166; --info: #4d8dff;
+  --sel: rgba(247, 86, 50, .18);
+  --chrome-bg: rgba(16, 14, 26, .5);
+  --glass-strong: rgba(16, 14, 24, .82);
+  --glass-blur: 14px; --glass-sat: 1.9;
+  --rim-hi: rgba(255, 255, 255, .3); --rim-lo: rgba(255, 255, 255, .06);
+  --ctl-bg: rgba(255, 255, 255, .045); --ctl-bg-h: rgba(255, 255, 255, .085);
+  --ctl-line: rgba(255, 255, 255, .1); --ctl-line-h: rgba(255, 255, 255, .18);
+  --box-bg: rgba(255, 255, 255, .035); --box-line: rgba(255, 255, 255, .08);
+  --ombre: 0 18px 50px -20px rgba(0, 0, 0, .75);
+  --ombre-contact: 0 1px 2px rgba(0, 0, 0, .35);
+  --lueur-a: rgba(247, 86, 50, .55); --lueur-b: rgba(143, 18, 171, .55); --lueur-c: rgba(41, 63, 116, .75);
+  color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------ BASE */
+html, body { background: var(--bg); color: var(--text); }
+body {
+  font: 400 var(--fs-13) / 1.45 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+::selection { background: var(--sel); }
+* { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.v2 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.v2 svg.i { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.v2 svg.i.sm { width: 15px; height: 15px; }
+.v2 .num { font-variant-numeric: tabular-nums; }
+.v2 .muted { color: var(--text-2); }
+.v2 .faint { color: var(--text-3); }
+.v2 .display { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+
+/* Le fond vivant : trois lueurs, periodes premieres entre elles (17/23/31 s),
+   animees en `transform` — la combinaison ne se repete qu'au bout de ~3,4 h. */
+.fond-vivant { position: fixed; inset: -20%; z-index: 0; pointer-events: none; }
+.fond-vivant i { position: absolute; width: 70%; height: 70%; border-radius: 50%; filter: blur(60px); will-change: transform; }
+.fond-vivant i:nth-child(1) { left: -5%; bottom: -10%; background: radial-gradient(closest-side, var(--lueur-a), transparent); animation: v2-derive-1 17s ease-in-out infinite alternate; }
+.fond-vivant i:nth-child(2) { right: -10%; bottom: 0; background: radial-gradient(closest-side, var(--lueur-b), transparent); animation: v2-derive-2 23s ease-in-out infinite alternate; }
+.fond-vivant i:nth-child(3) { left: 20%; top: -20%; background: radial-gradient(closest-side, var(--lueur-c), transparent); animation: v2-derive-3 31s ease-in-out infinite alternate; }
+@keyframes v2-derive-1 { to { transform: translate(18%, -12%) scale(1.15); } }
+@keyframes v2-derive-2 { to { transform: translate(-16%, -10%) scale(.9); } }
+@keyframes v2-derive-3 { to { transform: translate(-12%, 16%) scale(1.1); } }
+
+/* ------------------------------------------------------------------ MATIERE
+   Liquid glass : voile presque incolore, flou leger et sature, liseré d'un
+   pixel en degrade (vif en haut, eteint sur les flancs), reflet qui suit le
+   pointeur (`--mx`/`--my`, poses par `hooks/useReflet.ts`). */
+.verre {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(240px circle at var(--mx, 50%) var(--my, -40%), rgba(255, 255, 255, .12), transparent 60%),
+    linear-gradient(165deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, 0) 42%),
+    var(--chrome-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(1.05);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(1.05);
+  box-shadow: inset 0 0 22px rgba(255, 255, 255, .035), var(--ombre-contact), var(--ombre);
+}
+.verre::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(172deg, var(--rim-hi), var(--rim-lo) 24%, transparent 46%, transparent 72%, var(--rim-lo));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.verre.fort { background: linear-gradient(165deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0) 42%), var(--glass-strong); }
+
+/* ------------------------------------------------------------------ PRIMITIVES */
+.v2 .card { background: var(--box-bg); box-shadow: inset 0 0 0 1px var(--box-line); border-radius: var(--r-lg); }
+.v2 .card.pad { padding: 16px; }
+.v2 .label { font-size: var(--fs-11); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+
+.v2 .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 32px; padding: 0 13px; border: 0; border-radius: var(--r-sm);
+  font: 600 var(--fs-13) var(--font-ui); color: var(--text); white-space: nowrap; cursor: pointer;
+  background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: transform 620ms var(--ressort-ample), background-color var(--t-fast), box-shadow var(--t-fast), opacity var(--t-fast);
+}
+.v2 .btn:hover:not(:disabled) { background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
+.v2 .btn:active:not(:disabled) { transform: scale(.94); transition-duration: 90ms; }
+.v2 .btn:disabled { opacity: .45; cursor: default; }
+/* L'ACTION PRINCIPALE porte le degrade. Une par ecran, deux au plus. Son survol
+   est DECLARE ici : sans lui, la regle generique ci-dessus remettrait le fond a
+   plat (constate le 08/09 sur les puces de filtre). */
+.v2 .btn.primary { background: var(--bony-grad); color: #fff; box-shadow: none; }
+.v2 .btn.primary:hover:not(:disabled) { background: var(--bony-grad); box-shadow: none; filter: brightness(1.08); }
+.v2 .btn.ghost { background: transparent; box-shadow: none; }
+.v2 .btn.ghost:hover:not(:disabled) { background: var(--ctl-bg); }
+.v2 .btn.danger { color: var(--danger); }
+.v2 .btn.sm { height: 27px; padding: 0 10px; font-size: var(--fs-12); border-radius: 8px; }
+.v2 .btn.pill { border-radius: 99px; }
+
+.v2 .icon-btn {
+  width: 34px; height: 34px; display: inline-grid; place-items: center; flex: none;
+  border: 0; border-radius: 10px; background: transparent; color: var(--text-2); cursor: pointer;
+  transition: transform 620ms var(--ressort-ample), background-color var(--t-fast), color var(--t-fast);
+}
+.v2 .icon-btn:hover { background: var(--ctl-bg-h); color: var(--text); }
+.v2 .icon-btn:active { transform: scale(.9); transition-duration: 90ms; }
+
+/* Champs : l'anneau de focus GRANDIT (CHARTE-GRAPHIQUE 7.2). */
+.v2 .input, .v2 .textarea, .v2 .select {
+  width: 100%; height: 36px; padding: 0 12px; border: 0; outline: 0; border-radius: var(--r-sm);
+  font: 500 var(--fs-13) var(--font-ui); color: var(--text);
+  background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: box-shadow var(--t-med) var(--ressort-vif), background-color var(--t-fast);
+}
+.v2 .input:hover, .v2 .textarea:hover, .v2 .select:hover { background: var(--ctl-bg-h); }
+.v2 .input:focus, .v2 .textarea:focus, .v2 .select:focus { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--focus); }
+.v2 .textarea { height: auto; min-height: 80px; padding: 8px 12px; resize: vertical; line-height: 1.5; }
+.v2 .field { display: grid; gap: 6px; min-width: 0; }
+
+/* Le controle segmente : UNE pastille mobile (`useIndicateurGlissant`), jamais
+   un fond peint sur le bouton actif. */
+.v2 .seg { position: relative; display: inline-flex; padding: 3px; border-radius: 99px; background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); flex: none; }
+.v2 .seg > button {
+  position: relative; z-index: 1; height: 28px; padding: 0 13px; border: 0; border-radius: 99px;
+  background: transparent; font: 600 var(--fs-12) var(--font-ui); color: var(--text-2); white-space: nowrap; cursor: pointer;
+  transition: color var(--t-med);
+}
+.v2 .seg > button[aria-pressed='true'] { color: var(--text); }
+.v2 .seg > .pouce { position: absolute; top: 3px; bottom: 3px; left: 0; border-radius: 99px; background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h), var(--ombre-contact); pointer-events: none; }
+
+/* Puces : selection MULTIPLE = teinte ; le degrade plein reste a la selection
+   UNIQUE (CLAUDE.md). */
+.v2 .chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: 0; border-radius: 99px;
+  font: 600 var(--fs-12) var(--font-ui); color: var(--text-2); white-space: nowrap; cursor: pointer;
+  background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: transform 620ms var(--ressort-ample), background-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+.v2 .chip:hover { color: var(--text); background: var(--ctl-bg-h); }
+.v2 .chip[aria-pressed='true'] { color: var(--accent); background: var(--sel); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.v2 .chip:active { transform: scale(.92); transition-duration: 90ms; }
+
+/* Marques en etiquettes PLEINES (regle v2.1 de Gearbox). */
+.v2 .marque { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .03em; white-space: nowrap; }
+.v2 .marque.renault { background: var(--brand-renault); color: #1a1500; }
+.v2 .marque.dacia { background: var(--brand-dacia); color: #fff; }
+.v2 .marque.alpine { background: var(--brand-alpine); color: #fff; }
+.v2 .badge {
+  display: inline-flex; align-items: center; gap: 5px; height: 21px; padding: 0 8px; border-radius: 7px; white-space: nowrap;
+  font-size: var(--fs-11); font-weight: 700;
+  background: color-mix(in srgb, var(--c, var(--text-3)) 20%, transparent);
+  color: color-mix(in srgb, var(--c, var(--text-2)) 75%, var(--text));
+}
+
+.v2 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.v2 .kpi { padding: 14px 16px; border-radius: var(--r-lg); background: var(--box-bg); box-shadow: inset 0 0 0 1px var(--box-line); min-width: 0; }
+.v2 .kpi .l { display: block; color: var(--text-3); font-weight: 700; font-size: var(--fs-12); }
+.v2 .kpi .v { display: block; font-size: var(--fs-28); font-weight: 800; letter-spacing: -.03em; line-height: 1.15; }
+.v2 .kpi.accent { background: var(--bony-grad); color: #fff; box-shadow: 0 18px 40px -18px rgba(247, 86, 50, .7); }
+.v2 .kpi.accent .l { color: rgba(255, 255, 255, .82); }
+
+.v2 .kbd {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 6px;
+  font-size: var(--fs-11); font-weight: 700; color: var(--text-2);
+  background: var(--ctl-bg-h); box-shadow: inset 0 -1px 0 var(--line-2), inset 0 0 0 1px var(--line);
+}
+
+.v2 .tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-13); }
+.v2 .tbl th { position: sticky; top: 0; z-index: 1; text-align: left; padding: 9px 10px; font-size: var(--fs-11); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); background: var(--glass-strong); box-shadow: inset 0 -1px 0 var(--line); white-space: nowrap; }
+.v2 .tbl td { height: 42px; padding: 0 10px; border-bottom: 1px solid var(--line); }
+.v2 .tbl tbody tr { transition: background-color var(--t-fast); }
+.v2 .tbl tbody tr:hover { background: var(--ctl-bg); }
+.v2 .tbl .r { text-align: right; }
+
+.v2 .empty { display: grid; place-items: center; gap: 6px; padding: 40px 20px; text-align: center; color: var(--text-3); }
+.v2 .skel { border-radius: 8px; background: linear-gradient(90deg, var(--ctl-bg), var(--ctl-bg-h), var(--ctl-bg)); background-size: 200% 100%; animation: v2-skel 1.2s linear infinite; }
+@keyframes v2-skel { to { background-position: -200% 0; } }
+
+/* Entrees echelonnees : `--i` = rang. */
+.v2 .enter { animation: v2-entre 560ms var(--ressort-vif) both; animation-delay: calc(var(--i, 0) * 40ms); }
+@keyframes v2-entre { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+
+/* ------------------------------------------------------------------ PAGE */
+.v2 .page { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 16px; padding: 92px 26px 40px; max-width: 120rem; margin: 0 auto; }
+.v2 .app-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-height: 40px; }
+.v2 .app-head h1 { margin: 0; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; font-size: 17px; letter-spacing: .03em; }
+.v2 .app-head .sub { color: var(--text-3); font-weight: 600; }
+.v2 .app-head .droite { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ------------------------------------------------------------------ VOLET (sheet)
+   Monte en ressort depuis le bas, dans un PORTAIL : un ancetre `transform` ou
+   `overflow` ne peut pas le rattraper. */
+.v2-voile { position: fixed; inset: 0; z-index: 900; background: rgba(5, 6, 12, .38); animation: v2-fondu var(--t-med) ease both; }
+.v2-voile.sortie { animation: v2-fondu-sortie 200ms ease both; }
+.v2-volet {
+  position: fixed; z-index: 901; left: 50%; bottom: 16px; width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 32px); overflow: auto;
+  padding: 20px 22px; border-radius: var(--r-2xl);
+  transform: translateX(-50%); animation: v2-volet-monte 620ms var(--ressort-ample) both;
+}
+.v2-volet.sortie { animation: v2-volet-descend 240ms ease-in both; }
+.v2-volet h3 { margin: 0 0 4px; font-size: var(--fs-16); }
+.v2-volet .pied { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+@keyframes v2-fondu { from { opacity: 0; } }
+@keyframes v2-fondu-sortie { to { opacity: 0; } }
+@keyframes v2-volet-monte { from { transform: translate(-50%, 110%); } }
+@keyframes v2-volet-descend { to { transform: translate(-50%, 110%); } }
+
+/* ------------------------------------------------------------------ L'ILE (bureau)
+   D18 : la navigation flottante. La GOUTTE est le seul element mobile : elle
+   suit l'item actif, y compris PENDANT la retraction (corrige le defaut de la
+   maquette, ou elle se recalait 380 ms trop tard). */
+.ile {
+  position: fixed; z-index: 800; top: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 99px;
+  transition: padding 500ms var(--ressort-vif), top 500ms var(--ressort-vif);
+}
+.ile .logo { width: 30px; height: 30px; margin: 0 6px 0 4px; flex: none; }
+.ile .item {
+  position: relative; z-index: 1; display: flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px;
+  border: 0; border-radius: 99px; background: transparent; cursor: pointer;
+  font: 700 var(--fs-13) var(--font-ui); color: var(--text-2); white-space: nowrap;
+  transition: color var(--t-med), padding 500ms var(--ressort-vif);
+}
+.ile .item:hover { color: var(--text); }
+.ile .item[aria-current='page'] { color: #fff; }
+.ile .item .lib { display: inline-block; max-width: 160px; overflow: hidden; transition: max-width 500ms var(--ressort-vif), opacity 300ms; }
+/* Geometrie posee EN DUR par `useIndicateurGlissant` (une variable CSS dans
+   `transform` ne s'interpole pas — CLAUDE.md, mesure le 04/09). */
+.ile .goutte, .barre-bas .goutte {
+  position: absolute; z-index: 0; top: 0; left: 0; border-radius: 99px; pointer-events: none;
+  background: var(--bony-grad); box-shadow: 0 8px 22px -10px rgba(247, 86, 50, .9);
+  transition: transform 560ms var(--ressort-ample), width 560ms var(--ressort-ample), height 500ms var(--ressort-vif), opacity var(--t-med);
+}
+.ile .sep { width: 1px; height: 22px; margin: 0 4px; background: var(--line-2); flex: none; }
+.ile.retractee { padding: 4px; top: 10px; }
+.ile.retractee .item { padding: 0 11px; }
+.ile.retractee .item .lib { max-width: 0; opacity: 0; }
+
+/* ------------------------------------------------------------------ BARRE DU BAS (telephone) */
+.barre-bas { display: none; }
+@media (max-width: 760px) {
+  .ile { display: none; }
+  .v2 .page { padding: 16px 14px 120px; }
+  .barre-bas {
+    display: flex; position: fixed; z-index: 800; left: 14px; right: 14px; bottom: calc(18px + env(safe-area-inset-bottom));
+    padding: 6px; border-radius: 30px; justify-content: space-around;
+    transition: left 500ms var(--ressort-vif), right 500ms var(--ressort-vif), bottom 500ms var(--ressort-vif);
+  }
+  .barre-bas .item {
+    position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    height: 52px; border: 0; border-radius: 24px; background: transparent; cursor: pointer;
+    font: 800 10.5px var(--font-ui); color: var(--text-2);
+    transition: color var(--t-med), height 500ms var(--ressort-vif);
+  }
+  .barre-bas .item[aria-current='page'] { color: #fff; }
+  .barre-bas .item .lib { transition: opacity 250ms; }
+  .barre-bas .goutte { border-radius: 24px; }
+  .barre-bas.retractee { left: 64px; right: 64px; bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .barre-bas.retractee .item { height: 40px; }
+  .barre-bas.retractee .lib { opacity: 0; font-size: 0; }
+}
+
+/* ------------------------------------------------------------------ RECHERCHE (palette) */
+.palette-voile { position: fixed; inset: 0; z-index: 950; display: grid; place-items: start center; padding-top: 14vh; background: rgba(5, 6, 12, .35); animation: v2-fondu var(--t-med) ease both; }
+.palette { width: min(580px, calc(100vw - 24px)); padding: 10px; border-radius: var(--r-xl); animation: v2-palette 520ms var(--ressort-ample) both; }
+@keyframes v2-palette { from { opacity: 0; transform: scale(.94) translateY(-10px); } }
+.palette .champ { display: flex; align-items: center; gap: 10px; padding: 0 10px; color: var(--text-3); }
+.palette .champ input { flex: 1; height: 46px; border: 0; outline: 0; background: none; font: 600 17px var(--font-ui); color: var(--text); }
+.palette .res { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow: auto; }
+.palette .r { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 0; border-radius: 12px; background: transparent; cursor: pointer; font: 600 var(--fs-13) var(--font-ui); color: var(--text); text-align: left; }
+.palette .r[aria-selected='true'] { background: var(--ctl-bg-h); }
+.palette .r .k { margin-left: auto; font-size: var(--fs-11); color: var(--text-3); font-weight: 700; }
+
+/* ------------------------------------------------------------------ TEMOIN DE SANTE (1.9) */
+.sante { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: 99px; font-size: var(--fs-12); font-weight: 700; color: var(--text-2); background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); white-space: nowrap; }
+.sante i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: v2-battement 2.4s ease-out infinite; }
+.sante.lent i { background: var(--warn); }
+.sante.coupe i { background: var(--danger); animation: none; }
+@keyframes v2-battement {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 7px transparent; }
+}
+
+/* ------------------------------------------------------------------ TRANSITIONS DE RUBRIQUE
+   View Transitions API : l'ancienne rubrique se dissout, la nouvelle monte. */
+::view-transition-old(contenu-v2) { animation: 200ms ease both v2-sortie; }
+::view-transition-new(contenu-v2) { animation: 520ms var(--ressort-vif) both v2-arrivee; }
+@keyframes v2-sortie { to { opacity: 0; transform: scale(.985); } }
+@keyframes v2-arrivee { from { opacity: 0; transform: translateY(14px) scale(.99); } }
+/* Bascule de theme : un disque qui s'etend depuis le bouton. */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+html.vt-theme::view-transition-new(root) { animation: v2-disque 700ms var(--ease-out) both; }
+@keyframes v2-disque {
+  from { clip-path: circle(0 at var(--ox, 50%) var(--oy, 0)); }
+  to { clip-path: circle(var(--or, 150vmax) at var(--ox, 50%) var(--oy, 0)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 *, .v2 *::before, .v2 *::after, .ile, .barre-bas, .fond-vivant i { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+html.animations-reduites .v2 *, html.animations-reduites .fond-vivant i { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+
+} /* @layer v2 */
+
+@layer v2 {
+/* ------------------------------------------------------------------ REGLAGES */
+.v2 .reglages-grille { display: grid; grid-template-columns: 240px 1fr; gap: 14px; align-items: start; }
+@media (max-width: 760px) { .v2 .reglages-grille { grid-template-columns: 1fr; } }
+.v2 .reglages-section {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; border-radius: 12px;
+  background: transparent; cursor: pointer; font: 700 var(--fs-13) var(--font-ui); color: var(--text); text-align: left;
+  transition: background-color var(--t-fast);
+}
+.v2 .reglages-section:hover { background: var(--ctl-bg); }
+.v2 .reglages-section.actif { background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
+.v2 .reglages-section .pastille { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: #fff; font-weight: 800; }
+.v2 .avatar-v2 { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--bony-grad); color: #fff; font-weight: 800; text-transform: uppercase; }
+
+/* Interrupteur : la pastille saute en ressort. */
+.v2 .interrupteur-v2 {
+  appearance: none; position: relative; flex: none; width: 40px; height: 24px; margin: 0; border-radius: 99px; cursor: pointer;
+  background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line); transition: background-color var(--t-med);
+}
+.v2 .interrupteur-v2::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform 560ms var(--ressort-ample);
+}
+.v2 .interrupteur-v2:checked { background: var(--ok); }
+.v2 .interrupteur-v2:checked::after { transform: translateX(16px); }
+}

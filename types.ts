@@ -18,6 +18,9 @@ export interface Utilisateur {
   loginId: string;
   nom: string;
   actif: boolean;
+  /// Un administrateur a remplace son mot de passe : il doit choisir le sien a la
+  /// connexion (D14 de PLAN-GRID-V2.md). Pose et retire par la base, jamais ici.
+  doitChangerMdp: boolean;
 }
 
 /// Resume des droits, POUR L'AFFICHAGE UNIQUEMENT. Il ne fait autorite sur rien :

@@ -1,191 +1,110 @@
-import { useEffect, useRef, useState } from 'react';
-import { useIndicateurGlissant } from './hooks/useIndicateurGlissant';
+import { useState } from 'react';
 import { Rempart } from './components/Rempart';
+import { Coquille, type Rubrique } from './components/coquille/Coquille';
 import { useSession } from './contexts/SessionContext';
-import { useTheme } from './contexts/ThemeContext';
 import { Connexion } from './pages/Connexion';
 import { Vendeurs } from './pages/Vendeurs';
 import { Campagne } from './pages/Campagne';
 import { Saisie } from './pages/Saisie';
 import { Tables } from './pages/Tables';
 import { Dashboard } from './pages/Dashboard';
-import { Gestion } from './pages/Gestion';
+import { ChoisirMotDePasse, Reglages } from './pages/Reglages';
 
-type Onglet = 'saisie' | 'tableau' | 'tables' | 'vendeurs' | 'campagne' | 'gestion';
+// ============================================================================
+// L'APPLICATION — coquille v2 (lot 4 de PLAN-GRID-V2.md).
+//
+// L'ORDRE DES RUBRIQUES : la SAISIE d'abord, toujours — c'est le coeur du produit
+// et l'ecran d'accueil d'un chef de table qui se connecte pendant une seance.
+// Puis le tableau de bord, ouvert a TOUT compte actif (les compteurs sont
+// publics, c'est ce qui donne un objet au palier Lecteur). Puis la preparation,
+// dans l'ordre ou on s'en sert : les effectifs, les vendeurs, la campagne.
+// Enfin les Reglages, dont les SECTIONS dependent du palier — la gestion des
+// comptes y vit, reservee a `admin` (sans cette frontiere, `direction` pourrait
+// se promouvoir administrateur).
+//
+// La navigation filtree par palier est un CONFORT, pas une securite : chaque
+// lecture et chaque ecriture sont revalidees par la RLS (interdit n.5).
+// ============================================================================
 
-const LIBELLES: Record<Onglet, string> = {
-  saisie: 'Saisie',
-  tableau: 'Tableau de bord',
-  tables: 'Tables',
-  vendeurs: 'Vendeurs',
-  campagne: 'Campagnes',
-  gestion: 'Comptes',
+type Id = 'saisie' | 'tableau' | 'effectifs' | 'vendeurs' | 'campagnes' | 'reglages';
+
+const TOUTES: Record<Id, Rubrique> = {
+  saisie: { id: 'saisie', libelle: 'Saisie', icone: 'saisie' },
+  tableau: { id: 'tableau', libelle: 'Tableau de bord', court: 'Tableau', icone: 'tableau' },
+  // « Effectifs » et non plus « Tables » (D12) : c'est la gestion des vendeurs
+  // presents a chaque session, en mode table comme en mode site.
+  effectifs: { id: 'effectifs', libelle: 'Effectifs', icone: 'effectifs' },
+  vendeurs: { id: 'vendeurs', libelle: 'Vendeurs', icone: 'vendeurs', secondaire: true },
+  campagnes: { id: 'campagnes', libelle: 'Campagnes', icone: 'campagnes', secondaire: true },
+  reglages: { id: 'reglages', libelle: 'Réglages', icone: 'reglages' },
 };
 
-/// Ordre des onglets : la SAISIE d'abord, toujours. C'est le coeur du produit, et
-/// l'ecran d'accueil d'un chef de table qui se connecte pendant une session.
-/// Viennent ensuite les ecrans de preparation, dans l'ordre ou on les utilise :
-/// on compose les tables, on regle les vendeurs, on parametre la campagne.
-/// Ecrans d'administration : `admin` ET `direction`.
-const ONGLETS_ADMIN: Onglet[] = ['tables', 'vendeurs', 'campagne'];
-
-/// La GESTION DES COMPTES est le seul ecran reserve a `admin`. C'est toute la
-/// difference entre les deux paliers hauts, et sa raison d'etre : sans cette
-/// frontiere, `direction` pourrait se promouvoir administrateur.
-const ONGLETS_GESTION: Onglet[] = ['gestion'];
-
-/// Le tableau de bord est ouvert a TOUT compte actif : les compteurs sont publics,
-/// et c'est ce qui donne un objet au role Lecteur. C'est aussi ce que fait le
-/// fichier — l'onglet RANK est lisible par tous.
-const ONGLETS_TOUS: Onglet[] = ['saisie', 'tableau'];
-
-/// Coquille de l'application. Les modules arrivent dans l'ordre du lotissement :
-/// A3-marques et A4-campagne (J2), C-saisie (J3-J4), B-tables (J5), D-dashboard
-/// (J6). L'ecran de saisie est le coeur du produit : en cas d'arbitrage entre
-/// l'elegance d'un ecran d'administration et la fluidite de la saisie, la saisie
-/// gagne toujours.
-///
-/// La navigation reservee aux admins est un CONFORT, pas une securite : chaque
-/// route de l'API revalide les droits (interdit n.5).
 export default function App() {
   const { session, chargement, deconnexion } = useSession();
-  const { theme, basculer } = useTheme();
-  // La saisie est l'ecran d'accueil : c'est le coeur du produit, pas une rubrique
-  // parmi d'autres. Un chef de table qui se connecte pendant une session doit y
-  // etre deja.
-  const [onglet, setOnglet] = useState<Onglet>('saisie');
-  const entete = useRef<HTMLElement | null>(null);
-
-  // ------------------------------------------------------------------------
-  // LA HAUTEUR DE L'EN-TETE EST MESUREE, PAS DEVINEE.
-  //
-  // Trois endroits du CSS en avaient besoin — le `top` collant de la liste des
-  // vendeurs et les deux `max-height` de l'ecran de saisie — et les trois
-  // portaient une constante differente : `4.5rem`, `6rem`, `9rem`. La vraie
-  // valeur est 57 px, et elle CHANGE : l'en-tete est en `flex-wrap`, donc sa
-  // barre d'onglets passe a la ligne sur un ecran etroit et il grandit.
-  //
-  // Le commentaire de la section « grille » du CSS le disait deja, deux fois :
-  // « une constante qui doit egaler la hauteur d'un element variable est un bug
-  // qui attend ». Il attendait, et il se voyait — la page de saisie debordait de
-  // 167 px a 1600x900, donc une barre de defilement pendant une session.
-  //
-  // Une mesure, une variable, trois usages. `ResizeObserver` et non un calcul au
-  // montage : le theme, la longueur du nom du compte et le passage a la ligne des
-  // onglets la font varier apres coup.
-  // ------------------------------------------------------------------------
-  useEffect(() => {
-    const cible = entete.current;
-    if (!cible) return;
-    const poser = () =>
-      document.documentElement.style.setProperty(
-        '--h-entete',
-        `${Math.round(cible.getBoundingClientRect().height)}px`
-      );
-    poser();
-    const observateur = new ResizeObserver(poser);
-    observateur.observe(cible);
-    return () => observateur.disconnect();
-    // `session` en dependance : l'en-tete n'existe pas avant la connexion, donc
-    // la ref est nulle au premier rendu.
-  }, [session]);
-
-  /// LES ONGLETS REELLEMENT VISIBLES, dans l'ordre d'affichage.
-  ///
-  /// Calcules AVANT les retours conditionnels, et c'est necessaire deux fois :
-  /// React exige un ordre d'appel de hooks stable — `useIndicateurGlissant`
-  /// placee plus bas disparaitrait du rendu quand la session est absente — et
-  /// l'index de la pastille doit porter sur CETTE liste, celle dont les boutons
-  /// enregistrent leurs refs. Le calculer sur la liste complete marcherait par
-  /// coincidence (`gereUtilisateurs` implique `administre`) et casserait au
-  /// premier palier ajoute.
-  ///
-  /// La navigation reservee reste un CONFORT et non une securite : chaque appel
-  /// est revalide par la RLS (interdit n.5). Ce filtre ne decide que de ce qui
-  /// s'affiche.
-  const droits = session?.droits;
-  const ongletsVisibles: Onglet[] = [
-    ...ONGLETS_TOUS,
-    ...(droits?.administre ? ONGLETS_ADMIN : []),
-    ...(droits?.gereUtilisateurs ? ONGLETS_GESTION : []),
-  ];
-
-  const navigation = useIndicateurGlissant(
-    Math.max(0, ongletsVisibles.indexOf(onglet)),
-    ongletsVisibles.length
-  );
+  const [active, setActive] = useState<Id>('saisie');
 
   if (chargement) return <div className="attente">Chargement...</div>;
-  if (!session || !droits) return <Connexion />;
+  if (!session) return <Connexion />;
 
-  const { utilisateur } = session;
+  const { utilisateur, droits } = session;
+
+  // D14 : un mot de passe remplace par un administrateur se REMPLACE a la
+  // connexion suivante. Rien d'autre n'est accessible avant.
+  if (utilisateur.doitChangerMdp) {
+    return (
+      <div className="v2">
+        <div className="fond-vivant" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </div>
+        <div className="page" style={{ maxWidth: 520, paddingTop: '12vh' }}>
+          <div className="card pad verre fort enter">
+            <ChoisirMotDePasse obligatoire />
+          </div>
+          <button type="button" className="btn ghost" onClick={deconnexion} style={{ justifySelf: 'center' }}>
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const ids: Id[] = [
+    ...(droits.lecteur && !droits.administre ? [] : (['saisie'] as Id[])),
+    'tableau',
+    ...(droits.administre ? (['effectifs', 'vendeurs', 'campagnes'] as Id[]) : []),
+    'reglages',
+  ];
+  const rubriques = ids.map((id) => TOUTES[id]);
+  const courante: Id = ids.includes(active) ? active : ids[0]!;
+
+  const palier = droits.admin ? 'admin' : droits.direction ? 'direction' : droits.lecteur ? 'lecteur' : 'encadrant';
 
   return (
-    <div className="application">
-      <header ref={entete}>
-        <span className="logotype">
-          <img className="logotype-marque" src="/grid.svg" alt="" aria-hidden="true" />
-          <span className="logotype-mot">GRID</span>
-        </span>
-
-        {/* UNE SEULE LISTE, et c'est ce qui permet a la pastille d'exister.
-            Les trois groupes de droits etaient rendus par trois `map`
-            successifs : il n'y avait donc aucune sequence continue le long de
-            laquelle un indicateur puisse glisser. Les paliers sont conserves —
-            ils decident seulement de ce qui ENTRE dans la liste. */}
-        <nav ref={navigation.conteneur} role="tablist" aria-label="Navigation">
-          <span className="pilule-onglet" aria-hidden="true" ref={navigation.indicateur} />
-          {ongletsVisibles.map((o, i) => (
-            <button
-              key={o}
-              type="button"
-              role="tab"
-              aria-selected={onglet === o}
-              ref={navigation.cible(i)}
-              className={onglet === o ? 'onglet actif' : 'onglet'}
-              onClick={() => setOnglet(o)}
-            >
-              {LIBELLES[o]}
-            </button>
-          ))}
-        </nav>
-
-        <span className="identite">
-          {utilisateur.nom}
-          {droits.admin && <span className="etiquette">admin</span>}
-          {droits.direction && <span className="etiquette">direction</span>}
-          {droits.lecteur && <span className="etiquette">lecteur</span>}
-          {!droits.admin && !droits.direction && !droits.lecteur && (
-            <span className="etiquette">encadrant</span>
-          )}
-        </span>
-        <button
-          type="button"
-          className="bascule"
-          onClick={basculer}
-          title={theme === 'sombre' ? 'Passer en clair' : 'Passer en sombre'}
-          aria-label={theme === 'sombre' ? 'Passer en clair' : 'Passer en sombre'}
-        >
-          {theme === 'sombre' ? '☀' : '☾'}
-        </button>
-        <button type="button" className="lien" onClick={deconnexion}>
-          Se deconnecter
-        </button>
-      </header>
-
-      <main>
-        {/* Une frontiere PAR ONGLET, pas une seule autour de tout : un ecran qui
-            casse ne doit pas emporter la navigation avec lui. La cle force le
-            remontage a chaque changement d'onglet. */}
-        <Rempart nom={LIBELLES[onglet]} key={onglet}>
-          {onglet === 'saisie' && <Saisie />}
-          {onglet === 'tableau' && <Dashboard />}
-          {onglet === 'tables' && droits.administre && <Tables />}
-          {onglet === 'vendeurs' && droits.administre && <Vendeurs />}
-          {onglet === 'campagne' && droits.administre && <Campagne />}
-          {onglet === 'gestion' && droits.gereUtilisateurs && <Gestion />}
-        </Rempart>
-      </main>
-    </div>
+    <Coquille
+      rubriques={rubriques}
+      active={courante}
+      aller={(id) => setActive(id as Id)}
+      nomCompte={utilisateur.nom}
+      palier={palier}
+      deconnexion={deconnexion}
+    >
+      {/* Une frontiere PAR RUBRIQUE : un ecran qui casse n'emporte pas la
+          navigation avec lui. La cle force le remontage au changement. */}
+      <Rempart nom={TOUTES[courante].libelle} key={courante}>
+        {courante === 'reglages' ? (
+          <Reglages />
+        ) : (
+          <div className="page page-ancienne">
+            {courante === 'saisie' && <Saisie />}
+            {courante === 'tableau' && <Dashboard />}
+            {courante === 'effectifs' && droits.administre && <Tables />}
+            {courante === 'vendeurs' && droits.administre && <Vendeurs />}
+            {courante === 'campagnes' && droits.administre && <Campagne />}
+          </div>
+        )}
+      </Rempart>
+    </Coquille>
   );
 }

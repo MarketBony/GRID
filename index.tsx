@@ -6,6 +6,8 @@ import { FournisseurTheme } from './contexts/ThemeContext';
 import { FournisseurCampagne } from './contexts/CampagneContext';
 import { configurationSupabase } from './services/supabase';
 import './index.css';
+import './styles/v2.css';
+import { appliquerPreferenceAnimations } from './pages/Reglages';
 
 const racine = document.getElementById('racine');
 if (!racine) throw new Error("Element #racine introuvable dans index.html");
@@ -56,6 +58,10 @@ function EcranConfiguration({ manquantes }: { manquantes: string[] }) {
     </div>
   );
 }
+
+// La preference « animations reduites » s'applique AVANT le premier rendu : sinon
+// les entrees animees de la premiere page joueraient quand meme.
+appliquerPreferenceAnimations();
 
 createRoot(racine).render(
   <StrictMode>
