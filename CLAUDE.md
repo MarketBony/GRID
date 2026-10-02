@@ -593,13 +593,14 @@ MOT_DE_PASSE="..." npm --prefix backend run comptes-auth -- --tous
 # Idempotent. Sans MOT_DE_PASSE, il en tire un au hasard et l'affiche une fois.
 MOT_DE_PASSE="..." npm run comptes-test
 
-# Les six suites de vérification. Aucune ne doit passer au rouge.
+# Les sept suites de vérification. Aucune ne doit passer au rouge.
 npm --prefix backend run test:garde-fous    # 39 invariants, chacun doit REFUSER
-npm --prefix backend run test:rls           # 97 contrôles des politiques ET des RPC
-npm --prefix backend run test:invariants    # 10 contrôles code <-> base (interdit n.6)
+npm --prefix backend run test:rls           # 116 contrôles des politiques ET des RPC
+npm --prefix backend run test:invariants    # 13 contrôles code <-> base (interdit n.6)
 npm --prefix backend run test:import        # 19 tests du parseur, fonctions pures
-npm --prefix backend run test:agregats      # 35 tests des totaux, contre les 1107 RDV de juin
+npm --prefix backend run test:agregats      # 36 tests des totaux, contre les 1107 RDV de juin
 npm --prefix backend run test:repartition   # 20 tests de la répartition graine 42
+npm --prefix backend run test:suivi         # 23 tests des indicateurs du suivi (fichier de suivi fictif, en mémoire)
 
 # Les 1107 RDV de juin, en base depuis le 01/09/2026. SANS `--reel`, il n'écrit
 # RIEN et vérifie tout : c'est le garde-fou permanent de la pagination.

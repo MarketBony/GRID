@@ -1,11 +1,57 @@
 # BUGS-CONNUS
 
-Mise a jour : 02/10/2026, creation de campagne.
+Mise a jour : 03/10/2026, robustesse de seance et comptes.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
 
 ---
+
+## [CORRIGE LE 03/10/2026] La charge d'une seance etait le PRODUIT des saisies par les postes
+
+Le correctif du 08/09 avait REGROUPE les rechargements, pas supprime : chaque poste
+rechargeait encore toute la vue d'ensemble (7 requetes, 1 000+ lignes) a chaque RDV
+du groupe, par fenetres de 30 s, et l'auteur la rechargeait apres CHACUNE de ses
+propres poses. Estime a ~20 000 requetes/h pour 25 postes a 258 RDV/h. Une ecriture
+refusee declenchait en plus un rechargement complet — la saturation s'entretenait.
+
+Correctif (lot 1 de `PLAN-GRID-V2.md`) : le message temps reel porte deja tout ce
+que la vue d'ensemble compte, il s'APPLIQUE EN MEMOIRE (`appliquerRdv`, qui rejoue
+les fonctions pures) ; un ecran = un appel (`charger_saisie`, `charger_tableau`) ; un
+RDV = un appel (`rdv_poser`, idempotent) ; file d'attente locale des poses (un RDV
+tape ne se perd plus) ; resynchronisation toutes les ~5 min, decalee par poste.
+Mesures avant/apres : `scripts/charge/`.
+
+## [CORRIGE LE 03/10/2026] « Les mots de passe se reinitialisent tout seuls »
+
+Aucun mecanisme ne reinitialise un mot de passe automatiquement. Trois defauts
+produisaient exactement ce symptome :
+
+1. **Toute erreur de connexion s'affichait « identifiant ou mot de passe
+   incorrect »** (`services/api.ts`) — service sature (le 08/09), reseau coupe,
+   limite de debit. L'utilisateur retapait un mot de passe juste, concluait qu'il
+   avait change, et demandait une reinitialisation. Desormais : quatre messages
+   distincts, et trois disent que le mot de passe n'est pas en cause.
+2. **Le lien « mot de passe » de l'ecran Comptes reinitialisait en UN clic**, sans
+   confirmation ; le nouveau ne s'affichait que chez l'administrateur qui avait
+   clique. Desormais : deux clics, le second nomme la personne.
+3. **Personne ne pouvait changer son propre mot de passe.** Desormais possible
+   (Reglages), et impose apres une reinitialisation (`doit_changer_mdp`).
+
+Indice concordant releve en base le 02/10 : plusieurs identites modifiees sans
+aucune connexion derriere (ccharlier le 02/10 a 20 h 40, derniere connexion le
+08/09 ; crichard le 30/09 ; rzennouche le 23/09). Impossible de dire par qui : le
+journal d'audit de Supabase est vide en base. D'ou `journal_compte`.
+
+Mesure le 02/10 : 30 connexions simultanees depuis la meme IP passent toutes (aucun
+429). La limite de debit d'Auth n'est donc pas atteinte a 30 ; elle reste a
+surveiller au-dela.
+
+## [CORRIGE LE 03/10/2026] L'evenement `tables:modifiees` etait ecoute et jamais emis
+
+Trois ecrans (saisie, tableau de bord, tables) y reagissaient ; aucun trigger ne
+l'envoyait. Une table recomposee pendant une seance ne se propageait donc pas.
+`diffuser_tables()` l'emet desormais.
 
 ## [OUVERT — 02/10/2026] `test:garde-fous` depend de la vraie campagne de juin : 34/39 sur Supabase
 
