@@ -1588,9 +1588,23 @@ pour septembre — **F-A4.4 (dupliquer avec les tables) n'est pas fait**.
 `test:garde-fous` 39/39, `test:invariants` 10/10, `test:import` 19/19,
 `test:agregats` 35/35, `test:repartition` 20/20 ; `tsc` front et backend propres.
 
-**Ce qui n'a PAS tourne au moment du commit** : rien sur Supabase. Le front de
-developpement attaque Supabase en direct (`.env`), donc le test au navigateur exige
-d'abord la migration en production.
+**Ce qui a tourne, sur Supabase** — les ports 5432/6543 etaient de nouveau bloques
+depuis le bureau (443 seul passait), la sequence a ete jouee en partage de connexion :
+- `migrate:deploy` : `20261002090000_campagne_creer` appliquee ;
+- `comparer` : **aucun ecart**, 25 migrations de part et d'autre ;
+- `test:rls` 97/97, `test:invariants` 10/10, `test:import` 19/19, `test:agregats`
+  35/35, `test:repartition` 20/20 ;
+- **`test:garde-fous` 34/39** — cinq echecs SANS RAPPORT avec ce lot : la suite pose
+  ses RDV d'essai sur la VRAIE campagne « Juin 2026 », cloturee le 02/10 par
+  l'utilisateur, et R-C.3 les refuse. Voir `BUGS-CONNUS.md`, en tete ;
+- PostgREST, cle publique : `rpc/campagne_creer` rend `42501` (refuse), une fonction
+  inexistante `PGRST202` — la fonction est donc exposee, et fermee a `anon`.
+
+**Front** : `master` pousse (`ae5dc11`), Cloudflare sert `index-CFAqIrVT.js`, le meme
+bundle que le build local.
+
+**Pas encore fait** : creer la campagne d'octobre depuis l'ecran. C'est la premiere
+utilisation reelle du bouton.
 
 **Correction non demandee, declaree** : `CLAUDE.md`, `README.md`, `ETAT-BACKEND.md`
 et `DEPLOIEMENT.md` annoncaient `test:agregats` a **27** tests ; la suite en rend

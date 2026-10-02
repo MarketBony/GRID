@@ -7,6 +7,34 @@ verifie, pas seulement corrige de memoire.
 
 ---
 
+## [OUVERT — 02/10/2026] `test:garde-fous` depend de la vraie campagne de juin : 34/39 sur Supabase
+
+`CLAUDE.md` affirmait que ses fixtures sont « creees, jamais choisies ». **C'est faux
+pour cette suite** : `tester-garde-fous.ts:75` lit `Juin 2026` par son libelle, puis
+son premier jour, son premier creneau et un vendeur VN Renault reels, et une
+quinzaine de controles s'y appuient.
+
+Le 02/10 l'utilisateur a cloture juin. Tout RDV d'essai y est donc refuse par R-C.3
+**avant** d'atteindre le garde-fou qu'il devait eprouver :
+
+| Controle en echec | Raison reelle |
+|---|---|
+| R-C.1 RDV sur une marque autorisee | campagne cloturee |
+| VN/VO RDV d'un vendeur VO sans marque | campagne cloturee |
+| dates : entree APRES une campagne ou le vendeur a des RDV | le RDV de preparation est refuse |
+| dates : sortie AVANT une campagne ou le vendeur a des RDV | idem |
+| dates : sortie APRES la campagne (non-regression) | idem |
+
+**Ce que ca ne dit PAS** : les garde-fous fonctionnent. La meme suite rend 39/39 en
+local, ou juin n'est pas cloturee, et `comparer` prouve que les deux schemas sont
+identiques. Mais sur Supabase, **cinq garde-fous ne sont plus eprouves**, et les
+prochaines campagnes cloturees n'y changeront rien.
+
+C'est exactement le defaut corrige dans `test:rls` le 01/09 : une suite de securite
+qu'un geste legitime de l'utilisateur fait tomber. Remede : le meme — un decor cree
+dans la transaction de chaque controle (campagne, jour, creneau, vendeurs VN et VO),
+a l'image de `poserDecor`.
+
 ## [CORRIGE LE 02/10/2026] Impossible de creer une campagne — la fonction n'avait jamais existe
 
 Constate par l'utilisateur le 02/10, pour la session du 06/10. Ce n'etait pas une

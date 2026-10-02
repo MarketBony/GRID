@@ -644,8 +644,11 @@ deux gestes légitimes faits depuis l'interface l'ont fait tomber à 82/87 sans 
 échec ne dise quoi que ce soit sur la RLS ; et archiver les comptes `.test` la
 **désarmait entièrement**, 0 contrôle exécuté, en silence. Elle fabrique désormais son
 propre monde dans la transaction de chaque contrôle. Même règle pour
-`test:garde-fous` : les fixtures sont **créées**, jamais **choisies** en base. Ce qui
+`test:garde-fous` : les fixtures doivent être **créées**, jamais **choisies** en base. Ce qui
 doit être éprouvé, c'est la contrainte, pas l'état de la base ce jour-là.
+*Ce n'est PAS encore le cas de `test:garde-fous`* : il s'appuie sur la vraie campagne
+« Juin 2026 », et sa clôture le 02/10 l'a fait tomber à 34/39 sur Supabase. Voir
+`BUGS-CONNUS.md`.
 
 **Toute lecture paginée porte un ORDRE STABLE, et pas seulement un contrôle de
 volume.** `LIMIT/OFFSET` sur une requête non ordonnée n'a aucune stabilité garantie :
