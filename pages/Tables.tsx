@@ -13,6 +13,7 @@ import {
 } from '../services/tables';
 import { chargerCampagnes, chargerCampagne, type CampagneResume } from '../services/campagnes';
 import { useTempsReel } from '../hooks/useTempsReel';
+import { EffectifsParSite } from '../components/effectifs/EffectifsParSite';
 import { comparerLibelle } from '../backend/src/utils/tri';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 
@@ -180,7 +181,7 @@ export function Tables() {
     <section className="ecran">
       <header className="ecran-entete">
         <div>
-          <h2>Tables</h2>
+          <h2>Effectifs</h2>
           <p className="note">
             Archiver une table rend ses membres à la réserve, où ils restent saisissables par leur
             chef de site.
@@ -223,13 +224,11 @@ export function Tables() {
         </div>
       )}
 
-      {parSite && (
-        <div className="info-bloc">
-          <strong>{session?.plaqueLibelle} est en mode « par site ».</strong> Cette plaque n’utilise
-          pas de tables : chaque chef de site saisit pour ses vendeurs, ce qui est le mode normal.
-          Composer des tables ici n’aurait aucun effet sur la saisie. Pour en utiliser, passer la
-          session en « par table » depuis l’écran Campagnes.
-        </div>
+      {/* EN MODE PAR SITE, on compose l'EFFECTIF (D12) : qui participe a la
+          seance. Il n'y a pas de tables, donc pas de reserve : la liste est celle
+          des vendeurs presents de la plaque. */}
+      {parSite && donnees && campagneId && (
+        <EffectifsParSite campagneId={campagneId} vendeurs={donnees.reserve} figee={figee} />
       )}
 
       {donnees && !parSite && (

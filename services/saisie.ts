@@ -45,6 +45,10 @@ export interface VendeurSaisie {
   /// deux filtres.
   dansMaTable: boolean;
   dansMonEquipe: boolean;
+  /// L'exception de l'ecran Effectifs : `false` = declare ABSENT de la seance.
+  /// Un absent sort de la grille par defaut (D11), il reste accessible par un
+  /// filtre — ses RDV eventuels ne disparaissent pas.
+  mobilise?: boolean | null;
 }
 
 export interface RdvSaisie {
@@ -104,6 +108,7 @@ interface ChargeSaisie {
   tables: unknown[];
   encadrements: { site_id: number }[];
   roles_campagne: { role: string; site_id: number | null; plaque_id: number | null }[];
+  mobilisations?: { vendeur_id: number; mobilise: boolean }[];
 }
 
 export async function chargerSaisie(campagneId: string): Promise<PerimetreSaisie> {
@@ -185,6 +190,7 @@ export async function chargerSaisie(campagneId: string): Promise<PerimetreSaisie
     if (r.role === 'chef_plaque' && r.plaque_id !== null) mesPlaques.add(txt(r.plaque_id));
   }
 
+  const mobilisationDe = new Map((brut.mobilisations ?? []).map((m) => [m.vendeur_id, m.mobilise]));
   const projetes: VendeurSaisie[] = lignesVendeurs.map((v) => ({
     id: txt(v.id),
     nom: v.nom,
@@ -193,6 +199,7 @@ export async function chargerSaisie(campagneId: string): Promise<PerimetreSaisie
     siteCode: v.site?.code ?? '',
     siteLibelle: v.site?.libelle ?? '',
     dansMaTable: vendeursDeMesTables.has(txt(v.id)),
+    mobilise: mobilisationDe.get(v.id) ?? null,
     dansMonEquipe:
       mesSites.has(txt(v.site?.id)) || mesPlaques.has(txt(v.site?.plaque_id)),
     sections:

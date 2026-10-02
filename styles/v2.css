@@ -521,3 +521,20 @@ html.animations-reduites .v2 *, html.animations-reduites .fond-vivant i { animat
   .v2 .issues, .v2 .avantages { justify-content: flex-start; }
 }
 }
+
+@layer v2 {
+/* ------------------------------------------------------------------ EFFECTIFS PAR SITE (D12) */
+.v2 .effectifs-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.v2 .effectif-ligne {
+  display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; cursor: pointer;
+  transition: opacity 300ms, background-color var(--t-fast);
+}
+.v2 .effectif-ligne:hover { background: var(--ctl-bg); }
+.v2 .effectif-ligne .nom { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .effectif-ligne.absent { opacity: .5; }
+.v2 .effectif-ligne.absent .nom { text-decoration: line-through; }
+}
+
+@layer v2 {
+.bascule-absents { display: flex; align-items: center; gap: 10px; padding: 6px 4px 10px; font-size: var(--fs-12); font-weight: 600; color: var(--text-2); cursor: pointer; }
+}

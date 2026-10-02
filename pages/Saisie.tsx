@@ -379,12 +379,18 @@ export function Saisie() {
   /// un piege — c'etait deja ecrit ici, et ca reste vrai.
   ///
   /// D'ou deux listes et non une : le total se calcule sur la premiere.
+  /// D11 : les vendeurs declares ABSENTS a l'ecran Effectifs sortent de la liste
+  /// par defaut, comme la reserve d'une table. Un interrupteur les fait revenir —
+  /// on ne cache pas un vendeur qui aurait quand meme des RDV a corriger.
+  const [voirAbsents, setVoirAbsents] = useState(false);
+  const absents = useMemo(() => (donnees?.vendeurs ?? []).filter((v) => v.mobilise === false), [donnees]);
+
   const vendeursOrigine = useMemo(() => {
-    const tous = donnees?.vendeurs ?? [];
+    const tous = (donnees?.vendeurs ?? []).filter((v) => voirAbsents || v.mobilise !== false);
     if (origineEffective === 'table') return tous.filter((v) => v.dansMaTable);
     if (origineEffective === 'equipe') return tous.filter((v) => v.dansMonEquipe);
     return tous;
-  }, [donnees, origineEffective]);
+  }, [donnees, origineEffective, voirAbsents]);
 
   /// Le total de l'origine courante. Il se somme sur `vendeursOrigine` et non sur
   /// tous les compteurs : c'est ce qui le fait suivre « ma table » / « mon
@@ -775,6 +781,16 @@ export function Saisie() {
             >
               Imprimer les plannings de l’équipe
             </button>
+          )}
+
+          {/* D11 : les absents declares a l'ecran Effectifs, masques par defaut. */}
+          {absents.length > 0 && (
+            <label className="v2 bascule-absents">
+              <input type="checkbox" className="interrupteur-v2" checked={voirAbsents} onChange={(e) => setVoirAbsents(e.target.checked)} />
+              <span>
+                Afficher les absents <span className="faint num">({absents.length})</span>
+              </span>
+            </label>
           )}
 
           {/* Le champ n'apparait qu'a partir de huit vendeurs : sur une table de
