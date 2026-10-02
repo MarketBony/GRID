@@ -3,6 +3,7 @@ import {
   AXES,
   classer,
   comparer,
+  duPhoning,
   totauxPar,
   totauxParJour,
   type Axe,
@@ -141,7 +142,7 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
     sessions: unknown[];
     vendeurs: unknown[];
     affectations: unknown[];
-    rdvs: { id: number; vendeur_id: number; type_vehicule: string; marque_id: number | null; jour: string; creneau_code: string }[];
+    rdvs: { id: number; vendeur_id: number; type_vehicule: string; marque_id: number | null; jour: string; creneau_code: string; source?: string }[];
     nb_rdvs: number;
   };
   if (!brut.campagne) throw new ErreurApi('Campagne introuvable.', 404);
@@ -266,7 +267,11 @@ async function chargerCampagne(campagneId: string): Promise<Charge> {
         effectifCibleTable: s.effectif_cible_table,
       })),
     vendeurs: lignesVendeur,
-    rdvs: rdvs.map((r) => ({
+    // LE PHONING SEULEMENT : le trafic naturel n'entre dans aucun total ni
+    // classement de la seance (D5). Le controle de volume ci-dessus porte sur
+    // TOUT ce que la base a rendu ; le filtre vient apres, et c'est `duPhoning`,
+    // source unique, qui le fait.
+    rdvs: duPhoning(rdvs).map((r) => ({
       id: txt(r.id),
       vendeurId: txt(r.vendeur_id),
       typeVehicule: r.type_vehicule as LigneRdv['typeVehicule'],
@@ -291,6 +296,7 @@ export interface EvenementRdv {
   creneauCode?: string;
   marqueId?: string | null;
   typeVehicule?: string;
+  source?: string;
   archive?: boolean;
 }
 
@@ -310,6 +316,8 @@ export interface EvenementRdv {
 /// qu'une requete de plus.
 export function appliquerRdv(d: Dashboard, e: EvenementRdv): Dashboard | null {
   if (!e.id || !e.vendeurId || !e.jour || !e.creneauCode || !e.typeVehicule) return null;
+  // Un RDV de trafic naturel n'existe pas pour le phoning (D5) : rien a appliquer.
+  if (duPhoning([e]).length === 0) return d;
   const autres = d.rdvs.filter((r) => r.id !== e.id);
   if (e.archive) {
     if (autres.length === d.rdvs.length) return d;

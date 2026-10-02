@@ -9,6 +9,7 @@ import {
   type LigneRdv,
   type LigneVendeur,
   type Totaux,
+  duPhoning,
 } from '../src/utils/agregats';
 import {
   ATTENDUS_SITES,
@@ -565,6 +566,23 @@ verifier(
   neuf.totalAnterieur === 0 && neuf.variation === null && ferme.total === 0 && ferme.variation === -100,
   `apparu : variation ${neuf.variation} (pas d infini) · disparu : ${ferme.ecart}`
 );
+
+// ---------------------------------------------------------------- trafic naturel
+// Un RDV showroom ajoute au jeu de juin ne doit RIEN changer aux totaux du
+// phoning, une fois passe par `duPhoning` — et il doit disparaitre de la liste.
+{
+  const avecShowroom = [
+    ...rdvs.map((x) => ({ ...x, source: 'relance' as const })),
+    { ...rdvs[0]!, source: 'showroom' as const },
+  ];
+  const filtres = duPhoning(avecShowroom);
+  const totalFiltre = totauxPar('groupe', filtres, vendeurs)[0]!.total;
+  verifier(
+    'trafic naturel : un RDV showroom ne compte pas dans le phoning',
+    filtres.length === rdvs.length && totalFiltre === groupe.total,
+    `${avecShowroom.length} lignes -> ${filtres.length} du phoning, total ${totalFiltre} (attendu ${groupe.total})`
+  );
+}
 
 // ---------------------------------------------------------------- restitution
 const largeur = Math.max(...resultats.map((r) => r.nom.length));

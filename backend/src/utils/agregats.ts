@@ -123,6 +123,18 @@ const rattachement = (v: LigneVendeur, axe: Axe): { cle: string; libelle: string
 
 const arrondi = (n: number) => Math.round(n * 100) / 100;
 
+/// LE PHONING, ET SEULEMENT LUI (lot 2 de PLAN-GRID-V2.md, 03/10/2026).
+///
+/// Un RDV de TRAFIC NATUREL (`source = 'showroom'`, saisi depuis le Suivi des
+/// RDV) n'est pas un resultat de la seance : il ne compte ni dans les totaux, ni
+/// dans les classements, ni dans la moyenne par vendeur du phoning (D5). Le
+/// filtre vit ICI, et nulle part ailleurs : un ecran qui l'oublierait gonflerait
+/// un classement sans que rien ne le signale. Une ligne SANS source est un RDV de
+/// phoning — tout l'historique anterieur au 03/10/2026, juin et septembre compris.
+export function duPhoning<T extends { source?: string | null }>(rdvs: T[]): T[] {
+  return rdvs.filter((r) => (r.source ?? 'relance') === 'relance');
+}
+
 /// QUI COMPTE DANS L'EFFECTIF — la regle du 08/09/2026, arbitree par l'utilisateur
 /// apres le premier exercice reel.
 ///

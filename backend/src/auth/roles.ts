@@ -69,6 +69,26 @@ export type TypeVehicule = (typeof TYPES_VEHICULE)[number];
 export const ORIGINES_AFFECTATION = ['auto', 'manuel'] as const;
 export type OrigineAffectation = (typeof ORIGINES_AFFECTATION)[number];
 
+/// Lot 2 de PLAN-GRID-V2.md (03/10/2026). `relance` : pris en seance de phoning ;
+/// `showroom` : trafic naturel, saisi depuis le Suivi des RDV et EXCLU des
+/// classements du phoning (`duPhoning` dans `utils/agregats.ts`).
+export const SOURCES_RDV = ['relance', 'showroom'] as const;
+export type SourceRdv = (typeof SOURCES_RDV)[number];
+
+/// L'issue d'un RDV suivi. Absente = « a traiter ». « Seche » n'est PAS une issue :
+/// c'est une commande sans DIAC, STOCK ni CS (D8).
+export const ISSUES_SUIVI = ['commande', 'offre_en_cours', 'annule', 'clos_sans_suite'] as const;
+export type IssueSuivi = (typeof ISSUES_SUIVI)[number];
+
+/// Ce que consigne `journal_compte`.
+export const ACTIONS_JOURNAL = [
+  'reinitialisation',
+  'changement_mot_de_passe',
+  'desactivation',
+  'reactivation',
+] as const;
+export type ActionJournal = (typeof ACTIONS_JOURNAL)[number];
+
 const dansLaListe = <T extends readonly string[]>(liste: T, valeur: unknown): boolean =>
   typeof valeur === 'string' && (liste as readonly string[]).includes(valeur);
 

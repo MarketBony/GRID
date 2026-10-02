@@ -54,6 +54,9 @@ import {
   MODES_SESSION,
   TYPES_VEHICULE,
   ORIGINES_AFFECTATION,
+  SOURCES_RDV,
+  ISSUES_SUIVI,
+  ACTIONS_JOURNAL,
   ROLES_GESTION_COMPTES,
   ROLES_ADMINISTRATION_REFERENTIELS,
 } from '../src/auth/roles';
@@ -90,6 +93,9 @@ const CHECKS: Attendu[] = [
     liste: ORIGINES_AFFECTATION,
     nomListe: 'ORIGINES_AFFECTATION',
   },
+  { contrainte: 'rdv_source_check', liste: SOURCES_RDV, nomListe: 'SOURCES_RDV' },
+  { contrainte: 'rdv_suivi_issue_check', liste: ISSUES_SUIVI, nomListe: 'ISSUES_SUIVI' },
+  { contrainte: 'journal_compte_action_check', liste: ACTIONS_JOURNAL, nomListe: 'ACTIONS_JOURNAL' },
 ];
 
 /// Extrait les litteraux d'une definition de contrainte.

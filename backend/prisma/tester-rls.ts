@@ -1702,6 +1702,134 @@ async function main() {
     (tx) => poser(tx, decor.vendeurHorsPerimetre.id, CLE)
   );
 
+  // --- SUIVI DES RDV, EFFECTIFS, JOURNAL (lot 2, 03/10/2026) ---
+  //
+  // Trois tables neuves : chacune dans les deux sens, comme le reste. Le RDV du
+  // decor est cree AVANT le changement d'identite, en proprietaire.
+  let rdvTable: bigint = 0n;
+  let rdvHors: bigint = 0n;
+  const deuxRdv = async (tx: Tx) => {
+    rdvTable = (await tx.rdv.create({ data: rdvDecor(decor.vendeurDeSaTable, decor.campagne1), select: { id: true } })).id;
+    rdvHors = (await tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, decor.campagne1), select: { id: true } })).id;
+  };
+  const qualifier = (tx: Tx, rdv: bigint, issue: string | null, diac = false) =>
+    tx.$queryRawUnsafe(
+      `SELECT relance.suivi_enregistrer($1, $2, $3, false, false, 'Clio', NULL)`,
+      rdv,
+      issue,
+      diac
+    );
+
+  await doitValoir(
+    'SUIVI  le chef qualifie un RDV de sa table',
+    { login: CHEF },
+    1,
+    async (tx) => {
+      await qualifier(tx, rdvTable, 'commande', true);
+      return nombre(tx, `SELECT count(*) AS n FROM relance.rdv_suivi WHERE rdv_id = ${rdvTable} AND issue = 'commande' AND diac`);
+    },
+    deuxRdv
+  );
+  await doitRefuser(
+    'SUIVI  le chef ne qualifie PAS un RDV hors perimetre',
+    { login: CHEF },
+    DROIT_INSUFFISANT,
+    (tx) => qualifier(tx, rdvHors, 'annule'),
+    deuxRdv
+  );
+  await doitValoir(
+    'SUIVI  le chef ne LIT pas le suivi d un RDV hors perimetre',
+    { login: CHEF },
+    0,
+    (tx) => nombre(tx, `SELECT count(*) AS n FROM relance.rdv_suivi WHERE rdv_id = ${rdvHors}`),
+    async (tx) => {
+      await deuxRdv(tx);
+      await tx.$executeRawUnsafe(`INSERT INTO relance.rdv_suivi (rdv_id, issue) VALUES (${rdvHors}, 'annule')`);
+    }
+  );
+  await doitRefuser(
+    'SUIVI  DIAC sur un RDV annule est refuse (CHECK)',
+    { login: ADMIN },
+    '23514',
+    (tx) => qualifier(tx, rdvTable, 'annule', true),
+    deuxRdv
+  );
+  await doitRefuser(
+    'SUIVI  aucun DELETE sur le suivi',
+    { login: ADMIN },
+    DROIT_INSUFFISANT,
+    (tx) => tx.$executeRawUnsafe(`DELETE FROM relance.rdv_suivi`),
+    deuxRdv
+  );
+  await doitValoir(
+    'SHOWROOM  le chef pose un RDV de trafic naturel, marque showroom',
+    { login: CHEF },
+    1,
+    async (tx) => {
+      await tx.$queryRawUnsafe(
+        `SELECT relance.rdv_poser_showroom($1, $2, $3::date, $4, NULL, 'VO', 'CLIENT SHOWROOM', $5::uuid)`,
+        decor.campagne1.id,
+        decor.vendeurDeSaTable.id,
+        decor.campagne1.jours[0],
+        decor.campagne1.creneau,
+        '00000000-0000-4000-8000-000000000043'
+      );
+      return nombre(tx, `SELECT count(*) AS n FROM relance.rdv WHERE client = 'CLIENT SHOWROOM' AND source = 'showroom'`);
+    }
+  );
+  await doitRefuser(
+    'EFFECTIFS  un encadrant ne compose pas la mobilisation',
+    { login: ENCADRANT },
+    DROIT_INSUFFISANT,
+    (tx) =>
+      tx.$executeRawUnsafe(
+        `INSERT INTO relance.mobilisation (campagne_id, vendeur_id, mobilise) VALUES (${decor.campagne1.id}, ${decor.vendeurEncadre.id}, false)`
+      )
+  );
+  await doitAccepter('EFFECTIFS  la direction compose la mobilisation', { login: DIRECTION }, (tx) =>
+    tx.$executeRawUnsafe(
+      `INSERT INTO relance.mobilisation (campagne_id, vendeur_id, mobilise) VALUES (${decor.campagne1.id}, ${decor.vendeurEncadre.id}, false)`
+    )
+  );
+  const journalPrepare = async (tx: Tx) => {
+    await tx.$executeRawUnsafe(
+      `INSERT INTO relance.journal_compte (cible_id, action) SELECT id, 'reinitialisation' FROM relance.utilisateur WHERE login_id = '${ENCADRANT}'`
+    );
+  };
+  await doitValoir(
+    'JOURNAL  invisible a un encadrant',
+    { login: ENCADRANT },
+    0,
+    (tx) => nombre(tx, `SELECT count(*) AS n FROM relance.journal_compte`),
+    journalPrepare
+  );
+  await doitValoir(
+    'JOURNAL  lisible par un admin',
+    { login: ADMIN },
+    1,
+    (tx) =>
+      nombre(
+        tx,
+        `SELECT count(*) AS n FROM relance.journal_compte j JOIN relance.utilisateur u ON u.id = j.cible_id WHERE u.login_id = '${ENCADRANT}'`
+      ),
+    journalPrepare
+  );
+  await doitRefuser(
+    'JOURNAL  la direction ne peut pas consigner une reinitialisation',
+    { login: DIRECTION },
+    ERREUR_METIER,
+    (tx) => tx.$executeRawUnsafe(`SELECT relance.compte_reinitialise((SELECT id FROM relance.utilisateur WHERE login_id = '${ENCADRANT}'))`)
+  );
+  await doitValoir(
+    'COMPTES  reinitialiser oblige a choisir son mot de passe',
+    { login: ADMIN },
+    1,
+    async (tx) => {
+      await tx.$executeRawUnsafe(`SELECT relance.compte_reinitialise((SELECT id FROM relance.utilisateur WHERE login_id = '${ENCADRANT}'))`);
+      return nombre(tx, `SELECT count(*) AS n FROM relance.utilisateur WHERE login_id = '${ENCADRANT}' AND doit_changer_mdp`);
+    }
+  );
+
   // ------------------------------------------------------------------ rapport
 
   const largeur = Math.max(...resultats.map((r) => r.nom.length));

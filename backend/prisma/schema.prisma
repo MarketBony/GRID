@@ -54,9 +54,9 @@ datasource db {
 /// de juin 2026 ne figurent pas parmi les 99 vendeurs, ce sont des encadrants
 /// sans bloc de saisie. Un vendeur qui se connecte porte `Vendeur.utilisateurId`.
 model Utilisateur {
-  id           BigInt    @id @default(autoincrement())
-  loginId      String    @unique @map("login_id")
-  passwordHash String    @map("password_hash")
+  id           BigInt @id @default(autoincrement())
+  loginId      String @unique @map("login_id")
+  passwordHash String @map("password_hash")
 
   /// Identite Supabase Auth (`auth.users.id`), sur laquelle repose TOUTE
   /// l'autorisation depuis la bascule sans serveur : `relance.utilisateur_courant()`
@@ -70,12 +70,17 @@ model Utilisateur {
   /// autre schema sans `multiSchema`, et une FK qu'il ignore serait proposee a la
   /// suppression a chaque `migrate diff`. Motif detaille dans la migration
   /// `20260831200000_auth_uid`.
-  authUid      String?   @unique @map("auth_uid") @db.Uuid
-  nom          String
-  actif        Boolean   @default(true)
-  creeLe       DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
-  creePar      BigInt?   @map("cree_par")
-  archiveLe    DateTime? @map("archive_le") @db.Timestamptz(6)
+  authUid String? @unique @map("auth_uid") @db.Uuid
+
+  /// Pose par `compte_reinitialise` quand un administrateur remplace le mot de
+  /// passe, retire par `mot_de_passe_choisi` : a la connexion suivante,
+  /// l'utilisateur choisit le sien (D14 de PLAN-GRID-V2.md).
+  doitChangerMdp Boolean   @default(false) @map("doit_changer_mdp")
+  nom            String
+  actif          Boolean   @default(true)
+  creeLe         DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar        BigInt?   @map("cree_par")
+  archiveLe      DateTime? @map("archive_le") @db.Timestamptz(6)
 
   rolesGlobaux  RoleGlobal[]
   rolesCampagne RoleCampagne[]
@@ -84,6 +89,7 @@ model Utilisateur {
   /// Sites que ce compte encadre — chef de site, chef de vente VN ou VO. Durable,
   /// contrairement a `tablesAnimees` qui appartient a une campagne.
   sitesEncadres EncadrementSite[]
+  journal       JournalCompte[]   @relation("journal_cible")
 
   @@map("utilisateur")
 }
@@ -205,7 +211,7 @@ model Site {
   creePar   BigInt?   @map("cree_par")
   archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)
 
-  plaque        Plaque         @relation(fields: [plaqueId], references: [id])
+  plaque        Plaque            @relation(fields: [plaqueId], references: [id])
   vendeurs      Vendeur[]
   /// Encadrants rattaches a ce site — chef de site, chefs de vente VN et VO.
   encadrants    EncadrementSite[]
@@ -313,11 +319,12 @@ model Vendeur {
   archiveLe  DateTime? @map("archive_le") @db.Timestamptz(6)
   archivePar BigInt?   @map("archive_par")
 
-  site         Site            @relation(fields: [siteId], references: [id])
-  utilisateur  Utilisateur?    @relation(fields: [utilisateurId], references: [id])
-  marques      VendeurMarque[]
-  affectations Affectation[]
-  rdvs         Rdv[]
+  site          Site            @relation(fields: [siteId], references: [id])
+  utilisateur   Utilisateur?    @relation(fields: [utilisateurId], references: [id])
+  marques       VendeurMarque[]
+  affectations  Affectation[]
+  rdvs          Rdv[]
+  mobilisations Mobilisation[]
 
   @@index([siteId])
   @@map("vendeur")
@@ -368,6 +375,7 @@ model Campagne {
   sessions      SessionPlaque[]
   rdvs          Rdv[]
   rolesCampagne RoleCampagne[]
+  mobilisations Mobilisation[]
 
   @@map("campagne")
 }
@@ -563,6 +571,15 @@ model Rdv {
   /// 03/10/2026 n'en ont pas, et les NULL ne se heurtent pas entre eux.
   cleClient String? @unique @map("cle_client") @db.Uuid
 
+  /// `relance` (pris en seance de phoning) | `showroom` (trafic naturel, saisi
+  /// depuis le Suivi des RDV). Liste valide : `SOURCES_RDV` dans
+  /// `backend/src/auth/roles.ts`, comparee au CHECK par `test:invariants`.
+  /// UN RDV SHOWROOM NE COMPTE PAS DANS LES CLASSEMENTS DU PHONING (D5) : le
+  /// filtre est `duPhoning` dans `agregats.ts`, source unique.
+  source String @default("relance")
+
+  suivi RdvSuivi?
+
   creeLe     DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
   creePar    BigInt?   @map("cree_par")
   modifieLe  DateTime? @map("modifie_le") @db.Timestamptz(6)
@@ -580,7 +597,7 @@ model Rdv {
   /// defaut pour une relation optionnelle : un RDV dont la marque serait annulee
   /// violerait aussitot le trigger « marque obligatoire pour un vendeur VN ». La
   /// suppression d'une marque est de toute facon interdite par trigger.
-  marque Marque? @relation(fields: [marqueId], references: [id], onDelete: Restrict)
+  marque   Marque?  @relation(fields: [marqueId], references: [id], onDelete: Restrict)
 
   /// GARDE-FOU R-A.2 — cles etrangeres COMPOSITES. Un RDV ne peut porter qu'un
   /// jour et un creneau QUI APPARTIENNENT A SA CAMPAGNE. Consequence voulue :
@@ -593,4 +610,71 @@ model Rdv {
   @@index([campagneId, vendeurId])
   @@index([campagneId, jour, creneauCode])
   @@map("rdv")
+}
+
+/// LE SUIVI D'UN RDV EN CONCESSION — rubrique « Suivi des RDV » (lot 2 de
+/// PLAN-GRID-V2.md). Une ligne par RDV, creee au premier geste de suivi.
+///
+/// `issue` NULLABLE : vide = « a traiter ». C'est ce qui permet de revenir en
+/// arriere sans supprimer (interdit n.1). Liste valide : `ISSUES_SUIVI`.
+/// DIAC / STOCK / CS n'ont de sens que pour une commande : un CHECK l'impose.
+/// « SECHE » N'EST PAS STOCKEE : c'est une commande sans aucun des trois (D8).
+/// Aucun agregat ici (interdit n.2) : les taux se calculent a la lecture.
+model RdvSuivi {
+  rdvId       BigInt    @id @map("rdv_id")
+  issue       String?
+  diac        Boolean   @default(false)
+  stock       Boolean   @default(false)
+  cs          Boolean   @default(false)
+  modele      String?
+  commentaire String?
+  creeLe      DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar     BigInt?   @map("cree_par")
+  modifieLe   DateTime? @map("modifie_le") @db.Timestamptz(6)
+  modifiePar  BigInt?   @map("modifie_par")
+
+  rdv Rdv @relation(fields: [rdvId], references: [id], onDelete: Restrict)
+
+  @@map("rdv_suivi")
+}
+
+/// QUI EST MOBILISE A UNE CAMPAGNE — onglet Effectifs (D12). Une ligne par
+/// EXCEPTION : sans ligne, la regle par defaut s'applique (en mode par site, tout
+/// vendeur present est mobilise ; en mode par table, la reserve ne l'est pas,
+/// arbitrage du 08/09). On bascule `mobilise`, on ne supprime jamais.
+/// La regle de calcul reste `mobilisation()` dans `agregats.ts`.
+model Mobilisation {
+  id         BigInt    @id @default(autoincrement())
+  campagneId BigInt    @map("campagne_id")
+  vendeurId  BigInt    @map("vendeur_id")
+  mobilise   Boolean   @default(false)
+  motif      String?
+  creeLe     DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar    BigInt?   @map("cree_par")
+  modifieLe  DateTime? @map("modifie_le") @db.Timestamptz(6)
+
+  campagne Campagne @relation(fields: [campagneId], references: [id], onDelete: Restrict)
+  vendeur  Vendeur  @relation(fields: [vendeurId], references: [id], onDelete: Restrict)
+
+  @@unique([campagneId, vendeurId])
+  @@index([vendeurId])
+  @@map("mobilisation")
+}
+
+/// QUI A FAIT QUOI SUR LES COMPTES. Alimente UNIQUEMENT par des fonctions
+/// `security definer` (auteur = `utilisateur_courant()`), lisible par les admins.
+/// Le journal d'audit de Supabase etait vide en base : on ne pouvait pas savoir
+/// qui avait reinitialise quel mot de passe. Liste valide : `ACTIONS_JOURNAL`.
+model JournalCompte {
+  id      BigInt   @id @default(autoincrement())
+  creeLe  DateTime @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar BigInt?  @map("cree_par")
+  cibleId BigInt   @map("cible_id")
+  action  String
+  detail  String?
+
+  cible Utilisateur @relation("journal_cible", fields: [cibleId], references: [id], onDelete: Restrict)
+
+  @@index([cibleId])
+  @@map("journal_compte")
 }
