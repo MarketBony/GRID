@@ -227,8 +227,8 @@ export function Vendeurs() {
   const actifs = donnees.vendeurs.filter((v) => !v.dateSortie);
 
   return (
-    <section className="ecran">
-      <header className="ecran-entete">
+    <div className="page">
+      <div className="app-head enter">
         <div>
           <h2>Vendeurs</h2>
         </div>
@@ -239,7 +239,7 @@ export function Vendeurs() {
             {actifs.filter((v) => v.typeVehicule === 'VO').length} VO
           </span>
         </div>
-      </header>
+      </div>
 
       {/* BARRE COLLANTE. Elle porte le seul chemin court vers « ajouter un
           vendeur » et le filtre qui reduit les 19 cartes : les deux ne servent a
@@ -495,7 +495,7 @@ export function Vendeurs() {
           }
         />
       ))}
-    </section>
+    </div>
   );
 }
 
@@ -598,7 +598,7 @@ function CarteSite({
   }, [vendeurs, afficherSortis, tri, filtreNom]);
 
   return (
-    <div className="carte">
+    <div className="card pad enter">
       <h3>
         {site.libelle}
         <span className="etiquette">{site.code}</span>

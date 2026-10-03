@@ -120,6 +120,12 @@ export default function App() {
           <Saisie />
         ) : courante === 'tableau' ? (
           <Dashboard />
+        ) : courante === 'effectifs' && droits.administre ? (
+          <Tables />
+        ) : courante === 'vendeurs' && droits.administre ? (
+          <Vendeurs />
+        ) : courante === 'campagnes' && droits.administre ? (
+          <Campagne />
         ) : (
           <div className="page page-ancienne">
 

@@ -178,8 +178,8 @@ export function Tables() {
   const parSite = session?.mode === 'par_site';
 
   return (
-    <section className="ecran">
-      <header className="ecran-entete">
+    <div className="page">
+      <div className="app-head enter">
         <div>
           <h2>Effectifs</h2>
           <p className="note">
@@ -187,7 +187,7 @@ export function Tables() {
             chef de site.
           </p>
         </div>
-        <div className="selecteurs">
+        <div className="droite">
           <select
             value={campagneId ?? ''}
             onChange={(e) => setCampagneId(e.target.value)}
@@ -212,7 +212,7 @@ export function Tables() {
             ))}
           </select>
         </div>
-      </header>
+      </div>
 
       {erreur && <div className="erreur-bloc">{erreur}</div>}
       {succes && <div className="succes-bloc">{succes}</div>}
@@ -420,7 +420,7 @@ export function Tables() {
           </div>
         </>
       )}
-    </section>
+    </div>
   );
 }
 

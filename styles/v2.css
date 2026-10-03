@@ -855,3 +855,53 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .ile .item { transition: color var(--t-med), padding 280ms var(--ease-out); }
 .ile .item .lib { transition: max-width 280ms var(--ease-out), opacity 180ms; }
 }
+
+@layer v2 {
+/* ------------------------------------------------------------------ CAMPAGNES / VENDEURS / EFFECTIFS v2 */
+.v2 .app-head h2 { margin: 0; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; font-size: 17px; letter-spacing: .03em; }
+.v2 .app-head > div:first-child .note { margin: 2px 0 0; }
+/* Boutons NUS des ecrans d'origine : controles v2, sans la bordure ni le flou
+   que l'ancienne feuille donnait a tout `button`. */
+.v2 .page button:not([class]) {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px;
+  border: 0; border-radius: var(--r-sm); backdrop-filter: none; -webkit-backdrop-filter: none;
+  font: 600 var(--fs-13) var(--font-ui); color: var(--text); cursor: pointer;
+  background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: transform 620ms var(--ressort-ample), background-color var(--t-fast), box-shadow var(--t-fast);
+}
+.v2 .page button:not([class]):hover:not(:disabled) { background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
+.v2 .page button:not([class]):active:not(:disabled) { transform: scale(.95); transition-duration: 90ms; }
+.v2 .page button { backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* Le bouton d'action de l'en-tete reste l'action principale de l'ecran. */
+.v2 .app-head .droite > button:not([class]) { background: var(--bony-grad); color: #fff; box-shadow: none; }
+.v2 .app-head .droite > button:not([class]):hover:not(:disabled) { background: var(--bony-grad); filter: brightness(1.08); }
+.v2 .champs { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.v2 .champs label { display: grid; gap: 6px; font-size: var(--fs-11); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+.v2 .card.pad + .card.pad { margin-top: 0; }
+.v2 .page > .card { min-width: 0; }
+/* Effectifs : la reserve et les tables, en colonnes de verre */
+.v2 .plateau > *, .v2 .colonne-table, .v2 .reserve { background: var(--box-bg); border: 0; border-radius: var(--r-lg); box-shadow: inset 0 0 0 1px var(--box-line); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+@layer v2 {
+.v2 .page input:not([type="checkbox"]):not([type="radio"]):not(.input), .v2 .page select:not(.select), .v2 .page textarea:not(.textarea) {
+  height: 34px; padding: 0 11px; border: 0; outline: 0; border-radius: var(--r-sm); text-transform: none; letter-spacing: 0;
+  font: 500 var(--fs-13) var(--font-ui); color: var(--text); background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  backdrop-filter: none; -webkit-backdrop-filter: none; transition: box-shadow var(--t-med) var(--ressort-vif);
+}
+.v2 .page input:focus, .v2 .page select:focus, .v2 .page textarea:focus { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--focus); }
+.v2 .page select option { background: var(--surface-1); color: var(--text); }
+.v2 th button, .v2 th.triable button { border: 0; padding: 0; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; height: auto; }
+.v2 th button:hover { color: var(--text); }
+}
+
+@layer v2 {
+.v2 .card th { background: none; border: 0; border-radius: 0; box-shadow: inset 0 -1px 0 var(--line); backdrop-filter: none; -webkit-backdrop-filter: none; padding: 8px 10px; font-size: var(--fs-11); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); }
+.v2 .card td { border-color: var(--line); }
+}
+
+@layer v2 {
+.v2 .page th button:not([class]) { height: auto; padding: 0; background: none; box-shadow: none; font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; }
+.v2 .page th button:not([class]):hover:not(:disabled) { background: none; box-shadow: none; color: var(--text); }
+.v2 .card table.tableau th, .v2 .card table th { background: transparent; }
+}

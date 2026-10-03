@@ -118,17 +118,17 @@ export function Campagne() {
     // en pose toujours deux, mais rien ne le garantit en production.
     if (listeChargee && liste.length === 0) {
       return (
-        <section className="ecran">
-          <header className="ecran-entete">
+        <div className="page">
+          <div className="app-head enter">
             <div>
               <h2>Campagnes</h2>
             </div>
-          </header>
+          </div>
           <div className="erreur-bloc">
             Aucune campagne en base. La creation reprend les creneaux d'une campagne existante :
             il en faut une premiere, posee par le seed.
           </div>
-        </section>
+        </div>
       );
     }
     return <div className="attente">Chargement de la campagne...</div>;
@@ -255,12 +255,12 @@ export function Campagne() {
   };
 
   return (
-    <section className="ecran">
-      <header className="ecran-entete">
+    <div className="page">
+      <div className="app-head enter">
         <div>
           <h2>Campagnes</h2>
         </div>
-        <div className="selecteurs">
+        <div className="droite">
           <select value={idCourant ?? ''} onChange={(e) => setIdCourant(e.target.value)}>
             {liste.map((c) => (
               <option key={c.id} value={c.id}>
@@ -282,7 +282,7 @@ export function Campagne() {
             </button>
           )}
         </div>
-      </header>
+      </div>
 
       {message && <div className="erreur-bloc">{message}</div>}
       {succes && <div className="succes-bloc">{succes}</div>}
@@ -300,7 +300,7 @@ export function Campagne() {
       }} />}
 
       {/* -------------------------------------------------------- identite */}
-      <div className="carte">
+      <div className="card pad enter">
         <h3>Identite</h3>
         <div className="champs">
           <label>
@@ -352,7 +352,7 @@ export function Campagne() {
       </div>
 
       {/* -------------------------------------------------------- jours */}
-      <div className="carte">
+      <div className="card pad enter">
         <h3>Jours retenus ({detail.jours.length})</h3>
         <ul className="puces">
           {detail.jours.map((j) => (
@@ -377,7 +377,7 @@ export function Campagne() {
       </div>
 
       {/* -------------------------------------------------------- creneaux */}
-      <div className="carte">
+      <div className="card pad enter">
         <h3>Creneaux ({detail.creneaux.length})</h3>
         <ol className="liste-creneaux">
           {detail.creneaux.map((c, i) => (
@@ -426,7 +426,7 @@ export function Campagne() {
       </div>
 
       {/* -------------------------------------------------------- sessions */}
-      <div className="carte">
+      <div className="card pad enter">
         <h3>Mode d'organisation par plaque</h3>
         <p className="note">
           Basculer en « par site » ne supprime aucune table : la composition reste et se retrouve
@@ -489,7 +489,7 @@ export function Campagne() {
       </div>
 
       {/* -------------------------------------------------------- cloture */}
-      <div className="carte">
+      <div className="card pad enter">
         <h3>Cloture</h3>
         <p className="note">
           Clôturer fige la campagne : plus aucune saisie, plus aucune modification de jour ni de
@@ -526,7 +526,7 @@ export function Campagne() {
               : 'Clôturer la campagne'}
         </button>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -562,7 +562,7 @@ function FormulaireCreation({
   };
 
   return (
-    <div className="carte">
+    <div className="card pad enter">
       <h3>Nouvelle campagne</h3>
       {erreur && <div className="erreur-bloc">{erreur}</div>}
       <form
