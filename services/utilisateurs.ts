@@ -233,11 +233,19 @@ export async function modifierCompte(
   return compte;
 }
 
-export const reinitialiserMotDePasse = (id: string, motDePasse?: string) =>
-  gererComptes<{ nom: string; motDePasse: string; genere: boolean }>('mot-de-passe', {
+/// Remplace le mot de passe (Edge Function), PUIS le consigne en base : qui a
+/// reinitialise qui, et quand (`journal_compte`), et la personne devra choisir le
+/// sien a la connexion suivante (D14). L'Edge Function n'est pas modifiee — son
+/// deploiement demande un jeton absent du poste ; la consignation passe par
+/// `compte_reinitialise`, reservee aux admins par la base.
+export async function reinitialiserMotDePasse(id: string, motDePasse?: string) {
+  const r = await gererComptes<{ nom: string; motDePasse: string; genere: boolean }>('mot-de-passe', {
     utilisateurId: id,
     motDePasse,
   });
+  verifier(await supabase.rpc('compte_reinitialise', { p_utilisateur_id: Number(id) }));
+  return r;
+}
 
 /// Suppression definitive. N'accepte qu'un compte SANS historique — un compte qui
 /// a anime une table explique la composition d'une campagne passee, et son retrait
