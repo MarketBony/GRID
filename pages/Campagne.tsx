@@ -18,6 +18,9 @@ import { useReferentiels } from '../hooks/useReferentiels';
 import { chargerSuivi, versLigneSuivi } from '../services/suivi';
 import { indicateurs } from '../backend/src/utils/suivi';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
+import { useIndicateurGlissant } from '../hooks/useIndicateurGlissant';
+import { Icone } from '../components/ui/Icone';
+import { Compteur } from '../components/ui/Compteur';
 
 // ============================================================================
 // ECRAN A4 — CAMPAGNE (F-A4.1 a F-A4.6)
@@ -113,6 +116,12 @@ export function Campagne() {
       />
     ) : null;
 
+  const curseurCampagne = useIndicateurGlissant(
+    Math.max(0, liste.findIndex((c) => c.id === idCourant)),
+    liste.length,
+    'y'
+  );
+
   if (!detail) {
     // Le seul ecran sans campagne a montrer est celui d'une base vide : le seed
     // en pose toujours deux, mais rien ne le garantit en production.
@@ -120,18 +129,24 @@ export function Campagne() {
       return (
         <div className="page">
           <div className="app-head enter">
-            <div>
-              <h2>Campagnes</h2>
-            </div>
+            <h1>Campagnes</h1>
           </div>
-          <div className="erreur-bloc">
+          <div className="bandeau-v2">
             Aucune campagne en base. La creation reprend les creneaux d'une campagne existante :
             il en faut une premiere, posee par le seed.
           </div>
         </div>
       );
     }
-    return <div className="attente">Chargement de la campagne...</div>;
+    return (
+      <div className="page">
+        <div className="skel" style={{ height: 40, width: 260 }} />
+        <div className="camp-v2">
+          <div className="skel" style={{ height: 360 }} />
+          <div className="skel" style={{ height: 360 }} />
+        </div>
+      </div>
+    );
   }
 
   const figee = detail.cloturee;
@@ -257,274 +272,319 @@ export function Campagne() {
   return (
     <div className="page">
       <div className="app-head enter">
-        <div>
-          <h2>Campagnes</h2>
-        </div>
+        <h1>Campagnes</h1>
+        <span className="sub">{liste.length} campagne{liste.length > 1 ? 's' : ''}</span>
         <div className="droite">
-          <select value={idCourant ?? ''} onChange={(e) => setIdCourant(e.target.value)}>
-            {liste.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.libelle}
-                {c.cloturee ? ' (cloturee)' : ''}
-              </option>
-            ))}
-          </select>
           {!creation && (
             <button
               type="button"
+              className="btn primary"
               onClick={() => {
                 setMessage(null);
                 setSucces(null);
                 setCreation(true);
               }}
             >
-              Nouvelle campagne
+              <Icone nom="plus" petite /> Nouvelle campagne
             </button>
           )}
         </div>
       </div>
 
-      {message && <div className="erreur-bloc">{message}</div>}
-      {succes && <div className="succes-bloc">{succes}</div>}
+      {message && <div className="bandeau-v2 erreur" role="alert">{message}</div>}
+      {succes && <div className="bandeau-v2 ok" role="status">{succes}</div>}
       {formulaireCreation}
-      {figee && (
-        <div className="erreur-bloc">
-          Campagne cloturee : ses jours, ses creneaux et ses RDV sont figes. C'est ce qui garantit
-          qu'un dashboard de campagne passee ne bougera plus.
-        </div>
-      )}
 
       {conflit && <DialogueConflit conflit={conflit} onAnnuler={() => setConflit(null)} onDeplacer={(vers) => {
         if (conflit.type === 'jours') void soumettreJours(conflit.cible, { mode: 'deplacer', vers });
         else void soumettreCreneaux(conflit.cible, { mode: 'deplacer', vers });
       }} />}
 
-      {/* -------------------------------------------------------- identite */}
-      <div className="card pad enter">
-        <h3>Identite</h3>
-        <div className="champs">
-          <label>
-            Libelle
-            <input
-              defaultValue={detail.libelle}
-              disabled={figee}
-              onBlur={(e) => {
-                if (e.target.value.trim() && e.target.value !== detail.libelle) {
-                  void agir(
-                    () => modifierCampagne(detail.id, { libelle: e.target.value.trim() }).then(() => recharger(detail.id)),
-                    'Libelle enregistre.'
-                  );
-                }
-              }}
-            />
-          </label>
-          <label>
-            Debut
-            <input
-              type="date"
-              defaultValue={detail.dateDebut.slice(0, 10)}
-              disabled={figee}
-              onChange={(e) =>
-                e.target.value &&
-                void agir(
-                  () => modifierCampagne(detail.id, { dateDebut: e.target.value }).then(() => recharger(detail.id)),
-                  'Date de debut enregistree.'
-                )
-              }
-            />
-          </label>
-          <label>
-            Fin
-            <input
-              type="date"
-              defaultValue={detail.dateFin.slice(0, 10)}
-              disabled={figee}
-              onChange={(e) =>
-                e.target.value &&
-                void agir(
-                  () => modifierCampagne(detail.id, { dateFin: e.target.value }).then(() => recharger(detail.id)),
-                  'Date de fin enregistree.'
-                )
-              }
-            />
-          </label>
-        </div>
-      </div>
-
-      {/* -------------------------------------------------------- jours */}
-      <div className="card pad enter">
-        <h3>Jours retenus ({detail.jours.length})</h3>
-        <ul className="puces">
-          {detail.jours.map((j) => (
-            <li key={j.jour}>
-              <span>{formaterJour(j.jour)}</span>
-              {!figee && (
-                <button type="button" className="retirer" onClick={() => retirerJour(j.jour)} aria-label={`Retirer ${j.jour}`}>
-                  x
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-        {!figee && (
-          <div className="ajout">
-            <input type="date" value={nouveauJour} onChange={(e) => setNouveauJour(e.target.value)} />
-            <button type="button" className="principal" onClick={ajouterJour} disabled={!nouveauJour}>
-              Ajouter ce jour
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* -------------------------------------------------------- creneaux */}
-      <div className="card pad enter">
-        <h3>Creneaux ({detail.creneaux.length})</h3>
-        <ol className="liste-creneaux">
-          {detail.creneaux.map((c, i) => (
-            <li key={c.code}>
-              <span className="code">{c.code}</span>
-              <span className="libelle">{c.libelle}</span>
-              {!figee && (
-                <span className="actions-ligne">
-                  <button type="button" onClick={() => deplacerCreneau(i, -1)} disabled={i === 0} aria-label="Monter">
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deplacerCreneau(i, 1)}
-                    disabled={i === detail.creneaux.length - 1}
-                    aria-label="Descendre"
-                  >
-                    ↓
-                  </button>
-                  <button type="button" className="retirer" onClick={() => retirerCreneau(c.code)} aria-label="Retirer">
-                    x
-                  </button>
+      <div className="camp-v2">
+        {/* La liste des campagnes : le curseur glisse d'une campagne a l'autre,
+            comme la liste des vendeurs de la saisie. */}
+        <aside className="card camp-liste enter" style={{ ['--i' as string]: 1 }}>
+          <div className="camp-liste-corps" ref={curseurCampagne.conteneur}>
+            <span className="curseur-v2" aria-hidden="true" ref={curseurCampagne.indicateur} />
+            {liste.map((c, i) => (
+              <button
+                key={c.id}
+                type="button"
+                ref={curseurCampagne.cible(i)}
+                className={`camp-item${c.id === idCourant ? ' actif' : ''}`}
+                onClick={() => setIdCourant(c.id)}
+              >
+                <span className="nom">{c.libelle}</span>
+                <span className="dates">
+                  {formaterCourt(c.dateDebut)} → {formaterCourt(c.dateFin)}
                 </span>
+                <span className={`etat-point${c.cloturee ? ' fige' : ''}`} title={c.cloturee ? 'Clôturée' : 'Ouverte'} />
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <div className="camp-detail">
+          {/* -------------------------------------------------------- en-tete */}
+          <section className="card pad camp-hero enter" style={{ ['--i' as string]: 2 }} key={detail.id}>
+            <div className="hero-ligne">
+              <input
+                className="hero-titre"
+                aria-label="Libellé de la campagne"
+                defaultValue={detail.libelle}
+                disabled={figee}
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  if (v && v !== detail.libelle) {
+                    void agir(
+                      () => modifierCampagne(detail.id, { libelle: v }).then(() => recharger(detail.id)),
+                      'Libellé enregistré.'
+                    );
+                  }
+                }}
+              />
+              <span className={`etat-campagne${figee ? ' fige' : ''}`}>
+                {figee ? <><Icone nom="cadenas" petite /> Clôturée</> : <><i /> Ouverte</>}
+              </span>
+            </div>
+            <div className="hero-dates">
+              <Icone nom="calendrier" petite />
+              <span>Du</span>
+              <input
+                type="date"
+                className="input"
+                defaultValue={detail.dateDebut.slice(0, 10)}
+                disabled={figee}
+                onChange={(e) =>
+                  e.target.value &&
+                  void agir(
+                    () => modifierCampagne(detail.id, { dateDebut: e.target.value }).then(() => recharger(detail.id)),
+                    'Date de début enregistrée.'
+                  )
+                }
+              />
+              <span>au</span>
+              <input
+                type="date"
+                className="input"
+                defaultValue={detail.dateFin.slice(0, 10)}
+                disabled={figee}
+                onChange={(e) =>
+                  e.target.value &&
+                  void agir(
+                    () => modifierCampagne(detail.id, { dateFin: e.target.value }).then(() => recharger(detail.id)),
+                    'Date de fin enregistrée.'
+                  )
+                }
+              />
+            </div>
+            <div className="kpis">
+              <div className="kpi accent">
+                <span className="l">Jours</span>
+                <span className="v"><Compteur valeur={detail.jours.length} /></span>
+              </div>
+              <div className="kpi">
+                <span className="l">Créneaux</span>
+                <span className="v"><Compteur valeur={detail.creneaux.length} /></span>
+              </div>
+              <div className="kpi">
+                <span className="l">Cases par vendeur</span>
+                <span className="v"><Compteur valeur={detail.jours.length * detail.creneaux.length} /></span>
+              </div>
+              <div className="kpi">
+                <span className="l">Vendeurs saisissables</span>
+                <span className="v"><Compteur valeur={detail.vendeursSaisissables} /></span>
+              </div>
+            </div>
+          </section>
+
+          <div className="camp-grille">
+            {/* -------------------------------------------------------- jours */}
+            <section className="card pad enter" style={{ ['--i' as string]: 3 }}>
+              <h3 className="card-titre"><Icone nom="calendrier" petite /> Jours <span className="faint num">{detail.jours.length}</span></h3>
+              <div className="tuiles-jours">
+                {detail.jours.map((j) => {
+                  const d = new Date(`${j.jour.slice(0, 10)}T12:00:00`);
+                  return (
+                    <div key={j.jour} className="tuile-jour">
+                      <span className="jsem">{d.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>
+                      <span className="jnum num">{String(d.getDate()).padStart(2, '0')}</span>
+                      <span className="jmois">{d.toLocaleDateString('fr-FR', { month: 'short' })}</span>
+                      {!figee && (
+                        <button type="button" className="tuile-retirer" onClick={() => retirerJour(j.jour)} aria-label={`Retirer ${formaterJour(j.jour)}`}>
+                          <Icone nom="fermer" petite />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {!figee && (
+                <div className="ajout-ligne">
+                  <input type="date" className="input" value={nouveauJour} onChange={(e) => setNouveauJour(e.target.value)} />
+                  <button type="button" className="btn" onClick={ajouterJour} disabled={!nouveauJour}>
+                    <Icone nom="plus" petite /> Ajouter
+                  </button>
+                </div>
               )}
-            </li>
-          ))}
-        </ol>
-        {!figee && (
-          <div className="ajout">
-            <input
-              value={nouveauCreneau}
-              onChange={(e) => setNouveauCreneau(e.target.value)}
-              placeholder="19:00-20:00"
-              spellCheck={false}
-            />
+            </section>
+
+            {/* -------------------------------------------------------- creneaux */}
+            <section className="card pad enter" style={{ ['--i' as string]: 4 }}>
+              <h3 className="card-titre"><Icone nom="horloge" petite /> Créneaux <span className="faint num">{detail.creneaux.length}</span></h3>
+              <ol className="creneaux-v2">
+                {detail.creneaux.map((c, i) => (
+                  <li key={c.code}>
+                    <span className="rang num">{i + 1}</span>
+                    <span className="code num">{c.code}</span>
+                    {c.libelle !== c.code && <span className="faint">{c.libelle}</span>}
+                    {!figee && (
+                      <span className="actions">
+                        <button type="button" className="icon-btn" onClick={() => deplacerCreneau(i, -1)} disabled={i === 0} aria-label="Monter">
+                          <Icone nom="haut" petite />
+                        </button>
+                        <button type="button" className="icon-btn" onClick={() => deplacerCreneau(i, 1)} disabled={i === detail.creneaux.length - 1} aria-label="Descendre">
+                          <Icone nom="bas" petite />
+                        </button>
+                        <button type="button" className="icon-btn danger" onClick={() => retirerCreneau(c.code)} aria-label="Retirer">
+                          <Icone nom="fermer" petite />
+                        </button>
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+              {!figee && (
+                <div className="ajout-ligne">
+                  <input
+                    className="input"
+                    value={nouveauCreneau}
+                    onChange={(e) => setNouveauCreneau(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && ajouterCreneau()}
+                    placeholder="19:00-20:00"
+                    spellCheck={false}
+                  />
+                  <button type="button" className="btn" onClick={ajouterCreneau} disabled={nouveauCreneau.trim() === ''}>
+                    <Icone nom="plus" petite /> Ajouter
+                  </button>
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* -------------------------------------------------------- sessions */}
+          <section className="card pad enter" style={{ ['--i' as string]: 5 }}>
+            <h3 className="card-titre"><Icone nom="effectifs" petite /> Organisation par plaque</h3>
+            <div className="plaques-v2">
+              {detail.sessions.map((s) => (
+                <LignePlaque
+                  key={s.id}
+                  libelle={s.plaqueLibelle}
+                  mode={s.mode}
+                  modes={donnees?.modesSession ?? [s.mode]}
+                  cible={s.effectifCibleTable}
+                  figee={figee}
+                  onMode={(mode) =>
+                    void agir(
+                      () => modifierSession(detail.id, s.id, { mode }).then(() => recharger(detail.id)),
+                      `${s.plaqueLibelle} : ${mode.replace('_', ' ')}.`
+                    )
+                  }
+                  onCible={(v) =>
+                    void agir(
+                      () => modifierSession(detail.id, s.id, { effectifCibleTable: v }).then(() => recharger(detail.id)),
+                      `${s.plaqueLibelle} : ${v ?? '—'} vendeurs par table.`
+                    )
+                  }
+                />
+              ))}
+            </div>
+            <p className="note">Passer en « par site » ne supprime aucune table : la composition revient au retour.</p>
+          </section>
+
+          {/* -------------------------------------------------------- cloture */}
+          <section className={`card pad enter camp-cloture${figee ? ' fige' : ''}`} style={{ ['--i' as string]: 6 }}>
+            <div>
+              <h3 className="card-titre"><Icone nom="cadenas" petite /> {figee ? 'Campagne clôturée' : 'Clôture'}</h3>
+              <p className="note">
+                {figee
+                  ? 'Jours, créneaux, RDV et suivi sont figés.'
+                  : 'Fige la saisie, les jours, les créneaux et le suivi des RDV. Réversible, mais jamais pendant une séance.'}
+                {!figee && aTraiter !== null && aTraiter > 0 && (
+                  <> <strong className="attention">{aTraiter} RDV encore à traiter dans le suivi.</strong></>
+                )}
+              </p>
+            </div>
             <button
               type="button"
-              className="principal"
-              onClick={ajouterCreneau}
-              disabled={nouveauCreneau.trim() === ''}
+              className={`btn${figee ? '' : arme ? ' danger arme' : ' danger'}`}
+              onClick={() => {
+                // EN DEUX CLICS quand il reste du suivi a faire (D10) : le second
+                // nomme ce qui va etre fige.
+                if (!figee && (aTraiter ?? 0) > 0 && !arme) {
+                  setArme(true);
+                  window.setTimeout(() => setArme(false), 6000);
+                  return;
+                }
+                setArme(false);
+                void agir(
+                  () => modifierCampagne(detail.id, { cloturee: !figee }).then(() => recharger(detail.id)),
+                  figee ? 'Campagne réouverte.' : 'Campagne clôturée.'
+                );
+              }}
             >
-              Ajouter ce creneau
+              {figee ? 'Réouvrir' : arme ? `Confirmer — ${aTraiter} RDV ne seront plus suivis` : 'Clôturer la campagne'}
             </button>
-          </div>
-        )}
+          </section>
+        </div>
       </div>
+    </div>
+  );
+}
 
-      {/* -------------------------------------------------------- sessions */}
-      <div className="card pad enter">
-        <h3>Mode d'organisation par plaque</h3>
-        <p className="note">
-          Basculer en « par site » ne supprime aucune table : la composition reste et se retrouve
-          au retour.
-        </p>
-        <table className="tableau">
-          <thead>
-            <tr>
-              <th>Plaque</th>
-              <th>Mode</th>
-              <th>Effectif cible par table</th>
-            </tr>
-          </thead>
-          <tbody>
-            {detail.sessions.map((s) => (
-              <tr key={s.id}>
-                <td>{s.plaqueLibelle}</td>
-                <td>
-                  <select
-                    value={s.mode}
-                    disabled={figee}
-                    onChange={(e) =>
-                      void agir(
-                        () => modifierSession(detail.id, s.id, { mode: e.target.value }).then(() => recharger(detail.id)),
-                        `${s.plaqueLibelle} : mode enregistre.`
-                      )
-                    }
-                  >
-                    {(donnees?.modesSession ?? [s.mode]).map((m) => (
-                      <option key={m} value={m}>
-                        {m.replace('_', ' ')}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min={1}
-                    defaultValue={s.effectifCibleTable ?? ''}
-                    disabled={figee || s.mode !== 'par_table'}
-                    onBlur={(e) => {
-                      const v = e.target.value === '' ? null : Number(e.target.value);
-                      if (v !== s.effectifCibleTable) {
-                        void agir(
-                          () =>
-                            modifierSession(detail.id, s.id, { effectifCibleTable: v }).then(() =>
-                              recharger(detail.id)
-                            ),
-                          `${s.plaqueLibelle} : effectif cible enregistre.`
-                        );
-                      }
-                    }}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+/// Une plaque : son mode en segmente (la pastille glisse comme partout) et la
+/// cible par table en pas-a-pas — un composant pour que chaque ligne ait son
+/// propre indicateur.
+function LignePlaque({
+  libelle,
+  mode,
+  modes,
+  cible,
+  figee,
+  onMode,
+  onCible,
+}: {
+  libelle: string;
+  mode: string;
+  modes: string[];
+  cible: number | null;
+  figee: boolean;
+  onMode: (m: string) => void;
+  onCible: (v: number | null) => void;
+}) {
+  const seg = useIndicateurGlissant(Math.max(0, modes.indexOf(mode)), modes.length);
+  const parTable = mode === 'par_table';
+  return (
+    <div className="plaque-v2">
+      <span className="plaque-nom">{libelle}</span>
+      <div className="seg" ref={seg.conteneur} role="radiogroup" aria-label={`Mode de ${libelle}`}>
+        <span className="pouce" ref={seg.indicateur} aria-hidden="true" />
+        {modes.map((m, i) => (
+          <button key={m} type="button" ref={seg.cible(i)} aria-pressed={m === mode} disabled={figee} onClick={() => m !== mode && onMode(m)}>
+            {m === 'par_table' ? 'Par table' : m === 'par_site' ? 'Par site' : m.replace('_', ' ')}
+          </button>
+        ))}
       </div>
-
-      {/* -------------------------------------------------------- cloture */}
-      <div className="card pad enter">
-        <h3>Cloture</h3>
-        <p className="note">
-          Clôturer fige la campagne : plus aucune saisie, plus aucune modification de jour ni de
-          créneau, <strong>et plus aucun suivi des RDV</strong>. On ne clôture donc qu’une fois le
-          suivi terminé. Réversible ici, mais à ne pas faire pendant une séance.
-        </p>
-        {!figee && aTraiter !== null && aTraiter > 0 && (
-          <p className="note" style={{ color: 'var(--attention)' }}>
-            <strong>{aTraiter} RDV</strong> sont encore « à traiter » dans le suivi.
-          </p>
-        )}
-        <button
-          type="button"
-          className={figee ? 'secondaire' : arme ? 'danger' : ''}
-          onClick={() => {
-            // EN DEUX CLICS quand il reste du suivi a faire (D10) : le second
-            // nomme ce qui va etre fige.
-            if (!figee && (aTraiter ?? 0) > 0 && !arme) {
-              setArme(true);
-              window.setTimeout(() => setArme(false), 6000);
-              return;
-            }
-            setArme(false);
-            void agir(
-              () => modifierCampagne(detail.id, { cloturee: !figee }).then(() => recharger(detail.id)),
-              figee ? 'Campagne réouverte.' : 'Campagne clôturée.'
-            );
-          }}
-        >
-          {figee
-            ? 'Réouvrir la campagne'
-            : arme
-              ? `Clôturer quand même — ${aTraiter} RDV ne pourront plus être suivis`
-              : 'Clôturer la campagne'}
+      <div className={`pas-a-pas${parTable ? '' : ' eteint'}`} title="Vendeurs visés par table">
+        <button type="button" className="icon-btn" disabled={figee || !parTable || (cible ?? 1) <= 1} onClick={() => onCible(Math.max(1, (cible ?? 5) - 1))} aria-label="Moins">
+          <Icone nom="bas" petite />
         </button>
+        <span className="num"><Compteur valeur={cible ?? 0} /></span>
+        <button type="button" className="icon-btn" disabled={figee || !parTable} onClick={() => onCible((cible ?? 4) + 1)} aria-label="Plus">
+          <Icone nom="haut" petite />
+        </button>
+        <span className="faint">/ table</span>
       </div>
     </div>
   );
@@ -562,40 +622,37 @@ function FormulaireCreation({
   };
 
   return (
-    <div className="card pad enter">
-      <h3>Nouvelle campagne</h3>
-      {erreur && <div className="erreur-bloc">{erreur}</div>}
+    <div className="card pad carte-action enter">
+      <h3 className="card-titre"><Icone nom="plus" petite /> Nouvelle campagne</h3>
+      {erreur && <div className="bandeau-v2 erreur">{erreur}</div>}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           if (pret) void creer();
         }}
       >
-        <div className="champs">
-          <label>
-            Libelle
-            <input value={libelle} onChange={(e) => setLibelle(e.target.value)} autoFocus />
+        <div className="champs-v2">
+          <label className="field large">
+            <span className="lbl">Libellé</span>
+            <input className="input" value={libelle} onChange={(e) => setLibelle(e.target.value)} placeholder="Novembre 2026" autoFocus />
           </label>
-          <label>
-            Debut
-            <input type="date" value={debut} onChange={(e) => setDebut(e.target.value)} />
+          <label className="field">
+            <span className="lbl">Début</span>
+            <input className="input" type="date" value={debut} onChange={(e) => setDebut(e.target.value)} />
           </label>
-          <label>
-            Fin
-            <input type="date" value={fin} min={debut || undefined} onChange={(e) => setFin(e.target.value)} />
+          <label className="field">
+            <span className="lbl">Fin</span>
+            <input className="input" type="date" value={fin} min={debut || undefined} onChange={(e) => setFin(e.target.value)} />
           </label>
         </div>
         <p className="note">
-          Un jour par date, du debut a la fin — a ajuster ensuite si la campagne a des trous.
-          Creneaux et mode par plaque repris de « {modele.libelle} ». Les tables se composent
-          ensuite dans l'onglet Tables.
+          Un jour par date du début à la fin, à ajuster ensuite. Créneaux et mode par plaque repris
+          de « {modele.libelle} ». Les tables se composent dans Effectifs.
         </p>
-        <div className="ajout">
-          <button type="submit" className="principal" disabled={!pret}>
-            {enCours ? 'Creation...' : 'Creer la campagne'}
-          </button>
-          <button type="button" className="secondaire" onClick={onAnnuler} disabled={enCours}>
-            Annuler
+        <div className="actions-v2">
+          <button type="button" className="btn ghost" onClick={onAnnuler} disabled={enCours}>Annuler</button>
+          <button type="submit" className="btn primary" disabled={!pret}>
+            {enCours ? 'Création…' : 'Créer la campagne'}
           </button>
         </div>
       </form>
@@ -624,10 +681,10 @@ function DialogueConflit({
   const totalArchives = conflit.conflit.impacts.reduce((n, i) => n + i.archives, 0);
 
   return (
-    <div className="carte conflit">
-      <h3>Des RDV sont rattaches a ce que vous retirez</h3>
+    <div className="card pad carte-action conflit-v2 enter" role="alertdialog">
+      <h3 className="card-titre">Des RDV sont rattachés à ce que vous retirez</h3>
 
-      <ul className="impacts">
+      <ul className="impacts-v2">
         {conflit.conflit.impacts.map((i) => (
           <li key={'jour' in i ? i.jour : i.creneau}>
             <strong>{'jour' in i ? formaterJour(i.jour) : i.creneau}</strong> —{' '}
@@ -647,10 +704,10 @@ function DialogueConflit({
         </p>
       )}
 
-      <div className="ajout">
-        <label>
-          Deplacer les {totalActifs + totalArchives} RDV vers
-          <select value={vers} onChange={(e) => setVers(e.target.value)}>
+      <div className="actions-v2">
+        <label className="field">
+          <span className="lbl">Déplacer les {totalActifs + totalArchives} RDV vers</span>
+          <select className="select" value={vers} onChange={(e) => setVers(e.target.value)}>
             {destinations.map((d) => (
               <option key={d} value={d}>
                 {conflit.type === 'jours' ? formaterJour(d) : d}
@@ -658,11 +715,9 @@ function DialogueConflit({
             ))}
           </select>
         </label>
-        <button type="button" onClick={() => onDeplacer(vers)} disabled={!vers}>
-          Deplacer et enregistrer
-        </button>
-        <button type="button" className="secondaire" onClick={onAnnuler}>
-          Annuler la modification
+        <button type="button" className="btn ghost" onClick={onAnnuler}>Annuler</button>
+        <button type="button" className="btn primary" onClick={() => onDeplacer(vers)} disabled={!vers}>
+          Déplacer et enregistrer
         </button>
       </div>
     </div>
@@ -681,6 +736,11 @@ const formaterJour = (iso: string): string => {
 
 /// `09:00-10:00` -> `9h-10h`, comme dans le fichier source. Si le code ne suit
 /// pas ce motif, on le garde tel quel : le libelle est libre.
+const formaterCourt = (iso: string): string => {
+  const [a, m, j] = iso.slice(0, 10).split('-');
+  return `${j}/${m}/${a.slice(2)}`;
+};
+
 const libelleDepuisCode = (code: string): string => {
   const m = code.match(/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/);
   if (!m) return code;

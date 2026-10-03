@@ -932,3 +932,107 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .page .seg > button:not([class]):hover:not(:disabled) { background: transparent; box-shadow: none; color: var(--text); }
 .v2 .page .seg > button:not([class]):active { transform: none; }
 }
+
+@layer v2 {
+/* ------------------------------------------------------------------ CAMPAGNES (refonte) */
+.v2 .camp-v2 { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; align-items: start; }
+.v2 .camp-liste { position: sticky; top: var(--h-entete, 80px); padding: 0; overflow: hidden; }
+.v2 .camp-liste-corps { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 8px; max-height: calc(100vh - var(--h-entete, 80px) - 20px); overflow: auto; }
+.v2 .camp-item {
+  position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'nom pt' 'dates pt'; align-items: center; column-gap: 8px;
+  min-height: 52px; padding: 8px 12px; border: 0; border-radius: 12px; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  transition: color var(--t-med), background-color var(--t-fast);
+}
+.v2 .camp-item:hover:not(.actif) { background: var(--ctl-bg); }
+.v2 .camp-item .nom { grid-area: nom; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .camp-item .dates { grid-area: dates; font-size: 11px; font-weight: 700; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.v2 .camp-item.actif { color: #fff; }
+.v2 .camp-item.actif .dates { color: rgba(255, 255, 255, .8); }
+.v2 .etat-point { grid-area: pt; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+.v2 .etat-point.fige { background: var(--text-3); box-shadow: none; }
+.v2 .camp-item.actif .etat-point { background: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, .25); }
+
+.v2 .camp-detail { display: grid; gap: 14px; min-width: 0; }
+.v2 .camp-hero { display: grid; gap: 14px; }
+.v2 .hero-ligne { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.v2 .hero-titre {
+  flex: 1; min-width: 200px; height: auto; padding: 4px 8px; margin-left: -8px; border: 0; border-radius: 10px; background: transparent; box-shadow: none;
+  font: 800 26px/1.2 var(--font-ui); letter-spacing: -.02em; color: var(--text); transition: background-color var(--t-fast), box-shadow var(--t-fast);
+}
+.v2 .hero-titre:hover:not(:disabled) { background: var(--ctl-bg); }
+.v2 .hero-titre:focus { outline: 0; background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--focus); }
+.v2 .hero-titre:disabled { opacity: 1; }
+.v2 .etat-campagne { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 99px; font-size: var(--fs-12); font-weight: 800;
+  color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+.v2 .etat-campagne i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: v2-battement 2.4s ease-out infinite; }
+.v2 .etat-campagne.fige { color: var(--text-2); background: var(--ctl-bg-h); }
+.v2 .hero-dates { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--text-2); font-weight: 700; font-size: var(--fs-13); }
+.v2 .hero-dates .input { width: auto; height: 34px; }
+
+.v2 .camp-grille { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.v2 .tuiles-jours { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+.v2 .tuile-jour {
+  position: relative; display: grid; justify-items: center; gap: 0; padding: 10px 6px 8px; border-radius: 14px;
+  background: var(--box-bg); box-shadow: inset 0 0 0 1px var(--box-line); animation: v2-entre 480ms var(--ressort-vif) both;
+}
+.v2 .tuile-jour .jsem { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+.v2 .tuile-jour .jnum { font-size: 26px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; }
+.v2 .tuile-jour .jmois { font-size: 11px; font-weight: 700; color: var(--text-3); }
+.v2 .tuile-retirer {
+  position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--danger); color: #fff; cursor: pointer; opacity: 0; transform: scale(.6); transition: opacity var(--t-fast), transform 420ms var(--ressort-vif);
+}
+.v2 .tuile-jour:hover .tuile-retirer, .v2 .tuile-retirer:focus-visible { opacity: 1; transform: scale(1); }
+@media (hover: none) { .v2 .tuile-retirer { opacity: 1; transform: scale(1); } }
+.v2 .ajout-ligne { display: flex; gap: 8px; margin-top: 12px; }
+.v2 .ajout-ligne .input { flex: 1; min-width: 0; height: 34px; }
+
+.v2 .creneaux-v2 { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.v2 .creneaux-v2 li { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 6px 0 4px; border-radius: 10px; transition: background-color var(--t-fast); }
+.v2 .creneaux-v2 li:hover { background: var(--ctl-bg); }
+.v2 .creneaux-v2 .rang { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: var(--ctl-bg-h); font-size: 11px; font-weight: 800; color: var(--text-3); }
+.v2 .creneaux-v2 .code { font-weight: 800; }
+.v2 .creneaux-v2 .actions { margin-left: auto; display: flex; gap: 2px; opacity: .35; transition: opacity var(--t-fast); }
+.v2 .creneaux-v2 li:hover .actions, .v2 .creneaux-v2 .actions:focus-within { opacity: 1; }
+.v2 .creneaux-v2 .icon-btn { width: 28px; height: 28px; }
+.v2 .icon-btn.danger:hover { color: var(--danger); }
+.v2 .icon-btn:disabled { opacity: .3; cursor: default; }
+
+.v2 .plaques-v2 { display: grid; gap: 6px; }
+.v2 .plaque-v2 { display: grid; grid-template-columns: minmax(110px, 1fr) auto auto; align-items: center; gap: 14px; padding: 8px 10px; border-radius: 14px; background: var(--box-bg); box-shadow: inset 0 0 0 1px var(--box-line); }
+.v2 .plaque-nom { font-weight: 800; letter-spacing: .02em; }
+.v2 .pas-a-pas { display: flex; align-items: center; gap: 4px; font-weight: 800; transition: opacity var(--t-med); }
+.v2 .pas-a-pas .num { min-width: 24px; text-align: center; font-size: var(--fs-16); }
+.v2 .pas-a-pas .faint { font-size: var(--fs-12); font-weight: 700; }
+.v2 .pas-a-pas.eteint { opacity: .35; }
+
+.v2 .camp-cloture { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 28%, transparent); }
+.v2 .camp-cloture.fige { box-shadow: inset 0 0 0 1px var(--box-line); }
+.v2 .camp-cloture .note { margin: 0; max-width: 60ch; }
+.v2 .camp-cloture .attention { color: var(--warn); }
+.v2 .btn.danger.arme { background: var(--danger); color: #fff; box-shadow: none; animation: v2-tremble 380ms ease-out; }
+@keyframes v2-tremble { 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
+
+/* Formulaires d'action posés dans la page (création, conflit) */
+.v2 .carte-action { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 24px 60px -30px rgba(247, 86, 50, .55); }
+.v2 .champs-v2 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+.v2 .field .lbl { font-size: var(--fs-11); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+.v2 .actions-v2 { display: flex; align-items: flex-end; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.v2 .actions-v2 .field { margin-right: auto; }
+.v2 .impacts-v2 { margin: 0 0 8px; padding-left: 18px; display: grid; gap: 4px; }
+
+@media (max-width: 1100px) { .v2 .camp-grille { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .v2 .camp-v2 { grid-template-columns: 1fr; }
+  .v2 .camp-liste { position: static; }
+  .v2 .camp-liste-corps { flex-direction: row; overflow-x: auto; max-height: none; }
+  .v2 .camp-liste .curseur-v2 { display: none; }
+  .v2 .camp-item { flex: none; min-width: 170px; background: var(--ctl-bg); }
+  .v2 .camp-item.actif { background: var(--bony-grad); }
+  .v2 .champs-v2 { grid-template-columns: 1fr 1fr; }
+  .v2 .champs-v2 .large { grid-column: 1 / -1; }
+  .v2 .plaque-v2 { grid-template-columns: 1fr auto; }
+  .v2 .plaque-v2 .pas-a-pas { grid-column: 1 / -1; }
+}
+}

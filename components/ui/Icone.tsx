@@ -22,6 +22,13 @@ const TRACES = {
   fermer: <path d="M6 6l12 12M18 6L6 18" />,
   coche: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   retour: <path d="M15 5l-7 7 7 7" />,
+  haut: <path d="M6 15l6-6 6 6" />,
+  bas: <path d="M6 9l6 6 6-6" />,
+  cadenas: <path d="M7 11V8a5 5 0 0110 0v3M6 11h12v9H6z" />,
+  calendrier: <path d="M5 6h14v14H5zM5 10h14M9 4v4M15 4v4" />,
+  horloge: <path d="M12 4a8 8 0 100 16 8 8 0 000-16zM12 8v4l3 2" />,
+  corbeille: <path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13" />,
+  crayon: <path d="M4 20l4-1 11-11-3-3L5 16l-1 4z" />,
   oeil: <><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="3" /></>,
   oeilBarre: <><path d="M3 3l18 18" /><path d="M10.6 5.6A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3 3.8M6.3 6.4A16.8 16.8 0 0 0 2.5 12S6 18.5 12 18.5a9 9 0 0 0 4-.9" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></>,
 } as const;
