@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GrilleUnique } from '../components/saisie/GrilleUnique';
-import { cleRdv } from '../utils/grille';
+import { Compteur } from '../components/ui/Compteur';
+import { cleRdv, libelleJour } from '../utils/grille';
 import { cleTri } from '../backend/src/utils/tri';
 import { useTempsReel } from '../hooks/useTempsReel';
 import { PanneauxLive } from '../components/PanneauxLive';
@@ -178,6 +179,15 @@ export function Saisie() {
   /// `services/fileAttente.ts`. Une ref et non un etat : elle ne se dessine pas,
   /// ce sont les RDV provisoires qu'elle porte qui se dessinent.
   const file = useRef<PoseEnAttente[]>([]);
+  const [enAttente, setEnAttente] = useState(0);
+  /// D13, n.5 : un client deja pose dans la campagne. Un AVERTISSEMENT, jamais un
+  /// refus — deux homonymes existent, et un client peut avoir deux RDV.
+  const [avertissement, setAvertissement] = useState<string | null>(null);
+  useEffect(() => {
+    if (!avertissement) return;
+    const t = window.setTimeout(() => setAvertissement(null), 7000);
+    return () => window.clearTimeout(t);
+  }, [avertissement]);
   const minuteurFile = useRef<number | null>(null);
 
   /// Les RDV provisoires de la file, sous la forme de la grille. Remis par-dessus
@@ -543,6 +553,7 @@ export function Saisie() {
 
   const enregistrerFile = () => {
     if (campagneId) ecrireFile(campagneId, file.current);
+    setEnAttente(file.current.length);
   };
 
   /// Programme le prochain passage de la file. Un seul minuteur a la fois : la
@@ -607,6 +618,21 @@ export function Saisie() {
       },
     };
     pose.corps.cle = pose.cle;
+    // Le doublon se cherche sur ce que CE poste voit — son perimetre — avec la
+    // cle de tri : « Éric Martin » et « ERIC MARTIN » sont le meme nom.
+    const cible = cleTri(client.trim());
+    const deja: string[] = [];
+    for (const [vid, cases] of rdvsParVendeur) {
+      for (const liste of cases.values()) {
+        for (const r of liste) {
+          if (cleTri(r.client) === cible) {
+            const v = donnees?.vendeurs.find((x) => x.id === vid);
+            deja.push(`${v?.nom ?? 'un vendeur'} (${libelleJour(r.jour)})`);
+          }
+        }
+      }
+    }
+    if (deja.length > 0) setAvertissement(`${client.trim().toUpperCase()} a déjà un RDV : ${deja.slice(0, 3).join(', ')}. Vérifier qu'il ne s'agit pas d'un doublon.`);
     file.current = [...file.current, pose];
     enregistrerFile();
     appliquer(provisoires().find((r) => r.id === `attente-${pose.cle}`)!);
@@ -669,22 +695,28 @@ export function Saisie() {
 
   return (
     <section className="ecran saisie">
-      <header className="ecran-entete">
-        <div>
-          <h2>{donnees.perimetre?.libelle ?? 'Saisie'}</h2>
-          <p className="note">
-            {donnees.campagne.libelle} · {donnees.vendeurs.length} vendeurs ·{' '}
-            {donnees.campagne.jours.length} jours × {donnees.campagne.creneaux.length} créneaux
-          </p>
+      <div className="v2 app-head" style={{ marginBottom: 14 }}>
+        <h1>{donnees.perimetre?.libelle ?? 'Saisie'}</h1>
+        <span className="sub">
+          {donnees.campagne.libelle} · {donnees.vendeurs.length} vendeurs · {donnees.campagne.jours.length} jours
+        </span>
+        <div className="droite">
+          {/* LE TEMOIN DE SANTE (1.9) : discret quand tout va bien, visible quand
+              des RDV attendent d'etre envoyes. */}
+          <span className={`sante${enAttente > 0 ? ' lent' : ''}`} title="RDV posés à l'écran mais pas encore acceptés par la base">
+            <i />
+            {enAttente > 0 ? `${enAttente} en attente d'envoi` : 'À jour'}
+          </span>
+          <span className="total-entete">
+            <Compteur valeur={totalOrigine} />
+            <span className="faint">{libelleTotal}</span>
+          </span>
+          <SelecteurCampagne campagnes={campagnes} valeur={campagneId} onChange={setCampagneId} />
         </div>
-        <div className="progression">
-          <strong>{totalOrigine}</strong>
-          <span>{libelleTotal}</span>
-        </div>
-        <SelecteurCampagne campagnes={campagnes} valeur={campagneId} onChange={setCampagneId} />
-      </header>
+      </div>
 
-      {erreur && <div className="erreur-bloc">{erreur}</div>}
+      {erreur && <div className="v2"><div className="bandeau-v2 erreur" role="alert">{erreur}</div></div>}
+      {avertissement && <div className="v2"><div className="bandeau-v2 avertissement" role="status">{avertissement}</div></div>}
       {figee && (
         <div className="info-bloc">
           Campagne clôturée : les chiffres sont figés, la saisie est fermée.
@@ -858,7 +890,7 @@ export function Saisie() {
                     </>
                   )}
                 </span>
-                <span className="compteur">{c?.total ?? 0}</span>
+                <span className="compteur"><Compteur valeur={c?.total ?? 0} /></span>
               </button>
             );
           })}
