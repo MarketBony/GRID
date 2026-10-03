@@ -15,6 +15,7 @@ import { chargerCampagnes, type CampagneResume } from '../services/campagnes';
 import { totauxParJour } from '../backend/src/utils/agregats';
 import { chargerSaisie } from '../services/saisie';
 import { useReferentiels } from '../hooks/useReferentiels';
+import { Compteur } from '../components/ui/Compteur';
 import { useTempsReel } from '../hooks/useTempsReel';
 import {
   FENETRE_VUE_ENSEMBLE,
@@ -351,13 +352,14 @@ export function Dashboard() {
   const aZero = donnees.totaux.site.filter((t) => t.total === 0).length;
 
   return (
-    <section className="ecran">
-      <header className="ecran-entete">
-        <div>
-          <h2>Tableau de bord</h2>
-        </div>
-        <div className="selecteurs">
+    <div className="page">
+      <div className="app-head enter">
+        <h1>Tableau de bord</h1>
+        <span className="sub">{donnees.campagne.libelle} · phoning uniquement</span>
+        <div className="droite">
           <select
+            className="select"
+            style={{ width: 'auto', height: 32 }}
             value={campagneId ?? ''}
             onChange={(e) => setCampagneId(e.target.value)}
             aria-label="Campagne"
@@ -369,53 +371,33 @@ export function Dashboard() {
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            className="principal"
-            onClick={() => void exporter()}
-            disabled={exportEnCours}
-          >
+          <button type="button" className="btn primary" onClick={() => void exporter()} disabled={exportEnCours}>
             {exportEnCours ? 'Export…' : 'Exporter en Excel'}
           </button>
         </div>
-      </header>
+      </div>
 
-      {erreur && <div className="erreur-bloc">{erreur}</div>}
+      {erreur && <div className="bandeau-v2 erreur">{erreur}</div>}
 
       {/* LES CHIFFRES CLES EN PREMIER. Le total se cachait dans un coin de
           l'en-tete pendant que la moitie de l'ecran restait vide. */}
-      <BandeauKpi
-        kpis={[
-          {
-            libelle: 'RDV obtenus',
-            valeur: groupe?.total ?? 0,
-            detail: `${groupe?.vn ?? 0} VN · ${groupe?.vo ?? 0} VO`,
-            maitresse: true,
-          },
-          {
-            libelle: 'Effectif',
-            valeur: groupe?.effectif ?? 0,
-            detail: 'vendeurs présents',
-          },
-          {
-            libelle: 'Moyenne / vendeur',
-            valeur: groupe?.moyenne ?? 0,
-            detail: 'RDV par vendeur',
-          },
-          {
-            libelle: 'Meilleure concession',
-            valeur: meilleure ? meilleure.total : 0,
-            detail: meilleure ? meilleure.libelle : '—',
-          },
-          {
-            libelle: 'Concessions à zéro',
-            valeur: aZero,
-            detail: `sur ${donnees.totaux.site.length}`,
-          },
-        ]}
-      />
+      <div className="kpis">
+        {[
+          { l: 'RDV obtenus', v: groupe?.total ?? 0, d: `${groupe?.vn ?? 0} VN · ${groupe?.vo ?? 0} VO`, accent: true },
+          { l: 'Effectif', v: groupe?.effectif ?? 0, d: 'vendeurs mobilisés' },
+          { l: 'Moyenne / vendeur', v: groupe?.moyenne ?? 0, d: 'RDV par vendeur' },
+          { l: 'Meilleure concession', v: meilleure ? meilleure.total : 0, d: meilleure ? meilleure.libelle : '—' },
+          { l: 'Concessions à zéro', v: aZero, d: `sur ${donnees.totaux.site.length}` },
+        ].map((k, i) => (
+          <div key={k.l} className={`kpi enter${k.accent ? ' accent' : ''}`} style={{ ['--i' as string]: i }}>
+            <span className="l">{k.l}</span>
+            <span className="v">{Number.isInteger(k.v) ? <Compteur valeur={k.v} /> : <span className="num">{k.v}</span>}</span>
+            <span className="d">{k.d}</span>
+          </div>
+        ))}
+      </div>
 
-      <div className="barre-outils">
+      <div className="dash-outils">
         <Segmente
           etiquette="Axe d'analyse"
           valeur={axe}
@@ -441,8 +423,10 @@ export function Dashboard() {
           ]}
         />
 
-        <div className="ligne-formulaire">
+        <div>
           <select
+            className="select"
+            style={{ width: 'auto', height: 32 }}
             value={comparaisonAvec}
             onChange={(e) => lancerComparaison(e.target.value)}
             aria-label="Comparer à"
@@ -498,9 +482,9 @@ export function Dashboard() {
       )}
 
       {/* ----------------------------------------- graphiques cote a cote */}
-      <div className="grille-graphiques">
-        <div className="carte">
-          <h3>
+      <div className="dash-graphiques">
+        <div className="card pad enter">
+          <h3 className="card-titre">
             Par jour
             <span className="etiquette">{parJour.length} jours</span>
             {critere !== 'global' && (
@@ -520,8 +504,8 @@ export function Dashboard() {
           <BarresParJour barres={barresParJour} />
         </div>
 
-        <div className="carte">
-          <h3>
+        <div className="card pad enter">
+          <h3 className="card-titre">
             Tête du classement
             <span className="etiquette">{LIBELLES_AXE[axe]}</span>
             <span className="etiquette">
@@ -544,8 +528,8 @@ export function Dashboard() {
       </div>
 
       {/* -------------------------------------------------- totaux par axe */}
-      <div className="carte">
-        <h3>
+      <div className="card pad enter">
+        <h3 className="card-titre">
           {LIBELLES_AXE[axe]}
           <span className="etiquette">{lignes.length}</span>
         </h3>
@@ -558,8 +542,8 @@ export function Dashboard() {
       </div>
 
       {/* -------------------------------------------------- classement */}
-      <div className="carte">
-        <h3>
+      <div className="card pad enter">
+        <h3 className="card-titre">
           Classement — {LIBELLES_AXE[axe]}
           <span className="etiquette">{rangs.length}</span>
         </h3>
@@ -586,7 +570,7 @@ export function Dashboard() {
           </ol>
         )}
       </div>
-    </section>
+    </div>
   );
 }
 

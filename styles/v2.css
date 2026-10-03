@@ -809,3 +809,23 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
   .v2 .vendeur-v2.actif { background: var(--bony-grad); }
 }
 }
+
+@layer v2 {
+/* ------------------------------------------------------------------ TABLEAU DE BORD v2 */
+.v2 .kpi .d { display: block; margin-top: 2px; font-size: 12px; font-weight: 600; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .kpi.accent .d { color: rgba(255, 255, 255, .82); }
+.v2 .kpi .v .compteur-roule { vertical-align: baseline; }
+.v2 .dash-outils { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.v2 .dash-graphiques { display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; }
+@media (max-width: 900px) { .v2 .dash-graphiques { grid-template-columns: 1fr; } }
+.v2 .card-titre { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; font-size: var(--fs-14); font-weight: 800; }
+.v2 .card-titre .etiquette { height: 20px; }
+.v2 .classement-complet { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 520px; overflow: auto; }
+.v2 .classement-complet li { display: grid; grid-template-columns: 34px 1fr auto auto; align-items: center; gap: 10px; min-height: 42px; padding: 0 10px; border-radius: 10px; }
+.v2 .classement-complet li:hover { background: var(--ctl-bg); }
+.v2 .classement-complet .rang { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-weight: 800; font-size: 12px; background: var(--ctl-bg-h); }
+.v2 .classement-complet li:first-child .rang { background: var(--bony-grad); color: #fff; }
+.v2 .classement-complet .libelle { font-weight: 700; }
+.v2 .classement-complet .detail { color: var(--text-3); font-size: 12px; }
+.v2 .classement-complet strong { font-size: var(--fs-16); }
+}
