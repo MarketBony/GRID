@@ -126,34 +126,55 @@ export function useIndicateurGlissant(
   // liste des vendeurs : un seul geste dans toute l'application.
   useLayoutEffect(() => {
     const ind = refIndicateur.current;
+    const conteneur = refConteneur.current;
     const fin = mesurer();
     if (!ind || !fin) return;
-    const avant = geo.current;
+    // LE POINT DE DEPART EST CE QU'ON VOIT, pas la derniere cible : en
+    // descendant la liste a la fleche, chaque appui interrompt le glissement
+    // precedent. Partir de l'ancienne CIBLE faisait sauter l'indicateur.
+    // getBoundingClientRect inclut la transformation animee en cours.
+    let avant = geo.current;
+    if (avant && conteneur && ind.getAnimations().some((x) => x.playState === 'running')) {
+      const r = ind.getBoundingClientRect();
+      const c = conteneur.getBoundingClientRect();
+      avant = {
+        x: r.left - c.left - conteneur.clientLeft + conteneur.scrollLeft,
+        y: r.top - c.top - conteneur.clientTop + conteneur.scrollTop,
+        w: r.width,
+        h: r.height,
+      };
+    }
+    ind.getAnimations().forEach((x) => x.cancel());
     geo.current = fin;
     placer(1);
     if (!avant) return;
-    const bouge = axe === 'x' ? Math.abs(avant.x - fin.x) > 0.5 : Math.abs(avant.y - fin.y) > 0.5;
+    const bouge = Math.abs(avant.x - fin.x) > 0.5 || Math.abs(avant.y - fin.y) > 0.5;
     const reduit =
       window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
       document.documentElement.classList.contains('animations-reduites');
-    if (!bouge || reduit) return;
+    if (!bouge || reduit || !fin.w || !fin.h) return;
     // L'union est PLAFONNEE a trois fois la cible : sur 104 vendeurs, un saut de
     // 60 lignes ferait une goutte de la hauteur de la liste.
     const [p0, t0, p1, t1] = axe === 'x' ? [avant.x, avant.w, fin.x, fin.w] : [avant.y, avant.h, fin.y, fin.h];
     const plafond = t1 * 3;
     const debut = p0 < p1 ? Math.max(p0, p1 + t1 - plafond) : p1;
     const union = Math.min(Math.max(p0 + t0, p1 + t1), Math.max(debut + plafond, p1 + t1)) - debut;
+    // TRANSFORM SEUL, donc compose par le GPU (03/10/2026). L'ancienne version
+    // animait width/height : le fil principal, celui-la meme que React occupe a
+    // redessiner la grille du vendeur choisi dans la MEME image — d'ou les
+    // saccades signalees par l'utilisateur. La taille finale est posee une fois
+    // par placer() ; le mouvement n'est qu'une translation et une echelle.
     const cadre = (x: number, y: number, w: number, h: number) => ({
-      transform: `translate3d(${x}px, ${y}px, 0)`,
-      width: `${w}px`,
-      height: `${h}px`,
+      transform: `translate3d(${x}px, ${y}px, 0) scale(${w / fin.w}, ${h / fin.h})`,
     });
     const depart = cadre(avant.x, avant.y, avant.w, avant.h);
     const etire = axe === 'x' ? cadre(debut, fin.y, union, fin.h) : cadre(fin.x, debut, fin.w, union);
     const arrivee = cadre(fin.x, fin.y, fin.w, fin.h);
+    ind.style.transformOrigin = '0 0';
     ind.style.transition = 'none';
-    ind.animate([depart, { ...etire, offset: 0.35 }, arrivee], { duration: SNAPPY.ms + 120, easing: 'ease-out' });
-    ind.animate([etire, arrivee], { duration: BOUNCY.ms, easing: BOUNCY.css, delay: (SNAPPY.ms + 120) * 0.35 });
+    const etirement = SNAPPY.ms + 120;
+    ind.animate([depart, { ...etire, offset: 0.35 }, arrivee], { duration: etirement, easing: 'ease-out' });
+    ind.animate([etire, arrivee], { duration: BOUNCY.ms, easing: BOUNCY.css, delay: etirement * 0.35 });
     requestAnimationFrame(() => (ind.style.transition = ''));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placer, nombre]);

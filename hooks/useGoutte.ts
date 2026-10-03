@@ -58,26 +58,32 @@ export function useGoutte(cleActive: string) {
         g.style.width = `${fin.w}px`;
         return;
       }
-      // Exactement la maquette : etirement vers l'union, puis resserrement en rebond.
-      const debut = Math.min(avant.x, fin.x);
-      const union = Math.max(avant.x + avant.w, fin.x + fin.w) - debut;
-      g.animate(
-        [
-          { left: `${avant.x}px`, width: `${avant.w}px` },
-          { left: `${debut}px`, width: `${union}px`, offset: 0.35 },
-          { left: `${fin.x}px`, width: `${fin.w}px` },
-        ],
-        { duration: SNAPPY.ms + 120, easing: 'ease-out' }
-      );
-      g.animate(
-        [
-          { left: `${debut}px`, width: `${union}px` },
-          { left: `${fin.x}px`, width: `${fin.w}px` },
-        ],
-        { duration: BOUNCY.ms, easing: BOUNCY.css, delay: (SNAPPY.ms + 120) * 0.35 }
-      );
+      // Exactement la maquette : etirement vers l'union, puis resserrement en
+      // rebond. EN TRANSFORM SEUL (03/10/2026) : left/width passaient par le fil
+      // principal, que le changement de rubrique occupe a la meme image — la
+      // goutte saccadait precisement quand on la regardait.
+      // Interrompue en vol, elle repart de la ou on la VOIT.
+      let depuis = avant;
+      if (g.getAnimations().some((x) => x.playState === 'running')) {
+        const rg = g.getBoundingClientRect();
+        depuis = { x: rg.left - p.left, w: rg.width };
+      }
+      g.getAnimations().forEach((x) => x.cancel());
       g.style.left = `${fin.x}px`;
       g.style.width = `${fin.w}px`;
+      g.style.transformOrigin = '0 50%';
+      // Union PLAFONNEE a 2,5 fois la cible : d'un bout a l'autre de l'Ile, la
+      // goutte s'etirait a x4,7 et ses bouts ronds devenaient des ovales.
+      const plafond = fin.w * 2.5;
+      const debut = depuis.x < fin.x ? Math.max(depuis.x, fin.x + fin.w - plafond) : fin.x;
+      const union = Math.min(Math.max(depuis.x + depuis.w, fin.x + fin.w), Math.max(debut + plafond, fin.x + fin.w)) - debut;
+      const cadre = (x: number, w: number) => ({ transform: `translateX(${x - fin.x}px) scaleX(${w / fin.w})` });
+      const etirement = SNAPPY.ms + 120;
+      g.animate([cadre(depuis.x, depuis.w), { ...cadre(debut, union), offset: 0.35 }, cadre(fin.x, fin.w)], {
+        duration: etirement,
+        easing: 'ease-out',
+      });
+      g.animate([cadre(debut, union), cadre(fin.x, fin.w)], { duration: BOUNCY.ms, easing: BOUNCY.css, delay: etirement * 0.35 });
     },
     [cleActive]
   );
