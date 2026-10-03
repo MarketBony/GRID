@@ -54,7 +54,7 @@ interface Props {
 /// Changer de rubrique AVEC transition : l'ancienne se dissout, la nouvelle
 /// monte (styles/v2.css, `contenu-v2`). `flushSync` rend le changement d'etat
 /// synchrone : c'est lui que la View Transitions API photographie.
-export function avecTransition(f: () => void) {
+export function avecTransition(f: () => void, sens: 1 | -1 | 0 = 0) {
   const doc = document as Document & { startViewTransition?: (f: () => void) => unknown };
   const reduit =
     window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
@@ -63,7 +63,12 @@ export function avecTransition(f: () => void) {
     f();
     return;
   }
-  doc.startViewTransition(() => flushSync(f));
+  // Le SENS de la navigation fait glisser la page : vers la gauche quand on va a
+  // une rubrique situee plus loin dans l'Ile, vers la droite sinon.
+  const html = document.documentElement;
+  html.dataset.vtSens = sens > 0 ? 'avant' : sens < 0 ? 'arriere' : '';
+  const t = doc.startViewTransition(() => flushSync(f)) as { finished?: Promise<unknown> } | undefined;
+  t?.finished?.finally(() => delete html.dataset.vtSens);
 }
 
 export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, palier, deconnexion, children }: Props) {
@@ -140,7 +145,10 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
 
   const changer = (id: string) => {
     setPlusOuvert(false);
-    if (id !== active) avecTransition(() => aller(id));
+    if (id === active) return;
+    const de = rubriques.findIndex((r) => r.id === active);
+    const vers = rubriques.findIndex((r) => r.id === id);
+    avecTransition(() => aller(id), de < 0 || vers < 0 ? 0 : vers > de ? 1 : -1);
   };
 
   const entrees = useMemo<EntreeRecherche[]>(

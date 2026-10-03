@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { BOUNCY, SNAPPY } from './useGoutte';
 
 // ============================================================================
 // L'INDICATEUR QUI GLISSE — la mécanique, une seule fois.
@@ -66,7 +67,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 /// `getComputedStyle` par changement de sélection pour récupérer une constante
 /// serait un calcul de mise en page inutile sur le chemin le plus chaud du
 /// produit. Les deux valeurs sont liées, et le commentaire du CSS le dit.
-const DUREE_ETIREMENT = 190;
 
 export interface IndicateurGlissant {
   /// Le conteneur, qui doit être `position: relative`. Dans une liste
@@ -90,7 +90,6 @@ export function useIndicateurGlissant(
   const refConteneur = useRef<HTMLElement | null>(null);
   const refIndicateur = useRef<HTMLElement | null>(null);
   const refCibles = useRef<(HTMLElement | null)[]>([]);
-  const precedent = useRef(indexActif);
 
   const placer = useCallback(
     (etirement: number) => {
@@ -113,7 +112,51 @@ export function useIndicateurGlissant(
 
   // `useLayoutEffect` : l'indicateur doit être placé AVANT que le navigateur ne
   // peigne, sinon il apparaît en haut à gauche puis saute à sa place.
-  useLayoutEffect(() => placer(1), [placer, nombre]);
+  /// Derniere geometrie posee : le point de DEPART du prochain glissement.
+  const geo = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  const mesurer = () => {
+    const c = refCibles.current[indexActif];
+    return c ? { x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight } : null;
+  };
+
+  // LE MOUVEMENT DE LA MAQUETTE, PARTOUT (03/10/2026, demande de l'utilisateur) :
+  // l'indicateur s'ETIRE vers l'union de l'ancienne et de la nouvelle position,
+  // puis se RESSERRE sur la cible au ressort « bouncy » — les memes deux
+  // animations que la goutte de l'Ile (`useGoutte`). Segmentes, curseur de la
+  // liste des vendeurs : un seul geste dans toute l'application.
+  useLayoutEffect(() => {
+    const ind = refIndicateur.current;
+    const fin = mesurer();
+    if (!ind || !fin) return;
+    const avant = geo.current;
+    geo.current = fin;
+    placer(1);
+    if (!avant) return;
+    const bouge = axe === 'x' ? Math.abs(avant.x - fin.x) > 0.5 : Math.abs(avant.y - fin.y) > 0.5;
+    const reduit =
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      document.documentElement.classList.contains('animations-reduites');
+    if (!bouge || reduit) return;
+    // L'union est PLAFONNEE a trois fois la cible : sur 104 vendeurs, un saut de
+    // 60 lignes ferait une goutte de la hauteur de la liste.
+    const [p0, t0, p1, t1] = axe === 'x' ? [avant.x, avant.w, fin.x, fin.w] : [avant.y, avant.h, fin.y, fin.h];
+    const plafond = t1 * 3;
+    const debut = p0 < p1 ? Math.max(p0, p1 + t1 - plafond) : p1;
+    const union = Math.min(Math.max(p0 + t0, p1 + t1), Math.max(debut + plafond, p1 + t1)) - debut;
+    const cadre = (x: number, y: number, w: number, h: number) => ({
+      transform: `translate3d(${x}px, ${y}px, 0)`,
+      width: `${w}px`,
+      height: `${h}px`,
+    });
+    const depart = cadre(avant.x, avant.y, avant.w, avant.h);
+    const etire = axe === 'x' ? cadre(debut, fin.y, union, fin.h) : cadre(fin.x, debut, fin.w, union);
+    const arrivee = cadre(fin.x, fin.y, fin.w, fin.h);
+    ind.style.transition = 'none';
+    ind.animate([depart, { ...etire, offset: 0.35 }, arrivee], { duration: SNAPPY.ms + 120, easing: 'ease-out' });
+    ind.animate([etire, arrivee], { duration: BOUNCY.ms, easing: BOUNCY.css, delay: (SNAPPY.ms + 120) * 0.35 });
+    requestAnimationFrame(() => (ind.style.transition = ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placer, nombre]);
 
   useEffect(() => {
     const c = refConteneur.current;
@@ -125,35 +168,13 @@ export function useIndicateurGlissant(
       const ind = refIndicateur.current;
       if (ind) ind.style.transition = 'none';
       placer(1);
+      geo.current = mesurer();
       if (ind) requestAnimationFrame(() => (ind.style.transition = ''));
     });
     o.observe(c);
     refCibles.current.forEach((el) => el && o.observe(el));
     return () => o.disconnect();
   }, [placer, nombre]);
-
-  // L'ÉTIREMENT est proportionnel au trajet et PLAFONNÉ : sur 104 vendeurs, un
-  // saut de 60 lignes déformerait l'indicateur au point de le rendre illisible.
-  // iOS fait la même chose — la déformation dit « ça vient de loin », elle ne
-  // mesure pas la distance.
-  //
-  // IL DOIT DURER UNE FRACTION DU TRAJET, PAS UNE IMAGE. Première version : posé
-  // puis retiré au `requestAnimationFrame` suivant. Mesuré, l'étirement maximal
-  // atteint était de 1,000 — c'est-à-dire aucun. La raison est que l'étirement
-  // et la translation vivent dans le MÊME `transform`, donc dans la même
-  // transition de 560 ms : re-cibler l'échelle à 1 seize millisecondes plus tard
-  // ne lui laisse pas le temps de s'éloigner de 1.
-  //
-  // Il est donc tenu sur ~35 % de la course, puis relâché : l'indicateur part
-  // étiré, se retasse pendant qu'il finit son trajet, et arrive rond.
-  useEffect(() => {
-    const trajet = Math.abs(indexActif - precedent.current);
-    precedent.current = indexActif;
-    if (trajet === 0) return;
-    placer(1 + Math.min(trajet, 3) * 0.06);
-    const t = setTimeout(() => placer(1), DUREE_ETIREMENT);
-    return () => clearTimeout(t);
-  }, [indexActif, placer]);
 
   return {
     conteneur: (el) => {

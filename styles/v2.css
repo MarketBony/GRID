@@ -357,10 +357,19 @@ body {
 
 /* ------------------------------------------------------------------ TRANSITIONS DE RUBRIQUE
    View Transitions API : l'ancienne rubrique se dissout, la nouvelle monte. */
-::view-transition-old(contenu-v2) { animation: 200ms ease both v2-sortie; }
-::view-transition-new(contenu-v2) { animation: 520ms var(--ressort-vif) both v2-arrivee; }
-@keyframes v2-sortie { to { opacity: 0; transform: scale(.985); } }
-@keyframes v2-arrivee { from { opacity: 0; transform: translateY(14px) scale(.99); } }
+::view-transition-old(contenu-v2) { animation: 260ms cubic-bezier(.4, 0, 1, 1) both v2-sortie; }
+::view-transition-new(contenu-v2) { animation: 760ms var(--ressort-ample) both v2-arrivee; }
+:root { --vt-dx: 0px; --vt-dy: 22px; }
+:root[data-vt-sens='avant'] { --vt-dx: 64px; --vt-dy: 0px; }
+:root[data-vt-sens='arriere'] { --vt-dx: -64px; --vt-dy: 0px; }
+/* L'ancienne page recule et se floute dans le sens oppose ; la nouvelle arrive
+   du cote ou se trouve sa rubrique, legerement inclinee, et se pose au ressort. */
+@keyframes v2-sortie { to { opacity: 0; filter: blur(6px); transform: translate(calc(var(--vt-dx) * -.6), calc(var(--vt-dy) * -.4)) scale(.94); } }
+@keyframes v2-arrivee {
+  0% { opacity: 0; filter: blur(8px); transform: translate(var(--vt-dx), var(--vt-dy)) scale(.96) rotate(calc(var(--vt-dx) / 64 * .6deg)); }
+  35% { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; filter: none; transform: none; }
+}
 /* Bascule de theme : un disque qui s'etend depuis le bouton. */
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 html.vt-theme::view-transition-new(root) { animation: v2-disque 700ms var(--ease-out) both; }
@@ -704,8 +713,7 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .lien { color: var(--text-2); text-decoration: none; font-weight: 600; }
 .v2 .lien:hover { color: var(--accent); }
 
-.v2 .ecran input:not([type="checkbox"]):not([type="radio"]), .v2 .ecran select, .v2 .ecran textarea,
-.v2 .boite-dialogue input:not([type="checkbox"]), .v2 .recherche-vendeur input {
+:where(.v2 .ecran, .v2 .boite-dialogue, .v2 .recherche-vendeur) :where(input:not([type="checkbox"], [type="radio"]), select, textarea) {
   height: 34px; padding: 0 11px; border: 0; outline: 0; border-radius: var(--r-sm);
   font: 500 var(--fs-13) var(--font-ui); color: var(--text);
   background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
@@ -862,15 +870,15 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .app-head > div:first-child .note { margin: 2px 0 0; }
 /* Boutons NUS des ecrans d'origine : controles v2, sans la bordure ni le flou
    que l'ancienne feuille donnait a tout `button`. */
-.v2 .page button:not([class]) {
+:where(.v2 .page) :where(button:not([class])) {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px;
   border: 0; border-radius: var(--r-sm); backdrop-filter: none; -webkit-backdrop-filter: none;
   font: 600 var(--fs-13) var(--font-ui); color: var(--text); cursor: pointer;
   background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
   transition: transform 620ms var(--ressort-ample), background-color var(--t-fast), box-shadow var(--t-fast);
 }
-.v2 .page button:not([class]):hover:not(:disabled) { background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
-.v2 .page button:not([class]):active:not(:disabled) { transform: scale(.95); transition-duration: 90ms; }
+:where(.v2 .page) :where(button:not([class])):hover:not(:disabled) { background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
+:where(.v2 .page) :where(button:not([class])):active:not(:disabled) { transform: scale(.95); transition-duration: 90ms; }
 .v2 .page button { backdrop-filter: none; -webkit-backdrop-filter: none; }
 /* Le bouton d'action de l'en-tete reste l'action principale de l'ecran. */
 .v2 .app-head .droite > button:not([class]) { background: var(--bony-grad); color: #fff; box-shadow: none; }
@@ -884,12 +892,15 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 }
 
 @layer v2 {
-.v2 .page input:not([type="checkbox"]):not([type="radio"]):not(.input), .v2 .page select:not(.select), .v2 .page textarea:not(.textarea) {
+/* :where() = specificite NULLE : tout composant v2 (recherche, saisie express,
+   segmente…) passe devant sans avoir a surenchérir. Les :not() d'origine
+   gonflaient la specificite et dessinaient un cadre DANS les controles. */
+:where(.v2 .page) :where(input:not([type="checkbox"], [type="radio"], .input), select:not(.select), textarea:not(.textarea)) {
   height: 34px; padding: 0 11px; border: 0; outline: 0; border-radius: var(--r-sm); text-transform: none; letter-spacing: 0;
   font: 500 var(--fs-13) var(--font-ui); color: var(--text); background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
   backdrop-filter: none; -webkit-backdrop-filter: none; transition: box-shadow var(--t-med) var(--ressort-vif);
 }
-.v2 .page input:focus, .v2 .page select:focus, .v2 .page textarea:focus { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--focus); }
+:where(.v2 .page) :where(input:not([type="checkbox"], [type="radio"], .input), select:not(.select), textarea:not(.textarea)):focus { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--focus); }
 .v2 .page select option { background: var(--surface-1); color: var(--text); }
 .v2 th button, .v2 th.triable button { border: 0; padding: 0; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; height: auto; }
 .v2 th button:hover { color: var(--text); }
