@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useIndicateurGlissant } from '../hooks/useIndicateurGlissant';
+import { Icone } from '../components/ui/Icone';
+import { Compteur } from '../components/ui/Compteur';
 import {
   archiverTable,
   chargerTables,
@@ -170,8 +173,21 @@ export function Tables() {
     [donnees]
   );
 
-  if (chargement && !donnees) return <div className="attente">Chargement des tables…</div>;
-  if (erreur && !donnees) return <div className="erreur-bloc">{erreur}</div>;
+  /// La plaque se choisit dans un segmente : la pastille glisse d'une plaque a
+  /// l'autre, comme partout.
+  const segPlaque = useIndicateurGlissant(
+    Math.max(0, sessions.findIndex((s) => s.id === sessionId)),
+    sessions.length
+  );
+
+  if (chargement && !donnees)
+    return (
+      <div className="page">
+        <div className="skel" style={{ height: 40, width: 260 }} />
+        <div className="skel" style={{ height: 420, marginTop: 14 }} />
+      </div>
+    );
+  if (erreur && !donnees) return <div className="page"><div className="bandeau-v2 erreur">{erreur}</div></div>;
 
   const session = donnees?.session;
   const figee = session?.cloturee ?? false;
@@ -180,19 +196,14 @@ export function Tables() {
   return (
     <div className="page">
       <div className="app-head enter">
-        <div>
-          <h2>Effectifs</h2>
-          <p className="note">
-            Archiver une table rend ses membres à la réserve, où ils restent saisissables par leur
-            chef de site.
-          </p>
-        </div>
+        <h1>Effectifs</h1>
+        {donnees && (
+          <span className="sub">
+            {parSite ? 'par site' : `${donnees.tables.length} table${donnees.tables.length > 1 ? 's' : ''}`} · {totalPlaque} vendeurs
+          </span>
+        )}
         <div className="droite">
-          <select
-            value={campagneId ?? ''}
-            onChange={(e) => setCampagneId(e.target.value)}
-            aria-label="Campagne"
-          >
+          <select className="select" value={campagneId ?? ''} onChange={(e) => setCampagneId(e.target.value)} aria-label="Campagne">
             {campagnes.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.libelle}
@@ -200,27 +211,25 @@ export function Tables() {
               </option>
             ))}
           </select>
-          <select
-            value={sessionId ?? ''}
-            onChange={(e) => setSessionId(e.target.value)}
-            aria-label="Plaque"
-          >
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.plaqueLibelle} — {s.mode === 'par_table' ? 'par table' : 'par site'}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
-      {erreur && <div className="erreur-bloc">{erreur}</div>}
-      {succes && <div className="succes-bloc">{succes}</div>}
+      <div className="seg seg-plaques enter" style={{ ['--i' as string]: 1 }} ref={segPlaque.conteneur} role="radiogroup" aria-label="Plaque">
+        <span className="pouce" ref={segPlaque.indicateur} aria-hidden="true" />
+        {sessions.map((s, i) => (
+          <button key={s.id} type="button" ref={segPlaque.cible(i)} aria-pressed={s.id === sessionId} onClick={() => setSessionId(s.id)}>
+            {s.plaqueLibelle}
+            <span className="mode">{s.mode === 'par_table' ? 'tables' : 'site'}</span>
+          </button>
+        ))}
+      </div>
+
+      {erreur && <div className="bandeau-v2 erreur" role="alert">{erreur}</div>}
+      {succes && <div className="bandeau-v2 ok" role="status">{succes}</div>}
 
       {figee && (
-        <div className="info-bloc">
-          Campagne clôturée : la composition est figée. C’est elle qui explique les totaux de cette
-          campagne, on ne la réécrit pas.
+        <div className="bandeau-v2">
+          <Icone nom="cadenas" petite /> Campagne clôturée : la composition est figée.
         </div>
       )}
 
@@ -233,9 +242,10 @@ export function Tables() {
 
       {donnees && !parSite && (
         <>
-          <div className="barre-outils">
+          {!figee && (
+          <div className="outils-tables card enter" style={{ ['--i' as string]: 2 }}>
             <form
-              className="ligne-formulaire"
+              className="groupe-outil"
               onSubmit={(e) => {
                 e.preventDefault();
                 const libelle = nouvelleTable.trim();
@@ -250,20 +260,23 @@ export function Tables() {
               }}
             >
               <input
+                className="input"
                 value={nouvelleTable}
                 onChange={(e) => setNouvelleTable(e.target.value)}
                 placeholder="Nouvelle table"
                 disabled={occupe || figee}
                 aria-label="Libellé de la nouvelle table"
               />
-              <button type="submit" className="secondaire" disabled={occupe || figee}>
-                + Créer
+              <button type="submit" className="btn" disabled={occupe || figee || nouvelleTable.trim() === ''}>
+                <Icone nom="plus" petite /> Créer
               </button>
             </form>
 
+            <span className="separateur" />
+
             <button
               type="button"
-              className="principal"
+              className="btn primary"
               disabled={occupe || figee || donnees.tables.length === 0}
               onClick={() =>
                 void agir(async () => {
@@ -278,12 +291,12 @@ export function Tables() {
               }
               title="Place les vendeurs sans table. Ne déplace personne."
             >
-              Compléter — graine 42
+              Compléter la répartition
             </button>
 
             <button
               type="button"
-              className="secondaire"
+              className="btn ghost"
               disabled={occupe || figee || donnees.tables.length === 0}
               onClick={() => {
                 // `remplacer` archive tout le travail manuel : on demande.
@@ -305,8 +318,10 @@ export function Tables() {
               Tout refaire
             </button>
 
+            <span className="separateur" />
+
             <form
-              className="ligne-formulaire"
+              className="groupe-outil"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (repriseDepuis === '') return;
@@ -322,6 +337,7 @@ export function Tables() {
               }}
             >
               <select
+                className="select"
                 value={repriseDepuis}
                 onChange={(e) => setRepriseDepuis(e.target.value)}
                 disabled={occupe || figee}
@@ -336,23 +352,24 @@ export function Tables() {
                     </option>
                   ))}
               </select>
-              <button type="submit" className="secondaire" disabled={occupe || figee || repriseDepuis === ''}>
+              <button type="submit" className="btn" disabled={occupe || figee || repriseDepuis === ''}>
                 Reprendre
               </button>
             </form>
           </div>
+          )}
 
           {selection && (
-            <div className="info-bloc">
-              <strong>{selection.nom}</strong> est sélectionné. Cliquer une table pour l’y placer, ou
-              la réserve pour l’en retirer.{' '}
-              <button type="button" className="lien" onClick={() => setSelection(null)}>
-                annuler
+            <div className="selection-flottante" role="status">
+              <span className="avatar">{selection.nom.split(/\s+/).slice(0, 2).map((m) => m[0]).join('')}</span>
+              <span><b>{selection.nom}</b> — cliquer une table, ou la réserve</span>
+              <button type="button" className="icon-btn" onClick={() => setSelection(null)} aria-label="Annuler la sélection">
+                <Icone nom="fermer" petite />
               </button>
             </div>
           )}
 
-          <div className="plateau">
+          <div className="plateau-v2">
             <ZoneReserve
               vendeurs={donnees.reserve}
               total={totalPlaque}
@@ -371,15 +388,17 @@ export function Tables() {
               onClicZone={() => surClicZone('reserve')}
             />
 
+            <div className="tables-grille">
             {donnees.tables.length === 0 ? (
-              <p className="note">
-                Aucune table sur cette session. En créer au moins une ci-dessus — la répartition
-                automatique remplit les tables existantes, elle n’en crée pas.
-              </p>
+              <div className="empty card">
+                Aucune table. En créer une ci-dessus : la répartition remplit les tables existantes,
+                elle n’en crée pas.
+              </div>
             ) : (
-              donnees.tables.map((t) => (
+              donnees.tables.map((t, i) => (
                 <ColonneTable
                   key={t.id}
+                  rang={i}
                   table={t}
                   donnees={donnees}
                   selection={selection}
@@ -417,6 +436,7 @@ export function Tables() {
                 />
               ))
             )}
+            </div>
           </div>
         </>
       )}
@@ -449,7 +469,7 @@ function ZoneReserve({
 }) {
   return (
     <div
-      className={`colonne-table reserve ${survolee ? 'survolee' : ''} ${
+      className={`zone-v2-table reserve-v2 ${survolee ? 'survolee' : ''} ${
         selection && selection.depuis !== 'reserve' ? 'cible' : ''
       }`}
       onDragOver={(e) => {
@@ -468,15 +488,12 @@ function ZoneReserve({
       }}
       onClick={onClicZone}
     >
-      <header>
+      <header className="table-tete">
         <h3>Réserve</h3>
-        <span className="etiquette">{vendeurs.length}</span>
+        <span className="effectif num"><Compteur valeur={vendeurs.length} /></span>
       </header>
-      <p className="note">
-        Non affectés à une table. Ils <strong>restent saisissables</strong> par leur chef de site
-        (F-B.8) : la réserve n’est pas un reliquat.
-      </p>
-      <ul className="cartes-vendeurs">
+      <p className="note">Sans table, toujours saisissables par leur chef de site.</p>
+      <ul className="membres-v2">
         {vendeurs.map((v) => (
           <CarteVendeur
             key={v.id}
@@ -488,9 +505,9 @@ function ZoneReserve({
           />
         ))}
       </ul>
-      <footer className="total-perimetre">
+      <footer className="total-plaque">
         <span>Plaque</span>
-        <strong>{total}</strong>
+        <strong className="num"><Compteur valeur={total} /></strong>
       </footer>
     </div>
   );
@@ -499,6 +516,7 @@ function ZoneReserve({
 // ---------------------------------------------------------------- une table
 
 function ColonneTable({
+  rang,
   table,
   donnees,
   selection,
@@ -512,6 +530,7 @@ function ColonneTable({
   onModifier,
   onArchiver,
 }: {
+  rang: number;
   table: TablePhoning;
   donnees: PerimetreTables;
   selection: Selection;
@@ -559,9 +578,10 @@ function ColonneTable({
 
   return (
     <div
-      className={`colonne-table ${survolee ? 'survolee' : ''} ${
+      className={`zone-v2-table card enter ${survolee ? 'survolee' : ''} ${
         selection && selection.depuis !== table.id ? 'cible' : ''
       }`}
+      style={{ ['--i' as string]: rang + 3 }}
       onDragOver={(e) => {
         if (figee) return;
         e.preventDefault();
@@ -578,26 +598,27 @@ function ColonneTable({
       }}
       onClick={onClicZone}
     >
-      <header>
+      <header className="table-tete">
         {renommage === null ? (
           <h3>
             {table.libelle}
             {!figee && (
               <button
                 type="button"
-                className="lien"
+                className="icon-btn renommer"
+                aria-label={`Renommer ${table.libelle}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setRenommage(table.libelle);
                 }}
               >
-                renommer
+                <Icone nom="crayon" petite />
               </button>
             )}
           </h3>
         ) : (
           <form
-            className="ligne-formulaire"
+            className="groupe-outil"
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault();
@@ -606,19 +627,26 @@ function ColonneTable({
               if (libelle !== '' && libelle !== table.libelle) onModifier({ libelle });
             }}
           >
-            <input value={renommage} onChange={(e) => setRenommage(e.target.value)} autoFocus />
-            <button type="submit" className="secondaire">
-              OK
-            </button>
+            <input className="input" value={renommage} onChange={(e) => setRenommage(e.target.value)} autoFocus />
+            <button type="submit" className="btn sm primary">OK</button>
           </form>
         )}
-        <span className="etiquette">{table.effectif}</span>
+        <span className={`effectif num${ecart !== null && Math.abs(ecart) > 1 ? ' hors-cible' : ''}`}>
+          <Compteur valeur={table.effectif} />
+          {donnees.session.effectifCibleTable !== null && <span className="cible-n">/{donnees.session.effectifCibleTable}</span>}
+        </span>
       </header>
+      {donnees.session.effectifCibleTable !== null && (
+        <div className="jauge" aria-hidden="true">
+          <span style={{ transform: `scaleX(${Math.min(1, table.effectif / Math.max(1, donnees.session.effectifCibleTable))})` }} />
+        </div>
+      )}
 
-      <div className="champs-table" onClick={(e) => e.stopPropagation()}>
-        <label>
-          Chef de table
+      <div className="chef-table" onClick={(e) => e.stopPropagation()}>
+        <label className="field">
+          <span className="lbl">Chef de table</span>
           <select
+            className="select"
             value={table.chefUtilisateurId ?? ''}
             disabled={figee || occupe}
             onChange={(e) => onModifier({ chefUtilisateurId: e.target.value || null })}
@@ -666,13 +694,13 @@ function ColonneTable({
       </div>
 
       {ecart !== null && ecart !== 0 && (
-        <p className={`note ${Math.abs(ecart) > 1 ? 'alerte' : ''}`}>
+        <p className={`note ${Math.abs(ecart) > 1 ? 'attention' : ''}`}>
           {ecart > 0 ? `${ecart} de trop` : `${-ecart} manquant${-ecart > 1 ? 's' : ''}`} par rapport
           à la cible de {donnees.session.effectifCibleTable}.
         </p>
       )}
 
-      <ul className="cartes-vendeurs">
+      <ul className="membres-v2">
         {table.membres.map((v) => (
           <CarteVendeur
             key={v.id}
@@ -685,20 +713,16 @@ function ColonneTable({
         ))}
       </ul>
 
-      {table.posesAuto > 0 && (
-        <p className="note">
-          {table.posesAuto} placement(s) par la répartition automatique, {table.effectif - table.posesAuto}{' '}
-          à la main.
-        </p>
-      )}
-
-      {!figee && (
-        <div className="actions" onClick={(e) => e.stopPropagation()}>
-          <button type="button" className="lien" onClick={onArchiver} disabled={occupe}>
-            archiver
+      <footer className="table-pied" onClick={(e) => e.stopPropagation()}>
+        <span className="faint">
+          {table.posesAuto > 0 ? `${table.posesAuto} auto · ${table.effectif - table.posesAuto} à la main` : ''}
+        </span>
+        {!figee && (
+          <button type="button" className="icon-btn danger" onClick={onArchiver} disabled={occupe} aria-label={`Archiver ${table.libelle}`} title="Archiver la table">
+            <Icone nom="corbeille" petite />
           </button>
-        </div>
-      )}
+        )}
+      </footer>
     </div>
   );
 }
@@ -725,7 +749,7 @@ function CarteVendeur({
         /* Le metier passe en CLASSE et non en couleur codee ici : c'est la
            feuille de style qui decide du lisere, et elle peut changer d'avis
            sans qu'on touche au composant. */
-        className={`carte-vendeur ${vendeur.typeVehicule === 'VO' ? 'vo' : 'vn'} ${
+        className={`membre-v2 ${vendeur.typeVehicule === 'VO' ? 'vo' : 'vn'} ${
           selectionne ? 'selectionne' : ''
         }`}
         draggable={!figee}
@@ -736,13 +760,9 @@ function CarteVendeur({
           onSelectionner(vendeur);
         }}
       >
-        <span className="nom">
-          {vendeur.nom}
-          <span className={`etiquette ${vendeur.typeVehicule === 'VO' ? 'vo' : 'vn'}`}>
-            {vendeur.typeVehicule}
-          </span>
-        </span>
-        <span className="detail">{vendeur.siteCode}</span>
+        <span className="nom">{vendeur.nom}</span>
+        <span className="site">{vendeur.siteCode}</span>
+        <span className="metier-mini">{vendeur.typeVehicule}</span>
       </button>
     </li>
   );
