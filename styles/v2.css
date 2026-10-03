@@ -618,3 +618,23 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .total-entete .compteur-roule { font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--accent); }
 .v2 .app-head select { height: 32px; border: 0; border-radius: var(--r-sm); padding: 0 10px; font: 600 var(--fs-13) var(--font-ui); color: var(--text); background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); }
 }
+
+@layer v2 {
+/* ------------------------------------------------------------------ VUE D'ENSEMBLE (carte de chaleur) */
+.vue-table { display: flex; flex-direction: column; gap: 12px; }
+.chaleur { border-collapse: separate; border-spacing: 4px; min-width: 560px; }
+.chaleur thead th { font-size: 11px; font-weight: 800; letter-spacing: .03em; color: var(--text-3); text-align: center; white-space: nowrap; }
+.chaleur tbody th { text-align: left; }
+.chaleur .nom-vendeur { border: 0; background: none; padding: 0 8px 0 0; cursor: pointer; font: 700 12.5px var(--font-ui); color: var(--text); white-space: nowrap; }
+.chaleur .nom-vendeur:hover { color: var(--accent); }
+.chaleur-case {
+  width: 100%; min-width: 38px; height: 30px; border: 0; border-radius: 8px; cursor: pointer;
+  font: 800 12px var(--font-ui); color: #fff;
+  transition: transform 560ms var(--ressort-ample), background-color 300ms;
+}
+.chaleur-case:hover { transform: scale(1.08); }
+.chaleur-case.n0 { background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); }
+.chaleur-case.n1 { background: color-mix(in srgb, var(--bony-orange) 62%, transparent); }
+.chaleur-case.n2 { background: var(--bony-grad); }
+.chaleur .total-jour { text-align: center; font-weight: 800; color: var(--text-2); }
+}

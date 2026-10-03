@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GrilleUnique } from '../components/saisie/GrilleUnique';
 import { Compteur } from '../components/ui/Compteur';
+import { VueTable } from '../components/saisie/VueTable';
 import { cleRdv, libelleJour } from '../utils/grille';
 import { cleTri } from '../backend/src/utils/tri';
 import { useTempsReel } from '../hooks/useTempsReel';
@@ -393,6 +394,8 @@ export function Saisie() {
   /// par defaut, comme la reserve d'une table. Un interrupteur les fait revenir —
   /// on ne cache pas un vendeur qui aurait quand meme des RDV a corriger.
   const [voirAbsents, setVoirAbsents] = useState(false);
+  const [vue, setVue] = useState<'vendeur' | 'table'>('vendeur');
+  const segVue = useIndicateurGlissant(vue === 'vendeur' ? 0 : 1, 2);
   const absents = useMemo(() => (donnees?.vendeurs ?? []).filter((v) => v.mobilise === false), [donnees]);
 
   const vendeursOrigine = useMemo(() => {
@@ -901,7 +904,26 @@ export function Saisie() {
         </aside>
 
         <div className="zone-grille">
-          {vendeur ? (
+          {/* D13 n.6 : le planning D'UN vendeur, ou la carte de chaleur de TOUS. */}
+          <div className="v2" style={{ marginBottom: 12 }}>
+            <div className="seg" ref={segVue.conteneur} role="radiogroup" aria-label="Affichage">
+              <span className="pouce" ref={segVue.indicateur} aria-hidden="true" />
+              <button type="button" ref={segVue.cible(0)} aria-pressed={vue === 'vendeur'} onClick={() => setVue('vendeur')}>Planning du vendeur</button>
+              <button type="button" ref={segVue.cible(1)} aria-pressed={vue === 'table'} onClick={() => setVue('table')}>Vue d'ensemble</button>
+            </div>
+          </div>
+          {vue === 'table' ? (
+            <VueTable
+              vendeurs={vendeursOrigine}
+              jours={donnees.campagne.jours}
+              creneaux={donnees.campagne.creneaux}
+              rdvsParVendeur={rdvsParVendeur}
+              ouvrir={(id) => {
+                setVendeurId(id);
+                setVue('vendeur');
+              }}
+            />
+          ) : vendeur ? (
             <GrilleUnique
               vendeur={vendeur}
               jours={donnees.campagne.jours}
