@@ -524,7 +524,12 @@ async function principal() {
   let arreter = () => undefined;
   try {
     preparer();
-    const vendeursIds = sql("select id from relance.vendeur where nom like 'CHARGE %' order by nom").split('\n').filter(Boolean);
+    const vendeursIds = sql("select id from relance.vendeur where nom like 'CHARGE %' order by nom")
+      // psql sous Windows rend des \r\n : sans `trim`, aucun identifiant ne
+      // correspondait a ceux du front, et presque aucune pose ne partait.
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
     rapport.vendeursFictifs = vendeursIds.length;
     rapport.santeAvant = await sante('avant');
 
