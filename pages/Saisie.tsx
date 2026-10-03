@@ -909,7 +909,7 @@ export function Saisie() {
             <div className="seg" ref={segVue.conteneur} role="radiogroup" aria-label="Affichage">
               <span className="pouce" ref={segVue.indicateur} aria-hidden="true" />
               <button type="button" ref={segVue.cible(0)} aria-pressed={vue === 'vendeur'} onClick={() => setVue('vendeur')}>Planning du vendeur</button>
-              <button type="button" ref={segVue.cible(1)} aria-pressed={vue === 'table'} onClick={() => setVue('table')}>Vue d'ensemble</button>
+              <button type="button" ref={segVue.cible(1)} aria-pressed={vue === 'table'} onClick={() => setVue('table')}>Carte du jour</button>
             </div>
           </div>
           {vue === 'table' ? (
