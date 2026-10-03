@@ -469,7 +469,7 @@ export function GrilleVendeur({
                         // derriere un marqueur a cliquer : les deux clients se
                         // lisent d'un coup d'oeil, et l'empilement occupe MOINS de
                         // hauteur qu'un nom seul, donc la geometrie de la grille ne
-                        // bouge pas. Les chiffres exacts sont dans `index.css`, avec
+                        // bouge pas. Les chiffres exacts sont dans `styles/composants-anciens.css`, avec
                         // ce qu'ils ont fallu mesurer pour y arriver.
                         //
                         // Le marqueur chiffre attire l'oeil sur une case qui sort de

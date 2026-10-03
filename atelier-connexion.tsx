@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { useState } from 'react';
-import './index.css';
+import './styles/composants-anciens.css';
 import './styles/v2.css';
 import { FondGrille } from './components/connexion/FondGrille';
 import { IntroGrid } from './components/connexion/IntroGrid';

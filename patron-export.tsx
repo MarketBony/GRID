@@ -3,12 +3,12 @@ import { createRoot } from 'react-dom/client';
 import { PlanningImprimable, paginer } from './components/PlanningImprimable';
 import type { RdvSaisie, VendeurSaisie } from './services/saisie';
 import { cleRdv } from './utils/grille';
-import './index.css';
+import './styles/composants-anciens.css';
 
 // ============================================================================
 // PATRON DU PLANNING IMPRIMABLE — artefact de developpement, hors production.
 //
-// Il monte le VRAI composant avec le VRAI `index.css`, sur les donnees de
+// Il monte le VRAI composant avec la VRAIE feuille (`styles/composants-anciens.css`), sur les donnees de
 // l'ecran de saisie du 08/09/2026 pour que le patron soit reconnaissable.
 //
 // `vite build` ne prend que `index.html` en entree : ce fichier ne part jamais

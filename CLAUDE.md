@@ -124,10 +124,13 @@ Lots 3 et 4 de `PLAN-GRID-V2.md`. À lire avant de toucher à l'interface.
 - **DA Gearbox OS, sans son moteur** : jetons, matière liquid glass (`.verre`),
   primitives aux noms de Gearbox (`.btn`, `.seg`, `.chip`, `.card`, `.kpi`, `.tbl`…),
   dans `styles/v2.css`. Clair ET sombre, toujours en verre.
-- **Deux couches CSS** : `index.css` vit dans `@layer ancien`, `styles/v2.css` dans
-  `@layer v2`, déclarée après — la v2 l'emporte quelle que soit la spécificité. Un
-  **pont** redéfinit les anciens jetons dans `.v2` : un écran pas encore porté prend
-  la palette v2 sans une ligne à toucher. `index.css` disparaîtra avec le dernier écran.
+- **Deux couches CSS** : `styles/composants-anciens.css` vit dans `@layer ancien`,
+  `styles/v2.css` dans `@layer v2`, déclarée après — la v2 l'emporte quelle que soit la
+  spécificité. **`index.css` est supprimé** (03/10/2026) : ses 4 757 lignes ont été
+  filtrées automatiquement (postcss) pour ne garder que les jetons, les `@keyframes`,
+  l'impression et les règles des classes encore employées. **Aucun sélecteur d'élément
+  nu n'y survit** (`button`, `input`, `header`…) : c'étaient eux, les doubles cadres. Une
+  classe portée en v2 se retire de ce fichier ; il disparaîtra avec la dernière.
 - **Navigation** : l'Île en haut au bureau, la barre flottante en bas au téléphone
   (`components/coquille/Coquille.tsx`). La goutte est `useIndicateurGlissant` — pas
   un troisième mécanisme. Recherche par la loupe ou `Ctrl K`.

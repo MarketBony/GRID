@@ -9,7 +9,7 @@ import { BarresParJour } from './components/Graphiques';
 import { totauxParJour, type LigneRdv, type LigneVendeur } from './backend/src/utils/agregats';
 import type { RdvSaisie, VendeurSaisie } from './services/saisie';
 import { useIndicateurGlissant } from './hooks/useIndicateurGlissant';
-import './index.css';
+import './styles/composants-anciens.css';
 
 // ============================================================================
 // ATELIER DE LA COUCHE VISUELLE — artefact de developpement, hors production.
@@ -20,7 +20,7 @@ import './index.css';
 // panneau et un bouton.
 //
 // CE QU'IL N'EST PAS : une maquette. Il importe les VRAIS composants et le VRAI
-// `index.css`. Ce qu'on y voit est ce que la production affiche, aux donnees
+// `styles/composants-anciens.css`. Ce qu'on y voit est ce que la production affiche, aux donnees
 // pres. Une maquette qui reimplemente les styles ne prouverait rien — c'est la
 // meme raison qui interdit de recopier les utils partages.
 //

@@ -5,7 +5,7 @@ import { FournisseurSession } from './contexts/SessionContext';
 import { FournisseurTheme } from './contexts/ThemeContext';
 import { FournisseurCampagne } from './contexts/CampagneContext';
 import { configurationSupabase } from './services/supabase';
-import './index.css';
+import './styles/composants-anciens.css';
 import './styles/v2.css';
 import { appliquerPreferenceAnimations } from './pages/Reglages';
 
