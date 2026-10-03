@@ -1,0 +1,850 @@
+<!doctype html>
+<!--
+  MAQUETTE — trois navigations pour GRID v2 (PLAN-GRID-V2.md, lot 4.1).
+  Page de mise au point : servie par Vite en developpement, EXCLUE du build
+  (vite build ne prend que index.html). Donnees fictives, aucun appel reseau.
+  Vanilla JS a dessein : on juge un mouvement et une ergonomie, pas une
+  architecture. Le choix fait, la navigation retenue sera ecrite en React.
+-->
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GRID — maquettes de navigation</title>
+<link rel="icon" type="image/svg+xml" href="/grid.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&family=Syncopate:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+/* =====================================================================
+   JETONS — repris de Gearbox maquette v2 (ui.css + da.css), direction
+   « nocturne », matiere « liquid ». Clair et sombre, rien d'autre.
+   ===================================================================== */
+:root {
+  --bony-orange: #f75632; --bony-violet: #8f12ab; --bony-blue: #293f74;
+  --bony-grad: linear-gradient(135deg, #ff6a3d, #a52fce);
+  --brand-renault: #ffcc33; --brand-dacia: #6a7551; --brand-alpine: #0055a4;
+  --font-ui: "Albert Sans", system-ui, sans-serif;
+  --font-display: "Syncopate", var(--font-ui);
+  --r-sm: 10px; --r-md: 13px; --r-lg: 16px; --r-xl: 22px; --r-2xl: 28px;
+  --fs-11: 11px; --fs-12: 12.5px; --fs-13: 13.5px; --fs-14: 14px; --fs-16: 16px; --fs-22: 22px; --fs-28: 28px;
+  --t-fast: 150ms; --t-med: 260ms; --t-slow: 440ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  /* remplaces au demarrage par de vrais ressorts linear() (voir script) */
+  --spring-snappy: var(--ease-out); --spring-soft: var(--ease-out); --spring-bouncy: var(--ease-out);
+}
+:root[data-theme="dark"] {
+  --bg: #0a0e1f; --surface-1: #121831; --surface-2: #19213f; --surface-3: #232c4f;
+  --line: rgba(170,185,255,.1); --line-2: rgba(170,185,255,.17); --line-3: rgba(170,185,255,.26);
+  --text: #f3f4fb; --text-2: #bcc2df; --text-3: #8189ae;
+  --ok: #3ed487; --warn: #ffb02e; --danger: #ff6166; --info: #4d8dff;
+  --glass-bg: rgba(14,12,22,.16); --glass-strong: rgba(16,14,24,.82); --chrome-bg: rgba(16,14,26,.5);
+  --glass-blur: 14px; --glass-sat: 1.9; --rim-hi: rgba(255,255,255,.3); --rim-lo: rgba(255,255,255,.06);
+  --ctl-bg: rgba(255,255,255,.045); --ctl-bg-h: rgba(255,255,255,.085); --ctl-line: rgba(255,255,255,.1); --ctl-line-h: rgba(255,255,255,.18);
+  --box-bg: rgba(255,255,255,.035); --box-line: rgba(255,255,255,.08);
+  --ombre: 0 18px 50px -20px rgba(0,0,0,.75);
+  --lueur-a: rgba(247,86,50,.55); --lueur-b: rgba(143,18,171,.55); --lueur-c: rgba(41,63,116,.75);
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #e4e2ea; --surface-1: #ffffff; --surface-2: #f4f3f8; --surface-3: #e9e7f0;
+  --line: rgba(20,16,30,.11); --line-2: rgba(20,16,30,.17); --line-3: rgba(20,16,30,.26);
+  --text: #120f19; --text-2: #4a4556; --text-3: #746f84;
+  --ok: #17a862; --warn: #d98a00; --danger: #e5383e; --info: #2f6fe0;
+  --glass-bg: rgba(255,255,255,.18); --glass-strong: rgba(250,249,253,.86); --chrome-bg: rgba(250,249,253,.62);
+  --glass-blur: 14px; --glass-sat: 1.8; --rim-hi: rgba(255,255,255,.85); --rim-lo: rgba(255,255,255,.2);
+  --ctl-bg: rgba(255,255,255,.55); --ctl-bg-h: rgba(255,255,255,.85); --ctl-line: rgba(20,16,30,.1); --ctl-line-h: rgba(20,16,30,.18);
+  --box-bg: rgba(255,255,255,.5); --box-line: rgba(20,16,30,.08);
+  --ombre: 0 18px 50px -22px rgba(20,16,30,.35);
+  --lueur-a: rgba(247,86,50,.36); --lueur-b: rgba(143,18,171,.3); --lueur-c: rgba(41,63,116,.26);
+  color-scheme: light;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { font: 400 var(--fs-13)/1.45 var(--font-ui); color: var(--text); background: #05060c; overflow: hidden; -webkit-font-smoothing: antialiased; }
+:root[data-theme="light"] body { background: #cfcdd8; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input { font: inherit; color: inherit; }
+h1, h2, h3 { margin: 0; letter-spacing: -.015em; }
+svg.i { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--text-2); } .faint { color: var(--text-3); }
+:focus-visible { outline: 2px solid var(--bony-orange); outline-offset: 2px; }
+
+/* =====================================================================
+   PUPITRE DE LA MAQUETTE (hors de l'ecran simule)
+   ===================================================================== */
+.pupitre { position: fixed; z-index: 100; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center;
+  padding: 6px; border-radius: 99px; background: rgba(20,20,30,.72); backdrop-filter: blur(20px); color: #eee; font-size: 12.5px;
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.1); }
+.pupitre .seg { --ctl-bg: rgba(255,255,255,.06); --ctl-bg-h: rgba(255,255,255,.16); --ctl-line-h: rgba(255,255,255,.2); color: #eee; }
+.pupitre .titre { padding: 0 10px; font-weight: 700; opacity: .7; }
+
+/* =====================================================================
+   SCENE ET ECRAN SIMULE
+   ===================================================================== */
+.scene { position: fixed; inset: 0; display: grid; place-items: center; padding: 64px 20px 20px; }
+.ecran { position: relative; overflow: hidden; container-type: size; container-name: ecran;
+  width: 100%; height: 100%; border-radius: 18px; background: var(--bg); box-shadow: 0 30px 80px -30px rgba(0,0,0,.8);
+  transition: width .6s var(--spring-soft), height .6s var(--spring-soft), border-radius .6s var(--spring-soft); }
+.scene[data-format="telephone"] .ecran { width: 390px; height: min(844px, calc(100vh - 90px)); border-radius: 46px;
+  box-shadow: 0 0 0 10px #111, 0 0 0 11px #333, 0 40px 90px -30px rgba(0,0,0,.9); }
+
+/* Fond vivant : trois lueurs, trois periodes premieres entre elles (17/23/31 s),
+   animees en transform — repris de GRID tel quel, c'est mesure. */
+.fond { position: absolute; inset: -20%; pointer-events: none; }
+.fond i { position: absolute; width: 70%; height: 70%; border-radius: 50%; filter: blur(60px); opacity: .9; will-change: transform; }
+.fond i:nth-child(1) { left: -5%; bottom: -10%; background: radial-gradient(closest-side, var(--lueur-a), transparent); animation: derive1 17s ease-in-out infinite alternate; }
+.fond i:nth-child(2) { right: -10%; bottom: 0; background: radial-gradient(closest-side, var(--lueur-b), transparent); animation: derive2 23s ease-in-out infinite alternate; }
+.fond i:nth-child(3) { left: 20%; top: -20%; background: radial-gradient(closest-side, var(--lueur-c), transparent); animation: derive3 31s ease-in-out infinite alternate; }
+@keyframes derive1 { to { transform: translate(18%, -12%) scale(1.15); } }
+@keyframes derive2 { to { transform: translate(-16%, -10%) scale(.9); } }
+@keyframes derive3 { to { transform: translate(-12%, 16%) scale(1.1); } }
+
+/* =====================================================================
+   MATIERE — liquid glass (da.css de Gearbox) + reflet qui suit le pointeur
+   ===================================================================== */
+.verre { position: relative; isolation: isolate;
+  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, -40%), rgba(255,255,255,.13), transparent 60%),
+              linear-gradient(165deg, rgba(255,255,255,.07), rgba(255,255,255,0) 42%), var(--chrome-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(1.05);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(1.05);
+  box-shadow: inset 0 0 22px rgba(255,255,255,.035), var(--ombre); }
+.verre::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; z-index: -1;
+  background: linear-gradient(172deg, var(--rim-hi), var(--rim-lo) 24%, transparent 46%, transparent 72%, var(--rim-lo));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.boite { background: var(--box-bg); box-shadow: inset 0 0 0 1px var(--box-line); border-radius: var(--r-lg); }
+
+/* Controles */
+.btn { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 13px; border-radius: var(--r-sm); font-weight: 600;
+  background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: background-color .16s, box-shadow .16s, transform .5s var(--spring-bouncy); }
+.btn:hover { background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
+.btn:active { transform: scale(.95); }
+.btn.principal { background: var(--bony-grad); color: #fff; box-shadow: none; }
+.btn.principal:hover { filter: brightness(1.08); }
+.seg { position: relative; display: inline-flex; padding: 3px; border-radius: 99px; background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); }
+.seg button { position: relative; z-index: 1; height: 28px; padding: 0 13px; border-radius: 99px; font-weight: 600; font-size: var(--fs-12); white-space: nowrap; transition: color .2s; }
+.seg button[aria-pressed="false"] { color: var(--text-2); }
+.pupitre .seg button[aria-pressed="false"] { color: rgba(255,255,255,.65); }
+.seg .pouce { position: absolute; top: 3px; bottom: 3px; left: 0; border-radius: 99px; background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
+.chip { height: 28px; padding: 0 11px; border-radius: 99px; font-weight: 700; font-size: var(--fs-12); background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: transform .5s var(--spring-bouncy), background .2s, color .2s; }
+.chip[aria-pressed="true"] { background: var(--bony-grad); color: #fff; box-shadow: none; animation: allume .5s var(--spring-bouncy); }
+@keyframes allume { 0% { transform: scale(.8); } }
+.marque { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+.marque.renault { background: var(--brand-renault); color: #1a1500; }
+.marque.dacia { background: var(--brand-dacia); color: #fff; }
+.marque.showroom { background: color-mix(in srgb, var(--info) 22%, transparent); color: var(--info); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--info) 45%, transparent); }
+
+/* =====================================================================
+   APPLICATION — zone de contenu commune aux trois navigations
+   ===================================================================== */
+.app { position: absolute; inset: 0; display: flex; }
+.contenu { position: relative; flex: 1; min-width: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; view-transition-name: contenu; }
+.page { padding: 22px 26px 120px; display: flex; flex-direction: column; gap: 16px; }
+.app-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-height: 40px; }
+.app-head h1 { font-family: var(--font-display); text-transform: uppercase; font-size: 17px; letter-spacing: .03em; }
+.app-head .sub { color: var(--text-3); font-weight: 600; }
+.app-head .droite { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+/* entree echelonnee */
+.entre { animation: entre .55s var(--spring-snappy) both; animation-delay: calc(var(--i, 0) * 45ms); }
+@keyframes entre { from { opacity: 0; transform: translateY(12px) scale(.985); } }
+
+/* KPIs */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.kpi { padding: 14px 16px; }
+.kpi .l { color: var(--text-3); font-weight: 700; font-size: var(--fs-12); }
+.kpi .v { font-size: 30px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; display: flex; }
+.kpi.accent { background: var(--bony-grad); color: #fff; box-shadow: 0 18px 40px -18px rgba(247,86,50,.7); }
+.kpi.accent .l { color: rgba(255,255,255,.8); }
+/* compteur qui roule */
+.roule { display: inline-flex; overflow: hidden; height: 1.15em; }
+.roule .col { display: flex; flex-direction: column; transition: transform .9s var(--spring-soft); }
+.roule .col span { display: block; height: 1.15em; width: .62em; text-align: center; }
+
+/* --- Saisie --- */
+.saisie { display: grid; grid-template-columns: 250px 1fr; gap: 14px; min-height: 0; }
+.liste { padding: 8px; display: flex; flex-direction: column; gap: 2px; position: relative; align-self: start; }
+.liste .curseur { position: absolute; left: 8px; right: 8px; top: 0; height: 46px; border-radius: 12px; background: var(--bony-grad); box-shadow: 0 10px 24px -12px rgba(247,86,50,.8); }
+.vendeur { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 12px; border-radius: 12px; text-align: left; transition: color .2s; }
+.vendeur:hover { background: var(--ctl-bg); }
+.vendeur .n { flex: 1; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vendeur .site { font-size: 11px; color: var(--text-3); font-weight: 700; }
+.vendeur .c { font-weight: 800; }
+.vendeur.actif { color: #fff; } .vendeur.actif .site { color: rgba(255,255,255,.75); }
+.grille-zone { padding: 14px; overflow: auto; }
+.express { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+.express .champ { flex: 1; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 12px; background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); transition: box-shadow .2s; }
+.express .champ:focus-within { box-shadow: inset 0 0 0 1px var(--bony-orange), 0 0 0 4px rgba(247,86,50,.22); }
+.express input { flex: 1; border: 0; outline: 0; background: none; font-weight: 600; }
+.kbd { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--ctl-bg-h); color: var(--text-2); }
+table.grille { border-collapse: separate; border-spacing: 5px; width: 100%; min-width: 560px; }
+.grille th { font-size: 11.5px; color: var(--text-3); font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 2px 4px; text-align: center; }
+.grille th.aujourdhui { color: var(--bony-orange); }
+.grille td.h { font-size: 12px; color: var(--text-3); font-weight: 700; white-space: nowrap; text-align: right; padding-right: 6px; width: 1%; }
+.case { height: 36px; border-radius: 10px; background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); font-weight: 700; font-size: 12.5px;
+  padding: 0 8px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; transition: background .2s, box-shadow .2s, transform .5s var(--spring-bouncy); }
+.case:hover { background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
+.case.prise { background: color-mix(in srgb, var(--bony-orange) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bony-orange) 45%, transparent); }
+.case.attente { animation: pulse 1.4s ease-in-out infinite; box-shadow: inset 0 0 0 1px dashed; }
+.case.attente::after { content: " ·  en attente"; color: var(--text-3); font-weight: 600; }
+@keyframes pulse { 50% { opacity: .55; } }
+.case.posee { animation: pose .7s var(--spring-bouncy); }
+@keyframes pose { 0% { transform: scale(.85); box-shadow: 0 0 0 0 rgba(247,86,50,.7); } 60% { box-shadow: 0 0 0 10px rgba(247,86,50,0); } }
+.case.focus { box-shadow: inset 0 0 0 2px var(--bony-orange); }
+.colonne-jour.aujourdhui .case { background: color-mix(in srgb, var(--bony-orange) 5%, var(--ctl-bg)); }
+
+/* --- Suivi --- */
+.suivi-ligne { display: grid; grid-template-columns: minmax(150px, 1.3fr) 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; }
+.suivi-ligne .client { font-weight: 800; }
+.suivi-ligne .meta { font-size: 12px; color: var(--text-3); font-weight: 600; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.issues { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.issue { height: 30px; padding: 0 11px; border-radius: 99px; font-weight: 700; font-size: 12px; background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); transition: transform .5s var(--spring-bouncy), background .25s, color .25s; }
+.issue:active { transform: scale(.94); }
+.issue.on[data-i="commande"] { background: var(--ok); color: #fff; box-shadow: none; }
+.issue.on[data-i="offre"] { background: var(--info); color: #fff; box-shadow: none; }
+.issue.on[data-i="annule"] { background: var(--danger); color: #fff; box-shadow: none; }
+.issue.on[data-i="clos"] { background: var(--text-3); color: #fff; box-shadow: none; }
+.avantages { display: flex; gap: 6px; align-items: center; justify-content: flex-end; grid-column: 1 / -1; overflow: hidden; }
+.seche { font-size: 12px; font-weight: 800; color: var(--text-3); padding: 0 8px; animation: entre .4s var(--spring-snappy) both; }
+.suivi-ligne { transition: box-shadow .3s; }
+.suivi-ligne[data-etat="commande"] { box-shadow: inset 3px 0 0 var(--ok), inset 0 0 0 1px var(--box-line); }
+.suivi-ligne[data-etat="offre"] { box-shadow: inset 3px 0 0 var(--info), inset 0 0 0 1px var(--box-line); }
+.suivi-ligne[data-etat="annule"] { box-shadow: inset 3px 0 0 var(--danger), inset 0 0 0 1px var(--box-line); }
+.suivi-ligne[data-etat="clos"] { box-shadow: inset 3px 0 0 var(--text-3), inset 0 0 0 1px var(--box-line); }
+
+/* --- Classement --- */
+.classement { padding: 8px; }
+.rang { display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: center; height: 44px; padding: 0 10px; border-radius: 12px; }
+.rang:nth-child(1) .pos { background: var(--bony-grad); color: #fff; }
+.rang .pos { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-weight: 800; font-size: 12px; background: var(--ctl-bg-h); }
+.rang .n { font-weight: 700; }
+.rang .v { font-weight: 800; }
+.rang.bouge { background: color-mix(in srgb, var(--bony-orange) 12%, transparent); transition: background 1.2s; }
+.deux { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+.barres { display: flex; align-items: flex-end; gap: 10px; height: 160px; padding: 16px; }
+.barres i { flex: 1; border-radius: 8px 8px 4px 4px; background: var(--bony-grad); transform-origin: bottom; animation: pousse .9s var(--spring-soft) both; animation-delay: calc(var(--i) * 60ms); }
+@keyframes pousse { from { transform: scaleY(0); } }
+
+/* --- Effectifs --- */
+.eff { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.eff .carte { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.eff .p { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: var(--ctl-bg); font-weight: 600; transition: opacity .3s, transform .4s var(--spring-bouncy); }
+.eff .p.absent { opacity: .45; text-decoration: line-through; }
+.interrupteur { margin-left: auto; width: 34px; height: 20px; border-radius: 99px; background: var(--ctl-bg-h); position: relative; box-shadow: inset 0 0 0 1px var(--ctl-line); transition: background .25s; }
+.interrupteur::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .45s var(--spring-bouncy); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.interrupteur.on { background: var(--ok); }
+.interrupteur.on::after { transform: translateX(14px); }
+
+/* --- Reglages --- */
+.reglages { display: grid; grid-template-columns: 240px 1fr; gap: 14px; }
+.sect { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-weight: 700; width: 100%; text-align: left; }
+.sect:hover { background: var(--ctl-bg); }
+.sect .pic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: #fff; }
+.sect .verrou { margin-left: auto; font-size: 10.5px; color: var(--text-3); font-weight: 800; text-transform: uppercase; }
+
+/* =====================================================================
+   OPTION A — « ILE » flottante
+   ===================================================================== */
+.ile { position: absolute; z-index: 20; left: 50%; top: 14px; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 99px;
+  transition: padding .5s var(--spring-snappy), top .5s var(--spring-snappy); }
+.ile .logo { width: 30px; height: 30px; margin: 0 6px 0 4px; }
+.ile .item { position: relative; z-index: 1; display: flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 99px; font-weight: 700; transition: color .25s, padding .5s var(--spring-snappy); white-space: nowrap; }
+.ile .item .lib { display: inline-block; max-width: 140px; overflow: hidden; transition: max-width .5s var(--spring-snappy), opacity .3s; }
+.ile .item[aria-current="true"] { color: #fff; }
+.ile .goutte { position: absolute; z-index: 0; top: 5px; height: 38px; border-radius: 99px; background: var(--bony-grad); box-shadow: 0 8px 22px -10px rgba(247,86,50,.9); }
+.ile.retractee { padding: 4px; top: 10px; }
+.ile.retractee .item { padding: 0 11px; }
+.ile.retractee .item .lib { max-width: 0; opacity: 0; }
+.ile .sep { width: 1px; height: 22px; background: var(--line-2); margin: 0 4px; }
+.optA .page { padding-top: 84px; }
+
+/* =====================================================================
+   OPTION B — RAIL + barre flottante (telephone)
+   ===================================================================== */
+.rail { position: relative; z-index: 20; margin: 12px 0 12px 12px; width: 220px; border-radius: 24px; padding: 14px 10px; display: flex; flex-direction: column; gap: 3px; flex: none;
+  transition: width .55s var(--spring-snappy); }
+.rail .tete { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; }
+.rail .tete img { width: 30px; height: 30px; }
+.rail .tete .mot { font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: .05em; background: var(--bony-grad); -webkit-background-clip: text; background-clip: text; color: transparent; white-space: nowrap; transition: opacity .3s; }
+.rail .item { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 12px; border-radius: 13px; font-weight: 700; white-space: nowrap; transition: color .25s; }
+.rail .item:hover:not([aria-current="true"]) { background: var(--ctl-bg); }
+.rail .item[aria-current="true"] { color: #fff; }
+.rail .item .lib { transition: opacity .3s; }
+.rail .item .badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; transition: opacity .3s; }
+.rail .goutte { position: absolute; left: 10px; right: 10px; top: 0; height: 42px; border-radius: 13px; background: var(--bony-grad); box-shadow: 0 10px 24px -12px rgba(247,86,50,.9); }
+.rail .groupe { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); padding: 14px 12px 6px; white-space: nowrap; transition: opacity .3s; }
+.rail .bas { margin-top: auto; display: flex; flex-direction: column; gap: 3px; }
+.rail.replie { width: 64px; }
+.rail.replie :is(.mot, .lib, .badge, .groupe) { opacity: 0; pointer-events: none; }
+.rail .moi { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 13px; }
+.av { width: 30px; height: 30px; border-radius: 50%; background: var(--bony-grad); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 12px; flex: none; }
+.barre-bas { display: none; }
+
+/* =====================================================================
+   OPTION C — ACCUEIL ET ESPACES
+   ===================================================================== */
+.accueil { padding: 70px 26px 40px; display: flex; flex-direction: column; gap: 18px; }
+.accueil .bonjour h1 { font-size: 30px; font-weight: 800; letter-spacing: -.03em; }
+.tuiles { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 170px; gap: 14px; }
+.tuile { border-radius: 26px; padding: 18px; display: flex; flex-direction: column; text-align: left; overflow: hidden; transition: transform .5s var(--spring-bouncy); }
+.tuile:hover { transform: scale(1.02); } .tuile:active { transform: scale(.97); }
+.tuile.l2 { grid-column: span 2; } .tuile.h2 { grid-row: span 2; }
+.tuile .t { display: flex; gap: 8px; align-items: center; font-weight: 800; color: var(--text-2); }
+.tuile .gros { margin-top: auto; font-size: 44px; font-weight: 800; letter-spacing: -.04em; line-height: 1; }
+.tuile.accent { background: var(--bony-grad); color: #fff; } .tuile.accent .t { color: rgba(255,255,255,.85); }
+.espace-tete { position: absolute; z-index: 20; top: 12px; left: 12px; display: flex; gap: 8px; align-items: center; padding: 5px 14px 5px 5px; border-radius: 99px; }
+.optC .page { padding-top: 70px; }
+
+/* =====================================================================
+   COMMUN : palette, sante, transitions
+   ===================================================================== */
+.voile { position: absolute; inset: 0; z-index: 50; background: rgba(5,6,12,.35); display: grid; place-items: start center; padding-top: 12cqh; opacity: 0; pointer-events: none; transition: opacity .25s; }
+.voile.ouvert { opacity: 1; pointer-events: auto; }
+.palette { width: min(560px, 92cqw); border-radius: 22px; padding: 10px; transform: scale(.94) translateY(-10px); opacity: 0; transition: transform .5s var(--spring-bouncy), opacity .25s; }
+.voile.ouvert .palette { transform: none; opacity: 1; }
+.palette input { width: 100%; height: 46px; border: 0; outline: 0; background: none; font-size: 17px; font-weight: 600; padding: 0 12px; }
+.palette .res { display: flex; flex-direction: column; gap: 2px; max-height: 50cqh; overflow: auto; }
+.palette .r { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; font-weight: 600; text-align: left; }
+.palette .r.sel { background: var(--ctl-bg-h); }
+.palette .r .k { margin-left: auto; font-size: 11px; color: var(--text-3); font-weight: 700; }
+.sante { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: 99px; font-size: 12px; font-weight: 700; color: var(--text-2); background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); }
+.sante i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: battement 2.4s ease-out infinite; }
+@keyframes battement { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); } 70%, 100% { box-shadow: 0 0 0 7px transparent; } }
+.toast { position: absolute; z-index: 60; left: 50%; bottom: 28px; transform: translate(-50%, 30px); opacity: 0; padding: 10px 16px; border-radius: 99px; font-weight: 700; transition: transform .5s var(--spring-bouncy), opacity .25s; }
+.toast.vu { transform: translate(-50%, 0); opacity: 1; }
+.fete { position: absolute; pointer-events: none; z-index: 70; }
+.fete i { position: absolute; width: 7px; height: 7px; border-radius: 2px; }
+
+/* View Transitions : rubrique -> rubrique, et theme en disque */
+::view-transition-old(contenu) { animation: .22s ease both sortie; }
+::view-transition-new(contenu) { animation: .5s var(--spring-snappy) both arrivee; }
+@keyframes sortie { to { opacity: 0; transform: scale(.985); filter: blur(4px); } }
+@keyframes arrivee { from { opacity: 0; transform: translateY(14px) scale(.99); } }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+.vt-theme::view-transition-new(root) { animation: disque .7s var(--ease-out) both; }
+@keyframes disque { from { clip-path: circle(0 at var(--ox) var(--oy)); } to { clip-path: circle(var(--or) at var(--ox) var(--oy)); } }
+::view-transition-group(carte) { animation-duration: .6s; animation-timing-function: var(--spring-snappy); }
+
+/* =====================================================================
+   TELEPHONE (requete de CONTENEUR, comme Gearbox : pas @media)
+   ===================================================================== */
+@container ecran (max-width: 700px) {
+  .page { padding: 16px 14px 120px; }
+  .saisie, .deux, .reglages { grid-template-columns: 1fr; }
+  .liste { flex-direction: row; overflow-x: auto; gap: 6px; padding: 6px; scrollbar-width: none; }
+  .liste .curseur { display: none; }
+  .vendeur { flex: none; height: 38px; border-radius: 99px; background: var(--ctl-bg); }
+  .vendeur.actif { background: var(--bony-grad); }
+  .vendeur .site { display: none; }
+  .suivi-ligne { grid-template-columns: 1fr; }
+  .issues, .avantages { justify-content: flex-start; }
+  .optA .page { padding-top: 16px; }
+  .ile { top: auto; bottom: 22px; }
+  .ile .logo, .ile .sep, .ile .extra { display: none; }
+  .ile .item { padding: 0 12px; }
+  .ile .item .lib { max-width: 0; opacity: 0; }
+  .ile .item[aria-current="true"] .lib { max-width: 120px; opacity: 1; }
+  /* Option B : le rail laisse place a une barre flottante en bas */
+  .rail { display: none; }
+  .barre-bas { display: flex; position: absolute; z-index: 20; left: 14px; right: 14px; bottom: 22px; padding: 6px; border-radius: 30px; justify-content: space-around;
+    transition: left .5s var(--spring-snappy), right .5s var(--spring-snappy), bottom .5s var(--spring-snappy); }
+  .barre-bas .item { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: 52px; border-radius: 24px; font-size: 10.5px; font-weight: 800; transition: color .25s, height .5s var(--spring-snappy); }
+  .barre-bas .item[aria-current="true"] { color: #fff; }
+  .barre-bas .item .lib { transition: opacity .25s; }
+  .barre-bas .goutte { position: absolute; top: 6px; height: 52px; border-radius: 24px; background: var(--bony-grad); transition: height .5s var(--spring-snappy); }
+  .barre-bas.retractee { left: 60px; right: 60px; bottom: 16px; }
+  .barre-bas.retractee .item { height: 40px; } .barre-bas.retractee .goutte { height: 40px; }
+  .barre-bas.retractee .lib { opacity: 0; font-size: 0; }
+  .tuiles { grid-template-columns: 1fr 1fr; grid-auto-rows: 140px; }
+  .tuile.l2 { grid-column: span 2; }
+  .accueil { padding: 60px 14px 40px; }
+  .accueil .bonjour h1 { font-size: 24px; }
+  .optC .page { padding-top: 64px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; } }
+</style>
+</head>
+<body>
+
+<div class="pupitre">
+  <span class="titre">Maquette</span>
+  <div class="seg" id="choixOption">
+    <span class="pouce"></span>
+    <button aria-pressed="true" data-v="A">A · Île</button>
+    <button aria-pressed="false" data-v="B">B · Rail</button>
+    <button aria-pressed="false" data-v="C">C · Accueil</button>
+  </div>
+  <div class="seg" id="choixFormat">
+    <span class="pouce"></span>
+    <button aria-pressed="true" data-v="bureau">Bureau</button>
+    <button aria-pressed="false" data-v="telephone">Téléphone</button>
+  </div>
+  <button class="btn" id="basculeTheme" style="border-radius:99px;height:34px;color:#eee;--ctl-bg:rgba(255,255,255,.06);--ctl-bg-h:rgba(255,255,255,.16)">
+    <svg class="i" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg> Thème
+  </button>
+</div>
+
+<div class="scene" data-format="bureau">
+  <div class="ecran" id="ecran">
+    <div class="fond"><i></i><i></i><i></i></div>
+    <div id="hote"></div>
+    <div class="voile" id="voile"><div class="palette verre" id="palette">
+      <input id="paletteChamp" placeholder="Aller à un vendeur, une rubrique, une action…" autocomplete="off" />
+      <div class="res" id="paletteRes"></div>
+    </div></div>
+    <div class="toast verre" id="toast"></div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   RESSORTS — meme modele que Gearbox (core.js) et GRID : oscillateur
+   amorti echantillonne, fige en linear(). Interpole par le compositeur.
+   ===================================================================== */
+function ressort({ raideur = 300, amortissement = 30, masse = 1 }) {
+  const w0 = Math.sqrt(raideur / masse), zeta = amortissement / (2 * Math.sqrt(raideur * masse));
+  const wd = w0 * Math.sqrt(Math.max(1 - zeta * zeta, 1e-6));
+  const x = (t) => zeta < 1 ? 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + (zeta * w0 / wd) * Math.sin(wd * t)) : 1 - Math.exp(-w0 * t) * (1 + w0 * t);
+  let duree = 0; for (let t = 0; t < 4; t += 0.01) { if (Math.abs(x(t) - 1) > 0.001) duree = t; }
+  duree = Math.max(duree, 0.2);
+  const pts = []; const n = 48;
+  for (let i = 0; i <= n; i++) pts.push(+x((i / n) * duree).toFixed(4));
+  pts[n] = 1;
+  return { css: `linear(${pts.join(', ')})`, ms: Math.round(duree * 1000) };
+}
+const RESSORTS = {
+  snappy: ressort({ raideur: 420, amortissement: 26 }),
+  soft: ressort({ raideur: 200, amortissement: 19 }),
+  bouncy: ressort({ raideur: 360, amortissement: 14 }),
+};
+for (const [k, s] of Object.entries(RESSORTS)) document.documentElement.style.setProperty(`--spring-${k}`, s.css);
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const avecTransition = (fn, classe) => {
+  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) { fn(); return; }
+  if (classe) document.documentElement.classList.add(classe);
+  const t = document.startViewTransition(fn);
+  t.finished.finally(() => classe && document.documentElement.classList.remove(classe));
+};
+
+/* Deplace un indicateur unique d'un element a un autre, en ressort, avec un
+   etirement « goutte » a mi-course : il couvre un instant les deux positions,
+   puis se resserre. C'est ce qui donne la sensation de liquide. */
+function glisser(indic, cible, axe = 'x', premier = false) {
+  if (!indic || !cible) return;
+  const parent = indic.offsetParent || indic.parentElement;
+  const p = parent.getBoundingClientRect(), r = cible.getBoundingClientRect();
+  const fin = axe === 'x' ? { pos: r.left - p.left + parent.scrollLeft, taille: r.width } : { pos: r.top - p.top + parent.scrollTop, taille: r.height };
+  const prop = axe === 'x' ? ['left', 'width'] : ['top', 'height'];
+  const avant = indic._etat;
+  indic._etat = fin;
+  if (premier || !avant) { indic.style[prop[0]] = fin.pos + 'px'; indic.style[prop[1]] = fin.taille + 'px'; return; }
+  const debut = Math.min(avant.pos, fin.pos), finMax = Math.max(avant.pos + avant.taille, fin.pos + fin.taille);
+  indic.animate([
+    { [prop[0]]: avant.pos + 'px', [prop[1]]: avant.taille + 'px' },
+    { [prop[0]]: debut + 'px', [prop[1]]: (finMax - debut) + 'px', offset: .35 },
+    { [prop[0]]: fin.pos + 'px', [prop[1]]: fin.taille + 'px' },
+  ], { duration: RESSORTS.snappy.ms + 120, easing: 'ease-out' });
+  indic.animate([{ [prop[0]]: debut + 'px', [prop[1]]: (finMax - debut) + 'px' }, { [prop[0]]: fin.pos + 'px', [prop[1]]: fin.taille + 'px' }],
+    { duration: RESSORTS.bouncy.ms, easing: RESSORTS.bouncy.css, delay: (RESSORTS.snappy.ms + 120) * .35 });
+  indic.style[prop[0]] = fin.pos + 'px'; indic.style[prop[1]] = fin.taille + 'px';
+}
+
+/* Segmentes du pupitre et des pages */
+function brancherSeg(seg, surChange) {
+  const pouce = $('.pouce', seg);
+  const maj = (premier) => { const b = $('button[aria-pressed="true"]', seg); glisser(pouce, b, 'x', premier); };
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    $$('button', seg).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    maj(false); surChange?.(b.dataset.v);
+  });
+  requestAnimationFrame(() => maj(true));
+}
+
+/* Compteur qui roule : une colonne de chiffres par position */
+function rouleur(el, valeur) {
+  const txt = String(valeur);
+  if (el.children.length !== txt.length) {
+    el.innerHTML = [...txt].map(() => `<span class="col">${'0123456789'.split('').map((d) => `<span>${d}</span>`).join('')}</span>`).join('');
+    el.classList.add('roule');
+    $$('.col', el).forEach((c) => (c.style.transform = 'translateY(0)'));
+    void el.offsetWidth;
+  }
+  [...txt].forEach((d, i) => (el.children[i].style.transform = `translateY(${-Number(d) * 1.15}em)`));
+}
+
+/* =====================================================================
+   DONNEES FICTIVES
+   ===================================================================== */
+const JOURS = ['JEU 08', 'VEN 09', 'SAM 10', 'DIM 11', 'LUN 12'];
+const CRENEAUX = ['9h-10h', '10h-11h', '11h-12h', '12h-13h', '14h-15h', '15h-16h', '16h-17h', '17h-18h', '18h-19h'];
+const VENDEURS = [
+  { id: 1, nom: 'Camille Arnoux', site: 'CLF', rdv: {} }, { id: 2, nom: 'Hugo Delmas', site: 'MOZ', rdv: {} },
+  { id: 3, nom: 'Inès Faure', site: 'USS', rdv: {} }, { id: 4, nom: 'Lucas Marty', site: 'CLF', rdv: {} },
+  { id: 5, nom: 'Sarah Vidal', site: 'MASS', rdv: {} }, { id: 6, nom: 'Théo Bonnet', site: 'MOZ', rdv: {} },
+];
+const CLIENTS = ['MOREL', 'GIRAUD', 'BLANC', 'ROUX', 'FOURNIER', 'GAUTHIER', 'PERRIN', 'MARCHAND', 'LEMAIRE', 'DUMONT', 'BRUN', 'COLIN'];
+let graine = 42; const alea = () => ((graine = (graine * 16807) % 2147483647) / 2147483647);
+for (const v of VENDEURS) for (let k = 0; k < 3 + Math.floor(alea() * 5); k++) {
+  const cle = `${Math.floor(alea() * 5)}|${Math.floor(alea() * 9)}|${alea() < .6 ? 'R' : 'D'}`;
+  v.rdv[cle] = CLIENTS[Math.floor(alea() * CLIENTS.length)];
+}
+const total = (v) => Object.keys(v.rdv).length;
+const SUIVI = [
+  { c: 'MOREL', m: 'Clio 6', v: 'Camille Arnoux', j: 'JEU 08 · 10h', b: 'renault', s: 'relance', i: null, a: [] },
+  { c: 'GIRAUD', m: 'Duster 4x4', v: 'Hugo Delmas', j: 'JEU 08 · 11h', b: 'dacia', s: 'relance', i: 'commande', a: ['DIAC', 'CS'] },
+  { c: 'BLANC', m: 'Megane E-Tech', v: 'Inès Faure', j: 'JEU 08 · 14h', b: 'renault', s: 'showroom', i: 'offre', a: [] },
+  { c: 'ROUX', m: 'Sandero', v: 'Lucas Marty', j: 'VEN 09 · 9h', b: 'dacia', s: 'relance', i: null, a: [] },
+  { c: 'FOURNIER', m: 'R5', v: 'Sarah Vidal', j: 'VEN 09 · 16h', b: 'renault', s: 'relance', i: 'commande', a: [] },
+];
+const RUBRIQUES = [
+  { id: 'saisie', lib: 'Saisie', ic: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>' },
+  { id: 'suivi', lib: 'Suivi des RDV', ic: '<path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>', badge: 2 },
+  { id: 'tableau', lib: 'Tableau de bord', ic: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' },
+  { id: 'effectifs', lib: 'Effectifs', ic: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.5a3 3 0 0 1 0 6M21 20a5 5 0 0 0-4-4.9"/>', groupe: 'Préparation' },
+  { id: 'campagnes', lib: 'Campagnes', ic: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>', groupe: 'Préparation' },
+  { id: 'reglages', lib: 'Réglages', ic: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>', bas: true },
+];
+const icone = (r) => `<svg class="i" viewBox="0 0 24 24">${r.ic}</svg>`;
+
+const etat = { option: 'A', rubrique: 'saisie', vendeur: 1, focus: null, replie: false, enEspace: false };
+
+/* =====================================================================
+   PAGES
+   ===================================================================== */
+const sante = `<span class="sante" title="Temps réel connecté · 120 ms · aucune écriture en attente"><i></i>En direct</span>`;
+
+function pageSaisie() {
+  const v = VENDEURS.find((x) => x.id === etat.vendeur);
+  const tot = VENDEURS.reduce((n, x) => n + total(x), 0);
+  const lignes = (marque) => CRENEAUX.map((cr, ci) => `<tr><td class="h">${cr}</td>${JOURS.map((_, ji) => {
+    const cle = `${ji}|${ci}|${marque}`; const nom = v.rdv[cle];
+    return `<td class="colonne-jour ${ji === 0 ? 'aujourdhui' : ''}"><button class="case ${nom ? 'prise' : ''}" data-cle="${cle}">${nom ?? ''}</button></td>`;
+  }).join('')}</tr>`).join('');
+  return `<div class="page">
+    <div class="app-head entre"><h1>Saisie</h1><span class="sub">Octobre 2026 · Table 2 CENTRE</span>
+      <div class="droite">${sante}<span class="boite" style="padding:6px 12px;font-weight:800">RDV de ma table · <span id="totTable" class="num"></span></span></div></div>
+    <div class="saisie">
+      <div class="liste boite entre" style="--i:1" id="liste"><span class="curseur" id="curseur"></span>
+        ${VENDEURS.map((x) => `<button class="vendeur ${x.id === v.id ? 'actif' : ''}" data-v="${x.id}"><span class="n">${x.nom}</span><span class="site">${x.site}</span><span class="c num" data-c="${x.id}">${total(x)}</span></button>`).join('')}
+      </div>
+      <div class="grille-zone boite entre" style="--i:2">
+        <div class="express"><div class="champ"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          <input id="express" placeholder="Nom du client — Entrée pose le RDV dans la prochaine case libre" /><span class="kbd">⏎</span></div>
+          <span class="kbd">Alt ↑↓ vendeur</span><span class="kbd">Ctrl Z</span></div>
+        <table class="grille"><tr><th></th>${JOURS.map((j, i) => `<th class="${i === 0 ? 'aujourdhui' : ''}">${j}</th>`).join('')}</tr>
+          <tr><td></td><td colspan="5"><span class="marque renault">RENAULT</span></td></tr>${lignes('R')}
+          <tr><td></td><td colspan="5" style="padding-top:10px"><span class="marque dacia">DACIA</span></td></tr>${lignes('D')}
+        </table>
+      </div>
+    </div></div>`;
+}
+function pageSuivi() {
+  return `<div class="page">
+    <div class="app-head entre"><h1>Suivi des RDV</h1><span class="sub">Octobre 2026 · mon périmètre</span>
+      <div class="droite"><div class="seg" data-seg><span class="pouce"></span><button aria-pressed="true">À traiter</button><button aria-pressed="false">Tous</button><button aria-pressed="false">Commandes</button></div>
+      <button class="btn principal"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Trafic naturel</button></div></div>
+    <div class="kpis">
+      ${[['Planifiés', 42], ['Traités', 31], ['Commandes', 14], ['Taux transfo.', '45%']].map(([l, n], i) => `<div class="kpi boite entre ${i === 3 ? 'accent' : ''}" style="--i:${i}"><span class="l">${l}</span><span class="v num" data-roule="${n}"></span></div>`).join('')}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">${SUIVI.map((r, k) => `
+      <div class="suivi-ligne boite entre" style="--i:${k + 2}" data-k="${k}" data-etat="${r.i ?? ''}">
+        <div><div class="client">${r.c} <span class="faint" style="font-weight:600">· ${r.m}</span></div><div class="meta">${r.v} · ${r.j} <span class="marque ${r.b}">${r.b.toUpperCase()}</span>${r.s === 'showroom' ? '<span class="marque showroom">SHOWROOM</span>' : ''}</div></div>
+        <div></div>
+        <div class="issues">${[['commande', 'Commande'], ['offre', 'Offre en cours'], ['annule', 'Annulé'], ['clos', 'Clos sans suite']].map(([i, l]) => `<button class="issue ${r.i === i ? 'on' : ''}" data-i="${i}">${l}</button>`).join('')}</div>
+        <div class="avantages">${r.i === 'commande' ? avantages(r) : ''}</div>
+      </div>`).join('')}</div></div>`;
+}
+const avantages = (r) => ['DIAC', 'STOCK', 'CS'].map((a) => `<button class="chip" aria-pressed="${r.a.includes(a)}" data-a="${a}">${a}</button>`).join('') + (r.a.length === 0 ? '<span class="seche">Commande sèche</span>' : '');
+function pageTableau() {
+  const cl = [...VENDEURS].sort((a, b) => total(b) - total(a));
+  return `<div class="page">
+    <div class="app-head entre"><h1>Tableau de bord</h1><span class="sub">Octobre 2026 · phoning uniquement</span><div class="droite">${sante}<button class="btn" id="simuler">Simuler un RDV d'un collègue</button></div></div>
+    <div class="kpis">${[['RDV du groupe', 612], ['VN', 488], ['VO', 124], ['Moy. / vendeur', 6]].map(([l, n], i) => `<div class="kpi boite entre ${i === 0 ? 'accent' : ''}" style="--i:${i}"><span class="l">${l}</span><span class="v num" data-roule="${n}" ${i === 0 ? 'id="kpiTotal"' : ''}></span></div>`).join('')}</div>
+    <div class="deux">
+      <div class="boite entre" style="--i:4"><div style="padding:14px 16px 0;font-weight:800">Par jour</div><div class="barres">${[62, 88, 100, 74, 55].map((h, i) => `<i style="--i:${i};height:${h}%"></i>`).join('')}</div></div>
+      <div class="classement boite entre" style="--i:5" id="classement">${cl.map((v, i) => `<div class="rang" data-v="${v.id}"><span class="pos">${i + 1}</span><span class="n">${v.nom}</span><span class="v num">${total(v)}</span></div>`).join('')}</div>
+    </div></div>`;
+}
+function pageEffectifs() {
+  const sites = [['CLERMONT-FERRAND', ['Camille Arnoux', 'Lucas Marty', 'Nora Petit', 'Yanis Roche']], ['MOZAC', ['Hugo Delmas', 'Théo Bonnet', 'Léa Garnier']], ['USSEL', ['Inès Faure', 'Paul Simon']], ['MASSAGETTES', ['Sarah Vidal', 'Eva Morin']]];
+  return `<div class="page">
+    <div class="app-head entre"><h1>Effectifs</h1><span class="sub">Octobre 2026 · NORD · mode par site</span>
+      <div class="droite"><div class="seg" data-seg><span class="pouce"></span><button aria-pressed="false">CENTRE</button><button aria-pressed="true">NORD</button><button aria-pressed="false">SUD</button><button aria-pressed="false">SUD-OUEST</button></div></div></div>
+    <div class="eff">${sites.map(([s, vs], k) => `<div class="carte boite entre" style="--i:${k}"><div style="font-weight:800">${s} <span class="faint">· ${vs.length} mobilisés</span></div>
+      ${vs.map((n) => `<div class="p">${n}<button class="interrupteur on" aria-label="Mobilisé"></button></div>`).join('')}</div>`).join('')}</div></div>`;
+}
+function pageCampagnes() {
+  return `<div class="page"><div class="app-head entre"><h1>Campagnes</h1><span class="sub">3 campagnes</span><div class="droite"><button class="btn principal">Nouvelle campagne</button></div></div>
+    ${[['Octobre 2026', '08/10 → 12/10', 'En cours'], ['Septembre 2026', '10/09 → 14/09', 'Clôturée'], ['Juin 2026', '11/06 → 15/06', 'Clôturée']].map(([l, d, e], i) => `<div class="boite entre" style="--i:${i};padding:16px;display:flex;align-items:center;gap:12px"><b style="font-size:15px">${l}</b><span class="faint">${d}</span><span style="margin-left:auto" class="sante">${e}</span></div>`).join('')}</div>`;
+}
+function pageReglages() {
+  const S = [['Mon compte', 'var(--info)', ''], ['Apparence', 'var(--bony-violet)', ''], ['Application', 'var(--ok)', ''], ['Comptes', 'var(--bony-orange)', 'admin'], ['Référentiels', 'var(--warn)', 'direction'], ['Journal', 'var(--text-3)', 'admin']];
+  return `<div class="page"><div class="app-head entre"><h1>Réglages</h1><span class="sub">les sections dépendent du palier</span></div>
+    <div class="reglages"><div class="boite entre" style="padding:8px">${S.map(([l, c, p]) => `<button class="sect"><span class="pic" style="background:${c}">${l[0]}</span>${l}${p ? `<span class="verrou">${p}</span>` : ''}</button>`).join('')}</div>
+    <div class="boite entre" style="--i:1;padding:18px;display:flex;flex-direction:column;gap:14px"><b style="font-size:15px">Mon compte</b>
+      <div class="row" style="display:flex;gap:12px;align-items:center"><span class="av" style="width:44px;height:44px">TL</span><div><b>Théo L.</b><div class="faint">tlabonne · admin · dernière connexion aujourd'hui</div></div></div>
+      <button class="btn" style="align-self:start">Changer mon mot de passe</button></div></div></div>`;
+}
+const PAGES = { saisie: pageSaisie, suivi: pageSuivi, tableau: pageTableau, effectifs: pageEffectifs, campagnes: pageCampagnes, reglages: pageReglages };
+
+/* =====================================================================
+   COQUILLES
+   ===================================================================== */
+const logo = '<img class="logo" src="/grid.svg" alt="GRID" />';
+function coquilleA() {
+  return `<div class="app optA"><div class="contenu" id="contenu"></div>
+    <nav class="ile verre" id="nav">${logo}<span class="goutte" id="goutte"></span>
+      ${RUBRIQUES.filter((r) => !r.bas).map((r) => `<button class="item" data-r="${r.id}" aria-current="${r.id === etat.rubrique}">${icone(r)}<span class="lib">${r.lib}</span></button>`).join('')}
+      <span class="sep"></span><button class="item extra" data-r="reglages" aria-current="${etat.rubrique === 'reglages'}">${icone(RUBRIQUES[5])}</button>
+      <button class="item extra" data-palette><span class="kbd">Ctrl K</span></button></nav></div>`;
+}
+function coquilleB() {
+  let groupe = null;
+  return `<div class="app optB">
+    <nav class="rail verre ${etat.replie ? 'replie' : ''}" id="nav"><div class="tete"><img src="/grid.svg" alt=""/><span class="mot">GRID</span></div><span class="goutte" id="goutte"></span>
+      ${RUBRIQUES.filter((r) => !r.bas).map((r) => { const g = r.groupe && r.groupe !== groupe ? `<div class="groupe">${(groupe = r.groupe)}</div>` : '';
+        return `${g}<button class="item" data-r="${r.id}" aria-current="${r.id === etat.rubrique}" title="${r.lib}">${icone(r)}<span class="lib">${r.lib}</span>${r.badge ? `<span class="badge">${r.badge}</span>` : ''}</button>`; }).join('')}
+      <div class="bas"><button class="item" data-palette title="Rechercher">${'<svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>'}<span class="lib">Rechercher <span class="kbd">Ctrl K</span></span></button>
+        <button class="item" data-r="reglages" aria-current="${etat.rubrique === 'reglages'}">${icone(RUBRIQUES[5])}<span class="lib">Réglages</span></button>
+        <button class="item" id="replier" title="Replier">${'<svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>'}<span class="lib">Replier</span></button></div></nav>
+    <div class="contenu" id="contenu"></div>
+    <nav class="barre-bas verre" id="navBas"><span class="goutte" id="goutteBas"></span>
+      ${RUBRIQUES.filter((r) => ['saisie', 'suivi', 'tableau', 'effectifs', 'reglages'].includes(r.id)).map((r) => `<button class="item" data-r="${r.id}" aria-current="${r.id === etat.rubrique}">${icone(r)}<span class="lib">${r.lib.split(' ')[0]}</span></button>`).join('')}
+    </nav></div>`;
+}
+function coquilleC() {
+  if (!etat.enEspace) {
+    const tot = VENDEURS.reduce((n, x) => n + total(x), 0);
+    const tuile = (id, cls, t, gros, sous) => `<button class="tuile verre ${cls}" data-r="${id}" style="view-transition-name:t-${id}"><span class="t">${icone(RUBRIQUES.find((r) => r.id === id))}${t}</span><span class="gros num">${gros}</span><span class="faint" style="font-weight:700;margin-top:6px">${sous}</span></button>`;
+    return `<div class="app optC"><div class="contenu" id="contenu"><div class="accueil">
+      <div class="bonjour entre"><div class="faint" style="font-weight:800;text-transform:uppercase;letter-spacing:.06em">Octobre 2026 · séance en cours</div><h1>Bonjour Théo</h1></div>
+      <div class="tuiles">
+        ${tuile('saisie', 'accent l2 h2', 'Saisie', tot, 'RDV de ma table · 6 vendeurs')}
+        ${tuile('suivi', 'l2', 'Suivi des RDV', 11, 'à traiter')}
+        ${tuile('tableau', '', 'Tableau', 612, 'RDV du groupe')}
+        ${tuile('effectifs', '', 'Effectifs', 96, 'mobilisés')}
+        ${tuile('campagnes', '', 'Campagnes', 3, '1 en cours')}
+        ${tuile('reglages', '', 'Réglages', '·', 'compte, apparence')}
+      </div></div></div></div>`;
+  }
+  return `<div class="app optC"><div class="contenu" id="contenu" style="view-transition-name:t-${etat.rubrique}"></div>
+    <div class="espace-tete verre"><button class="btn" id="retour" style="border-radius:99px;height:32px">‹ Accueil</button><b>${RUBRIQUES.find((r) => r.id === etat.rubrique).lib}</b><span class="kbd">Échap</span></div></div>`;
+}
+
+/* =====================================================================
+   RENDU ET INTERACTIONS
+   ===================================================================== */
+function rendre(premier = true) {
+  const hote = $('#hote');
+  hote.innerHTML = { A: coquilleA, B: coquilleB, C: coquilleC }[etat.option]();
+  rendrePage(true);
+  requestAnimationFrame(() => { placerIndicateurs(true); });
+  brancherCoquille();
+}
+function rendrePage() {
+  const c = $('#contenu'); if (!c) return;
+  if (etat.option === 'C' && !etat.enEspace) return;
+  c.innerHTML = PAGES[etat.rubrique]();
+  c.scrollTop = 0;
+  brancherPage();
+}
+function placerIndicateurs(premier = false) {
+  const nav = $('#nav');
+  if (nav) {
+    const cible = $(`.item[data-r="${etat.rubrique}"]:not(.extra)`, nav) || $(`.item[data-r="${etat.rubrique}"]`, nav);
+    if (cible && $('#goutte')) { $('#goutte').style.opacity = cible.offsetParent ? 1 : 0; glisser($('#goutte'), cible, etat.option === 'B' ? 'y' : 'x', premier); }
+  }
+  const bas = $('#navBas');
+  if (bas && getComputedStyle(bas).display !== 'none') {
+    const cible = $(`.item[data-r="${etat.rubrique}"]`, bas);
+    $('#goutteBas').style.opacity = cible ? 1 : 0;
+    if (cible) glisser($('#goutteBas'), cible, 'x', premier);
+  }
+  $$('#hote .item[data-r]').forEach((b) => b.setAttribute('aria-current', String(b.dataset.r === etat.rubrique)));
+}
+function aller(r) {
+  if (r === etat.rubrique && !(etat.option === 'C' && !etat.enEspace)) return;
+  if (etat.option === 'C') {
+    etat.rubrique = r; etat.enEspace = true;
+    avecTransition(() => { rendre(); });
+    return;
+  }
+  etat.rubrique = r;
+  placerIndicateurs();
+  avecTransition(() => rendrePage());
+}
+function brancherCoquille() {
+  $$('#hote .item[data-r], #hote .tuile[data-r]').forEach((b) => b.addEventListener('click', () => aller(b.dataset.r)));
+  $$('#hote [data-palette]').forEach((b) => b.addEventListener('click', ouvrirPalette));
+  $('#replier')?.addEventListener('click', () => { etat.replie = !etat.replie; $('#nav').classList.toggle('replie', etat.replie); });
+  $('#retour')?.addEventListener('click', () => { etat.enEspace = false; avecTransition(() => rendre()); });
+  // Retraction au defilement (A : l'ile ; B telephone : la barre du bas)
+  const c = $('#contenu');
+  let dernier = 0;
+  c?.addEventListener('scroll', () => {
+    const y = c.scrollTop, descend = y > dernier && y > 40; dernier = y;
+    $('.ile')?.classList.toggle('retractee', descend);
+    $('.barre-bas')?.classList.toggle('retractee', descend);
+    clearTimeout(c._t); c._t = setTimeout(() => placerIndicateurs(), 380);
+  }, { passive: true });
+  // Reflet speculaire qui suit le pointeur, sur tout le verre
+  $$('#hote .verre').forEach((el) => el.addEventListener('pointermove', (e) => {
+    const r = el.getBoundingClientRect(); el.style.setProperty('--mx', e.clientX - r.left + 'px'); el.style.setProperty('--my', e.clientY - r.top + 'px');
+  }));
+}
+function brancherPage() {
+  $$('#contenu [data-seg]').forEach((s) => brancherSeg(s));
+  $$('#contenu [data-roule]').forEach((el, i) => { const v = el.dataset.roule; const n = parseInt(v, 10);
+    if (isNaN(n)) { el.textContent = v; return; }
+    rouleur(el, 0); setTimeout(() => { rouleur(el, n); if (String(v).endsWith('%')) el.insertAdjacentHTML('beforeend', '<span>%</span>'); }, 120 + i * 80); });
+  if (etat.rubrique === 'saisie') brancherSaisie();
+  if (etat.rubrique === 'suivi') brancherSuivi();
+  if (etat.rubrique === 'tableau') brancherTableau();
+  $$('#contenu .interrupteur').forEach((b) => b.addEventListener('click', () => { b.classList.toggle('on'); b.closest('.p').classList.toggle('absent', !b.classList.contains('on')); }));
+}
+
+/* --- Saisie : poser, compteurs, curseur, express, clavier --- */
+function brancherSaisie() {
+  const v = () => VENDEURS.find((x) => x.id === etat.vendeur);
+  const majTotaux = () => { rouleur($('#totTable'), VENDEURS.reduce((n, x) => n + total(x), 0)); $$('[data-c]').forEach((el) => (el.textContent = total(VENDEURS.find((x) => x.id == el.dataset.c)))); };
+  majTotaux();
+  const curseur = $('#curseur');
+  const placer = (p) => { const a = $('.vendeur.actif'); if (a && curseur && getComputedStyle(curseur).display !== 'none') glisser(curseur, a, 'y', p); };
+  requestAnimationFrame(() => placer(true));
+  $$('.vendeur').forEach((b) => b.addEventListener('click', () => changerVendeur(Number(b.dataset.v))));
+  function changerVendeur(id) {
+    etat.vendeur = id;
+    $$('.vendeur').forEach((x) => x.classList.toggle('actif', Number(x.dataset.v) === id));
+    placer(false);
+    const z = $('.grille-zone'); const t = $('table.grille', z);
+    t.animate([{ opacity: .2, transform: 'translateX(10px)' }, { opacity: 1, transform: 'none' }], { duration: RESSORTS.snappy.ms, easing: RESSORTS.snappy.css });
+    $$('.case', t).forEach((c) => { const nom = v().rdv[c.dataset.cle]; c.textContent = nom ?? ''; c.classList.toggle('prise', !!nom); c.classList.remove('attente', 'posee'); });
+  }
+  const poser = (caseEl, nom) => {
+    v().rdv[caseEl.dataset.cle] = nom;
+    caseEl.textContent = nom; caseEl.classList.add('prise', 'attente');
+    setTimeout(() => { caseEl.classList.remove('attente'); caseEl.classList.add('posee'); majTotaux(); fete(caseEl, total(v())); }, 650);
+  };
+  $$('.case').forEach((c) => c.addEventListener('click', () => {
+    if (c.classList.contains('prise') || c.querySelector('input')) return;
+    // Saisie EN PLACE, comme dans GRID : Entree pose, Echap annule.
+    const champ = document.createElement('input');
+    champ.style.cssText = 'width:100%;border:0;outline:0;background:none;font-weight:700';
+    c.classList.add('focus'); c.textContent = ''; c.appendChild(champ); champ.focus();
+    const finir = (ok) => { const nom = champ.value.trim(); c.classList.remove('focus'); champ.remove(); if (ok && nom) poser(c, nom.toUpperCase()); };
+    champ.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') finir(true); if (e.key === 'Escape') finir(false); });
+    champ.addEventListener('blur', () => finir(false));
+  }));
+  $('#express').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || !e.target.value.trim()) return;
+    const libre = $$('.case').find((c) => !c.classList.contains('prise'));
+    if (libre) { poser(libre, e.target.value.trim().toUpperCase()); e.target.value = ''; libre.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  });
+  document.onkeydown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); ouvrirPalette(); }
+    if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && etat.rubrique === 'saisie') {
+      e.preventDefault(); const i = VENDEURS.findIndex((x) => x.id === etat.vendeur); const j = (i + (e.key === 'ArrowDown' ? 1 : -1) + VENDEURS.length) % VENDEURS.length; changerVendeur(VENDEURS[j].id);
+    }
+    if (e.key === 'Escape') { fermerPalette(); if (etat.option === 'C' && etat.enEspace) { etat.enEspace = false; avecTransition(() => rendre()); } }
+  };
+}
+/* Celebration discrete aux paliers d'un vendeur */
+function fete(el, n) {
+  if (n % 5 !== 0) return;
+  annonce(`${n}e RDV pour ${VENDEURS.find((x) => x.id === etat.vendeur).nom.split(' ')[0]} 🎉`);
+  const e = $('#ecran').getBoundingClientRect(), r = el.getBoundingClientRect();
+  const f = document.createElement('div'); f.className = 'fete'; f.style.left = r.left - e.left + r.width / 2 + 'px'; f.style.top = r.top - e.top + r.height / 2 + 'px';
+  const couleurs = ['#f75632', '#8f12ab', '#ffcc33', '#4d8dff', '#3ed487'];
+  for (let i = 0; i < 26; i++) { const p = document.createElement('i'); p.style.background = couleurs[i % 5]; f.appendChild(p);
+    const a = (Math.PI * 2 * i) / 26, d = 50 + Math.random() * 70;
+    p.animate([{ transform: 'translate(0,0) rotate(0)', opacity: 1 }, { transform: `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d + 40}px) rotate(${Math.random() * 540}deg)`, opacity: 0 }], { duration: 900 + Math.random() * 400, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' }); }
+  $('#ecran').appendChild(f); setTimeout(() => f.remove(), 1500);
+}
+function annonce(t) { const el = $('#toast'); el.textContent = t; el.classList.add('vu'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('vu'), 2200); }
+
+/* --- Suivi : issue en un geste, puces d'avantages, « seche » deduite --- */
+function brancherSuivi() {
+  $$('.suivi-ligne').forEach((ligne) => {
+    const r = SUIVI[ligne.dataset.k];
+    ligne.addEventListener('click', (e) => {
+      const iss = e.target.closest('.issue'), ch = e.target.closest('.chip');
+      if (iss) {
+        r.i = r.i === iss.dataset.i ? null : iss.dataset.i; if (r.i !== 'commande') r.a = [];
+        $$('.issue', ligne).forEach((b) => b.classList.toggle('on', b.dataset.i === r.i));
+        ligne.dataset.etat = r.i ?? '';
+        const av = $('.avantages', ligne); av.innerHTML = r.i === 'commande' ? avantages(r) : '';
+        av.animate([{ opacity: 0, transform: 'translateY(-6px)' }, { opacity: 1, transform: 'none' }], { duration: RESSORTS.snappy.ms, easing: RESSORTS.snappy.css });
+        ligne.animate([{ transform: 'scale(.99)' }, { transform: 'none' }], { duration: RESSORTS.bouncy.ms, easing: RESSORTS.bouncy.css });
+      }
+      if (ch) { const a = ch.dataset.a; r.a = r.a.includes(a) ? r.a.filter((x) => x !== a) : [...r.a, a]; $('.avantages', ligne).innerHTML = avantages(r); }
+    });
+  });
+}
+
+/* --- Tableau : classement qui se reordonne en glissant (FLIP) --- */
+function brancherTableau() {
+  $('#simuler').addEventListener('click', () => {
+    const v = VENDEURS[Math.floor(Math.random() * VENDEURS.length)];
+    v.rdv[`x${Date.now()}`] = 'X';
+    const cont = $('#classement'); const avant = new Map($$('.rang', cont).map((el) => [el.dataset.v, el.getBoundingClientRect().top]));
+    const cl = [...VENDEURS].sort((a, b) => total(b) - total(a));
+    cl.forEach((x, i) => { const el = $(`.rang[data-v="${x.id}"]`, cont); cont.appendChild(el); $('.pos', el).textContent = i + 1; $('.v', el).textContent = total(x); });
+    $$('.rang', cont).forEach((el) => { const dy = avant.get(el.dataset.v) - el.getBoundingClientRect().top;
+      if (dy) el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: RESSORTS.soft.ms, easing: RESSORTS.soft.css }); });
+    const el = $(`.rang[data-v="${v.id}"]`, cont); el.classList.add('bouge'); setTimeout(() => el.classList.remove('bouge'), 900);
+    const k = $('#kpiTotal'); const n = Number(k.dataset.roule) + 1; k.dataset.roule = n; rouleur(k, n);
+    annonce(`${v.nom.split(' ')[0]} vient de poser un RDV`);
+  });
+}
+
+/* --- Palette de commandes --- */
+const ENTREES = [...RUBRIQUES.map((r) => ({ t: r.lib, k: 'Rubrique', f: () => aller(r.id) })), ...VENDEURS.map((v) => ({ t: v.nom, k: `Vendeur · ${v.site}`, f: () => { etat.vendeur = v.id; etat.rubrique = 'x'; aller('saisie'); } })),
+  { t: 'Ajouter un RDV de trafic naturel', k: 'Action', f: () => aller('suivi') }, { t: 'Basculer le thème', k: 'Action', f: () => basculerTheme() }];
+let selPal = 0;
+function ouvrirPalette() { $('#voile').classList.add('ouvert'); $('#paletteChamp').value = ''; filtrer(''); setTimeout(() => $('#paletteChamp').focus(), 30); }
+function fermerPalette() { $('#voile').classList.remove('ouvert'); }
+function filtrer(q) {
+  const n = q.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  const res = ENTREES.filter((e) => e.t.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().includes(n)).slice(0, 8);
+  selPal = 0;
+  $('#paletteRes').innerHTML = res.map((e, i) => `<button class="r ${i === 0 ? 'sel' : ''}" data-i="${ENTREES.indexOf(e)}">${e.t}<span class="k">${e.k}</span></button>`).join('');
+}
+$('#paletteChamp').addEventListener('input', (e) => filtrer(e.target.value));
+$('#paletteChamp').addEventListener('keydown', (e) => {
+  const rs = $$('#paletteRes .r');
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); selPal = (selPal + (e.key === 'ArrowDown' ? 1 : -1) + rs.length) % rs.length; rs.forEach((r, i) => r.classList.toggle('sel', i === selPal)); }
+  if (e.key === 'Enter' && rs[selPal]) { fermerPalette(); ENTREES[rs[selPal].dataset.i].f(); }
+  if (e.key === 'Escape') fermerPalette();
+});
+$('#paletteRes').addEventListener('click', (e) => { const r = e.target.closest('.r'); if (r) { fermerPalette(); ENTREES[r.dataset.i].f(); } });
+$('#voile').addEventListener('click', (e) => { if (e.target.id === 'voile') fermerPalette(); });
+
+/* --- Theme : bascule en disque qui s'etend depuis le bouton --- */
+function basculerTheme(e) {
+  const b = $('#basculeTheme').getBoundingClientRect();
+  const x = e?.clientX ?? b.left + b.width / 2, y = e?.clientY ?? b.top + b.height / 2;
+  const root = document.documentElement;
+  root.style.setProperty('--ox', x + 'px'); root.style.setProperty('--oy', y + 'px');
+  root.style.setProperty('--or', Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)) + 'px');
+  avecTransition(() => { root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark'; }, 'vt-theme');
+}
+$('#basculeTheme').addEventListener('click', basculerTheme);
+
+/* --- Pupitre --- */
+brancherSeg($('#choixOption'), (v) => { etat.option = v; etat.enEspace = false; avecTransition(() => rendre()); });
+brancherSeg($('#choixFormat'), (v) => { $('.scene').dataset.format = v; setTimeout(() => placerIndicateurs(true), 650); });
+addEventListener('resize', () => placerIndicateurs(true));
+document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && etat.rubrique !== 'saisie') { e.preventDefault(); ouvrirPalette(); } });
+
+rendre();
+</script>
+</body>
+</html>

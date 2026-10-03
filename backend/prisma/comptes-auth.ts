@@ -116,10 +116,10 @@ async function main() {
   const motDePasse = process.env.MOT_DE_PASSE ?? randomBytes(12).toString('base64url');
   const genere = !process.env.MOT_DE_PASSE;
 
-  // Le minimum impose par le projet Supabase est de 12 caracteres. Autant le dire
+  // Le minimum impose par le projet Supabase est de 6 caracteres (decision de l utilisateur, 03/10/2026). Autant le dire
   // ici plutot que de laisser l'API refuser compte par compte.
-  if (motDePasse.length < 12) {
-    console.error('Le mot de passe doit faire au moins 12 caracteres (reglage du projet Supabase).');
+  if (motDePasse.length < 6) {
+    console.error('Le mot de passe doit faire au moins 6 caracteres (reglage du projet Supabase).');
     process.exit(1);
   }
 

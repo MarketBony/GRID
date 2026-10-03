@@ -161,11 +161,11 @@ async function compteCourant(): Promise<Utilisateur | null> {
 /// compte connecte changer le sien. Puis la base retire l'obligation de le
 /// choisir et consigne le geste au journal (`mot_de_passe_choisi`).
 ///
-/// 12 caracteres au moins : c'est le reglage du projet Supabase, on le dit avant
+/// 6 caracteres au moins : c'est le reglage du projet Supabase, on le dit avant
 /// qu'il refuse.
 export async function changerMonMotDePasse(nouveau: string): Promise<void> {
-  if (nouveau.length < 12) {
-    throw new ErreurApi('Le mot de passe doit faire au moins 12 caractères.', 400);
+  if (nouveau.length < 6) {
+    throw new ErreurApi('Le mot de passe doit faire au moins 6 caractères.', 400);
   }
   const { error } = await supabase.auth.updateUser({ password: nouveau });
   if (error) {

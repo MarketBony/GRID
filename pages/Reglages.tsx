@@ -123,7 +123,7 @@ export function ChoisirMotDePasse({ obligatoire = false, apres }: { obligatoire?
         <input className="input" type="password" autoComplete="new-password" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />
       </label>
       <span className="faint" style={{ fontSize: 12 }}>
-        12 caractères au moins.{' '}
+        6 caractères au moins.{' '}
         {confirmation !== '' && nouveau !== confirmation && <span style={{ color: 'var(--danger)' }}>Les deux saisies diffèrent.</span>}
       </span>
       {message && <span style={{ color: message.ok ? 'var(--ok)' : 'var(--danger)', fontWeight: 600 }}>{message.texte}</span>}

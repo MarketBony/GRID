@@ -129,8 +129,8 @@ Deno.serve(async (requete) => {
 
       const genere = !corps.motDePasse;
       const motDePasse = String(corps.motDePasse ?? motDePasseGenere());
-      if (motDePasse.length < 12) {
-        return reponse({ erreur: 'Le mot de passe doit faire au moins 12 caracteres.' }, 400);
+      if (motDePasse.length < 6) {
+        return reponse({ erreur: 'Le mot de passe doit faire au moins 6 caracteres.' }, 400);
       }
 
       // L'identite d'abord. Si l'insertion metier echoue ensuite, on la retire —
@@ -206,8 +206,8 @@ Deno.serve(async (requete) => {
 
       const genere = !corps.motDePasse;
       const motDePasse = String(corps.motDePasse ?? motDePasseGenere());
-      if (motDePasse.length < 12) {
-        return reponse({ erreur: 'Le mot de passe doit faire au moins 12 caracteres.' }, 400);
+      if (motDePasse.length < 6) {
+        return reponse({ erreur: 'Le mot de passe doit faire au moins 6 caracteres.' }, 400);
       }
 
       const { data: compte, error } = await service

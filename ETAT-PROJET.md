@@ -19,6 +19,59 @@ aujourd'hui est dans « CE QUI RESTE », en fin de fichier, et nulle part ailleu
 
 ---
 
+## 03/10/2026 — Interface v2 (lots 3 et 4 de `PLAN-GRID-V2.md`)
+
+Branche `feat/interface-v2`, 33 commits au-dessus de `master`. Aucune migration :
+celles du lot robustesse/suivi (`20261002204318`, `20261002213103`) sont déjà sur
+Supabase depuis le 02/10.
+
+**Ce qui est livré :**
+
+- **Coquille** — l'Île en haut au bureau, la barre flottante en bas au téléphone ;
+  goutte de sélection reprise de `maquette-navigation.html` (étirement vers
+  l'union des deux positions, puis ressort « bouncy »). Le MÊME mouvement est porté
+  par `useIndicateurGlissant` : tous les segmentés, le curseur de la liste de la
+  saisie, les listes Campagnes et Vendeurs. Recherche par la loupe ou `Ctrl K`.
+- **Transitions de rubrique** directionnelles (View Transitions) : la page arrive du
+  côté où se trouve sa rubrique dans l'Île.
+- **Saisie** — une seule grille par vendeur, marque choisie à la saisie, absents
+  masqués, « vue d'ensemble » retirée. **Planning imprimable** : une feuille par vendeur.
+- **Suivi des RDV**, **Réglages** (mon compte, apparence, comptes admin, journal),
+  **Tableau de bord** portés en v2.
+- **Campagnes** refondue : liste à curseur, libellé éditable sur place, jours en
+  tuiles, créneaux en colonnes, mode par plaque en segmenté, cible par table en pas-à-pas.
+- **Vendeurs** refondu : un site à la fois choisi dans un rail groupé par plaque (la
+  page faisait 8 900 px), encadrement en cartes de personne, marques en puces nommées,
+  édition dans la ligne. Responsive vérifié à 375 px.
+  *Retiré :* le tri par marque (il n'existait que par les en-têtes de colonne) et le
+  filtre par plaque (le rail groupe par plaque).
+- **Effectifs** (ex-« Tables ») refondu : plaques en segmenté, réserve collante,
+  tables en cartes avec jauge de cible, sélection en barre flottante.
+
+**Défauts trouvés et corrigés en route :**
+
+- la pastille des segmentés était décalée de 3 px vers le bas : le hook pose
+  `translate(offsetLeft, offsetTop)` ET la feuille posait `top: 3px`. La position
+  appartient au hook seul ;
+- doubles cadres dans les contrôles imbriqués : les règles génériques de champ et de
+  bouton passent par `:where()` (spécificité nulle) ;
+- collision de classe `.identite` avec `index.css` (le nom passait à droite) ;
+- Vite a servi une fois `v2.css` lu au milieu d'un ajout : règles absentes au
+  navigateur alors que le fichier était juste. Se vérifie en listant `cssRules`.
+
+**Mot de passe minimum ramené de 12 à 6 caractères** — décision de l'utilisateur, le
+03/10/2026. Code aligné (`comptes-auth.ts`, Edge Function `gerer-comptes`,
+`services/api.ts`, Réglages). **Le réglage du projet Supabase reste à 12** tant que
+l'utilisateur ne l'a pas changé dans le tableau de bord (Authentication → Email →
+Minimum password length) : c'est lui qui refuse, avec `weak_password`. L'Edge
+Function doit être redéployée pour que l'écran Comptes accepte 6.
+
+**Recette :** les 7 suites vertes en local (39, 116, 13, 19, 39, 20, 23), `tsc` et
+build propres. La fluidité des animations ne se mesure pas dans le volet de l'agent
+(CLAUDE.md) : elle se juge dans une vraie fenêtre.
+
+---
+
 ## Ou en est le projet — au 24/09/2026
 
 **GRID a servi en conditions reelles.** La session de relance de septembre s'est
