@@ -117,6 +117,11 @@ export function Vendeurs() {
   /// les archives. Constate a l'essai.
   const [versionArchives, setVersionArchives] = useState(0);
 
+  // Au telephone, le rail est horizontal : le site choisi doit y etre VISIBLE.
+  useEffect(() => {
+    document.querySelector('.rail-site.actif')?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }, [siteCourant]);
+
   if (chargement)
     return (
       <div className="page">
@@ -649,51 +654,42 @@ function CarteSite({
             ? 'Aucun vendeur sur ce site.'
             : filtreNom !== ''
               ? `Aucun vendeur de ce site ne correspond à « ${filtreNom} ».`
-              : 'Tous les vendeurs de ce site sont sortis. Cocher « Vendeurs sortis » pour les voir.'}
+              : 'Tous les vendeurs de ce site sont sortis. Activer « Sortis » pour les voir.'}
         </p>
       ) : (
-        <table className="table-vendeurs">
-          <thead>
-            <tr>
-              <EnTeteTriable colonne="nom" libelle="Vendeur" tri={tri} onTrier={onTrier} />
-              {marques.map((m) => (
-                <EnTeteTriable
-                  key={m.id}
-                  colonne={`marque:${m.id}`}
-                  libelle={m.libelle}
-                  tri={tri}
-                  onTrier={onTrier}
-                  classe="colonne-marque"
-                />
-              ))}
-              <EnTeteTriable
-                colonne="metier"
-                libelle="Métier"
-                tri={tri}
-                onTrier={onTrier}
-                classe="colonne-type debut-groupe"
-              />
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {visibles.map((v) => (
-              <LigneVendeur
-                key={v.id}
-                vendeur={v}
-                marques={marques}
-                types={types}
-                sites={sites}
-                occupe={enCours === v.id}
-                enEdition={editionId === v.id}
-                onEditer={() => onEditer(v.id)}
-                onBasculerMarque={(id) => onBasculerMarque(v, id)}
-                onArchiver={() => onArchiver(v)}
-                onEnregistrer={(champs) => onEnregistrer(v, champs)}
-              />
+        <div className="liste-vendeurs-v2">
+          <div className="liste-tri">
+            <span className="lbl">{visibles.length} vendeur{visibles.length > 1 ? 's' : ''}</span>
+            <span className="espace" />
+            <span className="lbl">Trier</span>
+            {(
+              [
+                ['nom', 'Nom'],
+                ['metier', 'Métier'],
+              ] as const
+            ).map(([col, lib]) => (
+              <button key={col} type="button" className="chip" aria-pressed={tri.colonne === col} onClick={() => onTrier(col, 'texte')}>
+                {lib}
+                {tri.colonne === col && <Icone nom={tri.croissant ? 'bas' : 'haut'} petite />}
+              </button>
             ))}
-          </tbody>
-        </table>
+          </div>
+          {visibles.map((v) => (
+            <LigneVendeur
+              key={v.id}
+              vendeur={v}
+              marques={marques}
+              types={types}
+              sites={sites}
+              occupe={enCours === v.id}
+              enEdition={editionId === v.id}
+              onEditer={() => onEditer(v.id)}
+              onBasculerMarque={(id) => onBasculerMarque(v, id)}
+              onArchiver={() => onArchiver(v)}
+              onEnregistrer={(champs) => onEnregistrer(v, champs)}
+            />
+          ))}
+        </div>
       )}
 
       {enAjout ? (
@@ -741,32 +737,36 @@ function BlocEncadrement({
   occupe: boolean;
   onChanger: (siteId: string, role: string, utilisateurId: string | null) => void;
 }) {
-  // Un selecteur par role, dans l'ordre donne par le SERVEUR : aucune liste de
-  // roles n'est ecrite ici (interdit n.3).
+  // Une CARTE DE PERSONNE par role, dans l'ordre donne par le SERVEUR (interdit
+  // n.3). Le choix reste un `select` natif — clavier, lecteur d'ecran, roue du
+  // telephone — pose invisible sur toute la carte.
   return (
     <div className="encadrement-v2">
       {roles.map((role) => {
         const titulaire = encadrements.find((e) => e.role === role) ?? null;
         return (
-          <label key={role} className="field">
-            <span className="lbl">{libelleRoleEncadrement(role)}</span>
+          <label key={role} className={`role-carte${titulaire ? '' : ' vacant'}`}>
+            <span className="avatar" aria-hidden="true">{titulaire ? initiales(titulaire.nom) : '—'}</span>
+            <span className="role-texte">
+              <span className="lbl">{libelleRoleEncadrement(role)}</span>
+              <span className="qui">{titulaire?.nom ?? 'Personne'}</span>
+            </span>
+            <Icone nom="bas" petite />
             <select
-              className="select"
+              className="select-cache"
+              aria-label={libelleRoleEncadrement(role)}
               value={titulaire?.utilisateurId ?? ''}
               disabled={occupe}
               onChange={(e) => onChanger(siteId, role, e.target.value || null)}
             >
-              <option value="">aucun</option>
-              {/* TOUS LES COMPTES, tous sites confondus — pas seulement ceux de
-                  ce site. Un chef de vente de Clermont encadre parfois Mozac, et
-                  anime une table de Villefranche : c'est l'exercice meme. */}
+              <option value="">Personne</option>
+              {/* TOUS LES COMPTES, tous sites confondus : un chef de vente de
+                  Clermont encadre parfois Mozac. C'est l'exercice meme. */}
               {disponibles.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.nom}
                   {u.rolesGlobaux.length > 0 ? ` (${libelleRoleGlobal(u.rolesGlobaux)})` : ''}
-                  {u.encadrements.length > 0
-                    ? ` — ${u.encadrements.map((e) => e.siteCode).join(', ')}`
-                    : ''}
+                  {u.encadrements.length > 0 ? ` — ${u.encadrements.map((e) => e.siteCode).join(', ')}` : ''}
                 </option>
               ))}
             </select>
@@ -811,181 +811,176 @@ function LigneVendeur({
   onArchiver: () => void;
   onEnregistrer: (champs: ChampsEdition) => void;
 }) {
+  const vo = vendeur.typeVehicule === 'VO';
+  const sortie = vendeur.dateSortie ? vendeur.dateSortie.slice(0, 10).split('-').reverse().join('/') : null;
+
+  return (
+    <div className={`vendeur-ligne${sortie ? ' sorti' : ''}${enEdition ? ' ouverte' : ''}`}>
+      <div className="vendeur-resume">
+        <span className="avatar" aria-hidden="true">{initiales(vendeur.nom)}</span>
+        <span className="vendeur-id">
+          <span className="nom">{vendeur.nom}</span>
+          <span className="sous">
+            <span className={`metier ${vo ? 'vo' : 'vn'}`}>{vendeur.typeVehicule}</span>
+            {sortie && <span>sorti le {sortie}</span>}
+          </span>
+        </span>
+
+        {/* Les marques, NOMMEES : une puce par marque, pas une colonne de cases
+            dont il faut chercher l'en-tete. */}
+        <span className="marques-ligne">
+          {vo ? (
+            <span className="faint">Aucune marque (VO)</span>
+          ) : (
+            marques.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className="puce-marque"
+                aria-pressed={vendeur.marqueIds.includes(m.id)}
+                disabled={occupe}
+                onClick={() => onBasculerMarque(m.id)}
+              >
+                {vendeur.marqueIds.includes(m.id) && <Icone nom="coche" petite />}
+                {m.libelle}
+              </button>
+            ))
+          )}
+        </span>
+
+        <span className="actions-ligne">
+          <button type="button" className={`icon-btn${enEdition ? ' actif' : ''}`} onClick={onEditer} aria-label={`Modifier ${vendeur.nom}`} title="Modifier">
+            <Icone nom={enEdition ? 'fermer' : 'crayon'} petite />
+          </button>
+          <button
+            type="button"
+            className="icon-btn danger"
+            onClick={onArchiver}
+            disabled={occupe}
+            title="Archiver — la ligne disparaît, ses RDV restent en base"
+            aria-label={`Archiver ${vendeur.nom}`}
+          >
+            <Icone nom="corbeille" petite />
+          </button>
+        </span>
+      </div>
+
+      {enEdition && (
+        <EditionVendeur vendeur={vendeur} marques={marques} types={types} sites={sites} occupe={occupe} onAnnuler={onEditer} onEnregistrer={onEnregistrer} />
+      )}
+    </div>
+  );
+}
+
+/// L'edition, dans la ligne qui s'ouvre. Un composant a part : le segmente du
+/// metier porte son propre indicateur glissant, donc ses propres hooks.
+function EditionVendeur({
+  vendeur,
+  marques,
+  types,
+  sites,
+  occupe,
+  onAnnuler,
+  onEnregistrer,
+}: {
+  vendeur: VendeurReferentiel;
+  marques: { id: string; libelle: string }[];
+  types: TypeVehicule[];
+  sites: { id: string; code: string; libelle: string }[];
+  occupe: boolean;
+  onAnnuler: () => void;
+  onEnregistrer: (champs: ChampsEdition) => void;
+}) {
   const [nom, setNom] = useState(vendeur.nom);
   const [siteId, setSiteId] = useState(vendeur.siteId);
   const [dateEntree, setDateEntree] = useState(vendeur.dateEntree?.slice(0, 10) ?? '');
   const [dateSortie, setDateSortie] = useState(vendeur.dateSortie?.slice(0, 10) ?? '');
   const [typeVehicule, setType] = useState<TypeVehicule>(vendeur.typeVehicule);
   const [marqueIds, setMarqueIds] = useState<string[]>(vendeur.marqueIds);
+  const seg = useIndicateurGlissant(Math.max(0, types.indexOf(typeVehicule)), types.length);
 
   // Le serveur refuse un VN sans marque, et vide les marques d'un VO. On reprend
   // la meme regle ici pour desactiver le bouton et dire pourquoi.
   const manqueMarque = typeVehicule === 'VN' && marqueIds.length === 0;
   const valide = nom.trim() !== '' && !manqueMarque;
 
-  if (enEdition) {
-    return (
-      <tr className="ligne-edition">
-        <td colSpan={marques.length + 3}>
-          <div className="edition-v2">
-          <div className="champs-v2 cinq">
-            <label className="field">
-              <span className="lbl">Nom</span>
-              <input className="input" value={nom} onChange={(e) => setNom(e.target.value)} />
-            </label>
-            <label className="field">
-              <span className="lbl">Site</span>
-              <select className="select" value={siteId} onChange={(e) => setSiteId(e.target.value)}>
-                {sites.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.libelle} ({s.code})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span className="lbl">Métier</span>
-              <select
-                className="select"
-                value={typeVehicule}
-                onChange={(e) => setType(e.target.value as TypeVehicule)}
-              >
-                {types.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span className="lbl">Entrée</span>
-              <input
-                className="input"
-                type="date"
-                value={dateEntree}
-                onChange={(e) => setDateEntree(e.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span className="lbl">Sortie</span>
-              <input
-                className="input"
-                type="date"
-                value={dateSortie}
-                onChange={(e) => setDateSortie(e.target.value)}
-              />
-            </label>
-          </div>
-
-          {typeVehicule === 'VN' ? (
-            <div className="marques-choix">
-              <span className="lbl">Marques autorisées</span>
-              {marques.map((m) => (
-                <button key={m.id} type="button" className="chip" aria-pressed={marqueIds.includes(m.id)} onClick={() => setMarqueIds(bascule(marqueIds, m.id))}>
-                  {marqueIds.includes(m.id) && <Icone nom="coche" petite />} {m.libelle}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="note">
-              Un vendeur <strong>VO</strong> n’a aucune ventilation par marque : ses marques seront
-              effacées à l’enregistrement, et sa grille de saisie n’aura qu’une seule section.
-            </p>
-          )}
-
-          <p className="note">
-            Changer de site transfère le vendeur avec tout son historique. Une date de sortie le
-            retire des classements courants sans rien effacer.
-          </p>
-          {manqueMarque && (
-            <p className="note attention">
-              Un vendeur VN doit avoir au moins une marque : sans elle il ne peut recevoir aucun RDV.
-            </p>
-          )}
-          <div className="actions-v2">
-            <button type="button" className="btn ghost" onClick={onEditer}>
-              Annuler
-            </button>
-            <button
-              type="button"
-              className="btn primary"
-              disabled={occupe || !valide}
-              onClick={() =>
-                onEnregistrer({
-                  nom: nom.trim(),
-                  siteId,
-                  dateEntree: dateEntree === '' ? null : dateEntree,
-                  dateSortie: dateSortie === '' ? null : dateSortie,
-                  typeVehicule,
-                  marqueIds,
-                })
-              }
-            >
-              Enregistrer
-            </button>
-          </div>
-          </div>
-        </td>
-      </tr>
-    );
-  }
-
-  const vo = vendeur.typeVehicule === 'VO';
-
   return (
-    <tr className={vendeur.dateSortie ? 'sorti' : ''}>
-      <td className="cellule-nom">
-        <span className="avatar" aria-hidden="true">{initiales(vendeur.nom)}</span>
-        <span className="nom">{vendeur.nom}</span>
-        {vendeur.dateSortie && (
-          <span className="badge">
-            sorti le {vendeur.dateSortie.slice(0, 10).split('-').reverse().join('/')}
-          </span>
-        )}
-      </td>
+    <div className="edition-v2">
+      <div className="edition-grille">
+        <label className="field e-nom">
+          <span className="lbl">Nom</span>
+          <input className="input" value={nom} onChange={(e) => setNom(e.target.value)} />
+        </label>
+        <label className="field e-site">
+          <span className="lbl">Site</span>
+          <select className="select" value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+            {sites.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.libelle} ({s.code})
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="field e-metier">
+          <span className="lbl">Métier</span>
+          <div className="seg" ref={seg.conteneur} role="radiogroup" aria-label="Métier">
+            <span className="pouce" ref={seg.indicateur} aria-hidden="true" />
+            {types.map((t, i) => (
+              <button key={t} type="button" ref={seg.cible(i)} aria-pressed={t === typeVehicule} onClick={() => setType(t)}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+        <label className="field e-entree">
+          <span className="lbl">Entrée</span>
+          <input className="input" type="date" value={dateEntree} onChange={(e) => setDateEntree(e.target.value)} />
+        </label>
+        <label className="field e-sortie">
+          <span className="lbl">Sortie</span>
+          <input className="input" type="date" value={dateSortie} onChange={(e) => setDateSortie(e.target.value)} />
+        </label>
+      </div>
 
-      {marques.map((m) => (
-        <td key={m.id} className="colonne-marque">
-          {vo ? (
-            <span className="faint" title="Un vendeur VO n’a aucune ventilation par marque.">
-              —
-            </span>
-          ) : (
-            <button
-              type="button"
-              className="puce-marque"
-              aria-pressed={vendeur.marqueIds.includes(m.id)}
-              disabled={occupe}
-              onClick={() => onBasculerMarque(m.id)}
-              aria-label={`${vendeur.nom} — ${m.libelle}`}
-              title={m.libelle}
-            >
-              <Icone nom="coche" petite />
+      {typeVehicule === 'VN' ? (
+        <div className="marques-choix">
+          <span className="lbl">Marques</span>
+          {marques.map((m) => (
+            <button key={m.id} type="button" className="puce-marque" aria-pressed={marqueIds.includes(m.id)} onClick={() => setMarqueIds(bascule(marqueIds, m.id))}>
+              {marqueIds.includes(m.id) && <Icone nom="coche" petite />}
+              {m.libelle}
             </button>
-          )}
-        </td>
-      ))}
+          ))}
+        </div>
+      ) : (
+        <p className="note">Un vendeur VO n’a pas de marque : sa grille n’a qu’une section.</p>
+      )}
+      {manqueMarque && <p className="note attention">Au moins une marque : sans elle, aucun RDV possible.</p>}
 
-      <td className="colonne-type debut-groupe">
-        <span className={`metier ${vo ? 'vo' : 'vn'}`}>{vendeur.typeVehicule}</span>
-      </td>
-
-      <td className="colonne-actions">
-        <button type="button" className="icon-btn" onClick={onEditer} aria-label={`Modifier ${vendeur.nom}`} title="Modifier">
-          <Icone nom="crayon" petite />
+      <div className="edition-pied">
+        <p className="note">Changer de site transfère le vendeur avec son historique. Une sortie le retire des classements sans rien effacer.</p>
+        <button type="button" className="btn ghost" onClick={onAnnuler}>
+          Annuler
         </button>
         <button
           type="button"
-          className="icon-btn danger"
-          onClick={onArchiver}
-          disabled={occupe}
-          title="Archiver — la ligne disparaît, ses RDV restent en base"
-          aria-label={`Archiver ${vendeur.nom}`}
+          className="btn primary"
+          disabled={occupe || !valide}
+          onClick={() =>
+            onEnregistrer({
+              nom: nom.trim(),
+              siteId,
+              dateEntree: dateEntree === '' ? null : dateEntree,
+              dateSortie: dateSortie === '' ? null : dateSortie,
+              typeVehicule,
+              marqueIds,
+            })
+          }
         >
-          <Icone nom="corbeille" petite />
+          Enregistrer
         </button>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
 
@@ -1243,8 +1238,8 @@ function FormulaireNouveauVendeur({
         <div className="marques-choix">
           <span className="lbl">Marques</span>
           {marques.map((m) => (
-            <button key={m.id} type="button" className="chip" aria-pressed={marqueIds.includes(m.id)} onClick={() => setMarqueIds(bascule(marqueIds, m.id))}>
-              {marqueIds.includes(m.id) && <Icone nom="coche" petite />} {m.libelle}
+            <button key={m.id} type="button" className="puce-marque" aria-pressed={marqueIds.includes(m.id)} onClick={() => setMarqueIds(bascule(marqueIds, m.id))}>
+              {marqueIds.includes(m.id) && <Icone nom="coche" petite />}{m.libelle}
             </button>
           ))}
         </div>

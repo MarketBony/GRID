@@ -200,7 +200,7 @@ body {
   transition: color var(--t-med);
 }
 .v2 .seg > button[aria-pressed='true'] { color: var(--text); }
-.v2 .seg > .pouce { position: absolute; top: 3px; bottom: 3px; left: 0; border-radius: 99px; background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h), var(--ombre-contact); pointer-events: none; }
+.v2 .seg > .pouce { position: absolute; top: 0; left: 0; border-radius: 99px; background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h), var(--ombre-contact); pointer-events: none; }
 
 /* Puces : selection MULTIPLE = teinte ; le degrade plein reste a la selection
    UNIQUE (CLAUDE.md). */
@@ -969,7 +969,7 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .hero-dates { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--text-2); font-weight: 700; font-size: var(--fs-13); }
 .v2 .hero-dates .input { width: auto; height: 34px; }
 
-.v2 .camp-grille { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.v2 .camp-grille { display: grid; gap: 14px; }
 .v2 .tuiles-jours { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
 .v2 .tuile-jour {
   position: relative; display: grid; justify-items: center; gap: 0; padding: 10px 6px 8px; border-radius: 14px;
@@ -985,13 +985,13 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .tuile-jour:hover .tuile-retirer, .v2 .tuile-retirer:focus-visible { opacity: 1; transform: scale(1); }
 @media (hover: none) { .v2 .tuile-retirer { opacity: 1; transform: scale(1); } }
 .v2 .ajout-ligne { display: flex; gap: 8px; margin-top: 12px; }
-.v2 .ajout-ligne .input { flex: 1; min-width: 0; height: 34px; }
+.v2 .ajout-ligne .input { flex: 0 1 240px; min-width: 0; height: 34px; }
 
-.v2 .creneaux-v2 { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.v2 .creneaux-v2 { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 4px 12px; }
 .v2 .creneaux-v2 li { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 6px 0 4px; border-radius: 10px; transition: background-color var(--t-fast); }
 .v2 .creneaux-v2 li:hover { background: var(--ctl-bg); }
 .v2 .creneaux-v2 .rang { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: var(--ctl-bg-h); font-size: 11px; font-weight: 800; color: var(--text-3); }
-.v2 .creneaux-v2 .code { font-weight: 800; }
+.v2 .creneaux-v2 .code { font-weight: 800; white-space: nowrap; }
 .v2 .creneaux-v2 .actions { margin-left: auto; display: flex; gap: 2px; opacity: .35; transition: opacity var(--t-fast); }
 .v2 .creneaux-v2 li:hover .actions, .v2 .creneaux-v2 .actions:focus-within { opacity: 1; }
 .v2 .creneaux-v2 .icon-btn { width: 28px; height: 28px; }
@@ -1022,7 +1022,6 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .actions-v2 .field { margin-right: auto; }
 .v2 .impacts-v2 { margin: 0 0 8px; padding-left: 18px; display: grid; gap: 4px; }
 
-@media (max-width: 1100px) { .v2 .camp-grille { grid-template-columns: 1fr; } }
 @media (max-width: 900px) {
   .v2 .camp-v2 { grid-template-columns: 1fr; }
   .v2 .camp-liste { position: static; }
@@ -1073,41 +1072,11 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .site-compte > span:first-child { background: var(--bony-grad); color: rgba(255, 255, 255, .85); box-shadow: 0 14px 30px -16px rgba(247, 86, 50, .7); }
 .v2 .site-compte > span:first-child b { color: #fff; }
 
-.v2 .encadrement-v2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; padding: 12px; border-radius: 14px; background: var(--box-bg); box-shadow: inset 0 0 0 1px var(--box-line); }
 
-.v2 .table-vendeurs { width: 100%; border-collapse: separate; border-spacing: 0 3px; }
-.v2 .table-vendeurs th { padding: 4px 10px; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); text-align: left; background: none; border: 0; }
-.v2 .table-vendeurs th.colonne-marque, .v2 .table-vendeurs td.colonne-marque, .v2 .table-vendeurs .colonne-type { text-align: center; width: 1%; white-space: nowrap; }
-.v2 .table-vendeurs th button { all: unset; cursor: pointer; }
-.v2 .table-vendeurs th button:hover { color: var(--text); }
-.v2 .table-vendeurs td { padding: 6px 10px; border: 0; background: var(--box-bg); transition: background-color var(--t-fast); }
-.v2 .table-vendeurs td:first-child { border-radius: 12px 0 0 12px; }
-.v2 .table-vendeurs td:last-child { border-radius: 0 12px 12px 0; }
-.v2 .table-vendeurs tr:hover td { background: var(--ctl-bg-h); }
-.v2 .table-vendeurs tr.sorti td { opacity: .5; }
-.v2 .cellule-nom { display: flex; align-items: center; gap: 10px; min-height: 36px; font-weight: 700; }
-.v2 .cellule-nom .nom { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2 .avatar { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line); font-size: 11px; font-weight: 800; color: var(--text-2); }
-.v2 .puce-marque {
-  display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 9px; cursor: pointer;
-  background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); color: transparent;
-  transition: background-color var(--t-fast), color var(--t-fast), transform 420ms var(--ressort-vif);
-}
-.v2 .puce-marque:hover:not(:disabled) { background: var(--ctl-bg-h); color: var(--text-3); }
-.v2 .puce-marque[aria-pressed='true'] { background: var(--bony-grad); color: #fff; box-shadow: 0 8px 18px -10px rgba(247, 86, 50, .8); }
-.v2 .puce-marque[aria-pressed='true']:hover:not(:disabled) { background: var(--bony-grad); color: #fff; filter: brightness(1.08); }
-.v2 .puce-marque:active:not(:disabled) { transform: scale(.85); transition-duration: 90ms; }
 .v2 .metier { display: inline-grid; place-items: center; min-width: 36px; height: 22px; padding: 0 8px; border-radius: 99px; font-size: 11px; font-weight: 800; }
 .v2 .metier.vn { color: var(--accent); background: var(--sel); }
 .v2 .metier.vo { color: var(--text-2); background: var(--ctl-bg-h); }
-.v2 .table-vendeurs .colonne-actions { width: 1%; white-space: nowrap; text-align: right; }
-.v2 .table-vendeurs .colonne-actions .icon-btn { width: 30px; height: 30px; opacity: .45; transition: opacity var(--t-fast), background-color var(--t-fast); }
-.v2 .table-vendeurs tr:hover .colonne-actions .icon-btn, .v2 .table-vendeurs .colonne-actions .icon-btn:focus-visible { opacity: 1; }
-.v2 .table-vendeurs tr.ligne-edition td { background: transparent; padding: 0; }
-.v2 .edition-v2 { padding: 14px; border-radius: 14px; background: var(--box-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); animation: v2-entre 420ms var(--ressort-vif) both; }
-.v2 .champs-v2.cinq { grid-template-columns: 2fr 1.4fr .8fr 1fr 1fr; }
-.v2 .marques-choix { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
-.v2 .marques-choix .lbl { margin-right: 4px; font-size: var(--fs-11); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
 .v2 .note.attention { color: var(--warn); }
 .v2 .ajout-vendeur {
   display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; border: 0; border-radius: 12px; cursor: pointer;
@@ -1124,13 +1093,12 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
   .v2 .rail-site { flex: none; background: var(--ctl-bg); }
   .v2 .rail-site.actif { background: var(--bony-grad); }
   .v2 .champs-v2.cinq { grid-template-columns: 1fr 1fr; }
-  .v2 .site-v2 { overflow-x: auto; }
 }
 }
 
 @layer v2 {
 /* ------------------------------------------------------------------ EFFECTIFS (refonte) */
-.v2 .seg-plaques { display: flex; width: fit-content; max-width: 100%; overflow-x: auto; margin-bottom: 14px; }
+.v2 .seg-plaques { display: flex; flex-wrap: wrap; width: fit-content; max-width: 100%; margin-bottom: 14px; }
 .v2 .seg-plaques > button { height: 34px; padding: 0 16px; gap: 8px; font-weight: 800; }
 .v2 .seg-plaques .mode { font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
 
@@ -1203,4 +1171,85 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 @layer v2 {
 /* L'ancienne feuille habille tout `header` (fond, flou, collant) : neutralise ici. */
 .v2 .table-tete { position: static; padding: 0; border: 0; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+@layer v2 {
+/* ------------------------------------------------------------------ VENDEURS : encadrement, lignes, edition */
+.v2 .encadrement-v2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.v2 .role-carte {
+  position: relative; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 12px; border-radius: 14px; cursor: pointer;
+  background: var(--box-bg); box-shadow: inset 0 0 0 1px var(--box-line); transition: background-color var(--t-fast), box-shadow var(--t-fast), transform 420ms var(--ressort-vif);
+}
+.v2 .role-carte:hover { background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
+.v2 .role-carte:active { transform: scale(.98); }
+.v2 .role-carte:focus-within { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--focus); }
+.v2 .role-carte .avatar { width: 36px; height: 36px; font-size: 12px; background: var(--bony-grad); color: #fff; box-shadow: none; }
+.v2 .role-carte.vacant .avatar { background: var(--ctl-bg-h); color: var(--text-3); }
+.v2 .role-texte { display: grid; min-width: 0; flex: 1; }
+.v2 .role-texte .lbl { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+.v2 .role-texte .qui { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .role-carte.vacant .qui { color: var(--text-3); font-weight: 600; }
+.v2 .role-carte > .i { color: var(--text-3); flex: none; }
+.v2 .select-cache { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; appearance: none; border: 0; }
+
+.v2 .liste-vendeurs-v2 { display: grid; gap: 6px; }
+.v2 .liste-tri { display: flex; align-items: center; gap: 6px; padding: 0 2px 4px; }
+.v2 .liste-tri .lbl { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+.v2 .liste-tri .espace { flex: 1; }
+.v2 .liste-tri .chip { gap: 4px; }
+.v2 .vendeur-ligne { border-radius: 14px; background: var(--box-bg); box-shadow: inset 0 0 0 1px var(--box-line); transition: background-color var(--t-fast), box-shadow var(--t-med); }
+.v2 .vendeur-ligne:hover { background: var(--ctl-bg-h); }
+.v2 .vendeur-ligne.ouverte { background: var(--box-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 24px 50px -30px rgba(247, 86, 50, .6); }
+.v2 .vendeur-ligne.sorti { opacity: .55; }
+.v2 .vendeur-resume { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: 'av id marques actions'; align-items: center; gap: 12px; padding: 8px 10px 8px 12px; }
+.v2 .vendeur-resume .avatar { grid-area: av; }
+.v2 .vendeur-id { grid-area: id; display: grid; gap: 2px; min-width: 0; }
+.v2 .vendeur-id .nom { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .vendeur-id .sous { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; color: var(--text-3); }
+.v2 .metier { display: inline-grid; place-items: center; height: 18px; padding: 0 7px; border-radius: 99px; font-size: 10px; font-weight: 800; letter-spacing: .04em; }
+.v2 .metier.vn { color: var(--accent); background: var(--sel); }
+.v2 .metier.vo { color: var(--text-2); background: var(--ctl-bg-h); }
+.v2 .marques-ligne { grid-area: marques; display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; font-size: var(--fs-12); }
+.v2 .actions-ligne { grid-area: actions; display: flex; gap: 2px; }
+.v2 .actions-ligne .icon-btn { width: 32px; height: 32px; }
+.v2 .icon-btn.actif { background: var(--sel); color: var(--accent); }
+
+/* La puce de marque : nommee, cochee quand elle est autorisee. Teinte et coche,
+   pas le degrade plein — c'est un choix MULTIPLE (charte, CLAUDE.md). */
+.v2 .puce-marque {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 30px; padding: 0 12px; border: 0; border-radius: 99px; cursor: pointer;
+  background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); color: var(--text-3); font: 700 var(--fs-12) var(--font-ui);
+  transition: background-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast), transform 420ms var(--ressort-vif);
+}
+.v2 .puce-marque:hover:not(:disabled) { background: var(--ctl-bg-h); color: var(--text); }
+.v2 .puce-marque[aria-pressed='true'] { color: var(--accent); background: var(--sel); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent); }
+.v2 .puce-marque[aria-pressed='true']:hover:not(:disabled) { color: var(--accent); background: var(--sel); }
+.v2 .puce-marque:active:not(:disabled) { transform: scale(.92); transition-duration: 90ms; }
+.v2 .puce-marque .i { width: 13px; height: 13px; }
+
+.v2 .edition-v2 { display: grid; gap: 12px; padding: 0 0 14px; border-top: 1px solid var(--line); margin: 0 12px; animation: v2-entre 420ms var(--ressort-vif) both; }
+.v2 .edition-grille { display: grid; grid-template-columns: 2fr 1.5fr auto 1fr 1fr; gap: 10px; align-items: end; padding-top: 12px; }
+.v2 .edition-grille .seg { height: 36px; }
+.v2 .edition-grille .seg > button { padding: 0 16px; }
+.v2 .marques-choix { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.v2 .marques-choix .lbl { margin-right: 4px; font-size: var(--fs-11); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+.v2 .edition-pied { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.v2 .edition-pied .note { flex: 1; min-width: 220px; margin: 0; }
+.v2 .champs-v2.cinq { grid-template-columns: 2fr 1.4fr 1fr 1fr; }
+
+@media (max-width: 1100px) {
+  .v2 .vendeur-resume { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: 'av id actions' 'marques marques marques'; }
+  .v2 .marques-ligne { justify-content: flex-start; padding-left: 42px; }
+  .v2 .edition-grille { grid-template-columns: 1fr 1fr; }
+  .v2 .edition-grille .e-nom { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .v2 .edition-grille .e-site, .v2 .edition-grille .e-metier { grid-column: 1 / -1; }
+  .v2 .champs-v2, .v2 .champs-v2.cinq { grid-template-columns: 1fr; }
+  .v2 .marques-ligne { padding-left: 0; }
+  .v2 .site-compte > span { min-width: 54px; padding: 6px 10px; }
+  .v2 .site-nom { font-size: 20px; }
+  .v2 .barre-v2 .recherche-v2 { flex: 1 1 100%; }
+  .v2 .barre-v2 .espace { display: none; }
+}
 }
