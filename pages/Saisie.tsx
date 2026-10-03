@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GrilleUnique } from '../components/saisie/GrilleUnique';
 import { Compteur } from '../components/ui/Compteur';
+import { Icone } from '../components/ui/Icone';
 import { VueTable } from '../components/saisie/VueTable';
 import { cleRdv, libelleJour } from '../utils/grille';
 import { cleTri } from '../backend/src/utils/tri';
@@ -29,7 +30,6 @@ import {
 } from '../services/saisie';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 import { useIndicateurGlissant } from '../hooks/useIndicateurGlissant';
-import { Segmente } from '../components/Segmente';
 import { DialogueExport } from '../components/DialogueExport';
 import { PlanningImprimable, paginer } from '../components/PlanningImprimable';
 import {
@@ -396,6 +396,7 @@ export function Saisie() {
   const [voirAbsents, setVoirAbsents] = useState(false);
   const [vue, setVue] = useState<'vendeur' | 'table'>('vendeur');
   const segVue = useIndicateurGlissant(vue === 'vendeur' ? 0 : 1, 2);
+  const segOrigine = useIndicateurGlissant(['table', 'equipe', 'tout'].indexOf(origineEffective), 3);
   const absents = useMemo(() => (donnees?.vendeurs ?? []).filter((v) => v.mobilise === false), [donnees]);
 
   const vendeursOrigine = useMemo(() => {
@@ -683,22 +684,35 @@ export function Saisie() {
 
   // ---------------------------------------------------------------- rendu
 
-  if (chargement) return <div className="attente">Chargement du planning…</div>;
-  if (erreur && !donnees) return <div className="erreur-bloc">{erreur}</div>;
-  if (!donnees) return <div className="attente">Aucune campagne.</div>;
+  if (chargement) {
+    return (
+      <div className="page">
+        <div className="skel" style={{ height: 40, width: 320 }} />
+        <div className="saisie-v2">
+          <div className="skel" style={{ height: 420 }} />
+          <div className="skel" style={{ height: 420 }} />
+        </div>
+      </div>
+    );
+  }
+  if (erreur && !donnees) return <div className="page"><div className="bandeau-v2 erreur">{erreur}</div></div>;
+  if (!donnees) return <div className="page"><div className="empty card">Aucune campagne.</div></div>;
 
   if (donnees.message) {
     return (
-      <section className="ecran">
-        <SelecteurCampagne campagnes={campagnes} valeur={campagneId} onChange={setCampagneId} />
-        <div className="info-bloc">{donnees.message}</div>
-      </section>
+      <div className="page">
+        <div className="app-head enter">
+          <h1>Saisie</h1>
+          <div className="droite"><SelecteurCampagne campagnes={campagnes} valeur={campagneId} onChange={setCampagneId} /></div>
+        </div>
+        <div className="bandeau-v2">{donnees.message}</div>
+      </div>
     );
   }
 
   return (
-    <section className="ecran saisie">
-      <div className="v2 app-head" style={{ marginBottom: 14 }}>
+    <div className="page">
+      <div className="app-head enter">
         <h1>{donnees.perimetre?.libelle ?? 'Saisie'}</h1>
         <span className="sub">
           {donnees.campagne.libelle} · {donnees.vendeurs.length} vendeurs · {donnees.campagne.jours.length} jours
@@ -710,21 +724,13 @@ export function Saisie() {
             <i />
             {enAttente > 0 ? `${enAttente} en attente d'envoi` : 'À jour'}
           </span>
-          <span className="total-entete">
-            <Compteur valeur={totalOrigine} />
-            <span className="faint">{libelleTotal}</span>
-          </span>
           <SelecteurCampagne campagnes={campagnes} valeur={campagneId} onChange={setCampagneId} />
         </div>
       </div>
 
-      {erreur && <div className="v2"><div className="bandeau-v2 erreur" role="alert">{erreur}</div></div>}
-      {avertissement && <div className="v2"><div className="bandeau-v2 avertissement" role="status">{avertissement}</div></div>}
-      {figee && (
-        <div className="info-bloc">
-          Campagne clôturée : les chiffres sont figés, la saisie est fermée.
-        </div>
-      )}
+      {erreur && <div className="bandeau-v2 erreur" role="alert">{erreur}</div>}
+      {avertissement && <div className="bandeau-v2 avertissement" role="status">{avertissement}</div>}
+      {figee && <div className="bandeau-v2">Campagne clôturée : les chiffres sont figés, la saisie est fermée.</div>}
 
       {dialogue && (
         <DialogueExport
@@ -737,19 +743,9 @@ export function Saisie() {
         />
       )}
 
-      {/* LE PLANNING EST MONTE DANS UN PORTAIL SUR `document.body`, ET C'EST
-          INDISPENSABLE — pas un raffinement.
-
-          Il etait d'abord pose ici, dans l'ecran. Or l'impression masque
-          l'application par `html.impression-planning .application { display:none }`
-          et cet ecran EST dans `.application` : un ancetre en `display: none`
-          retire ses descendants du rendu, impression comprise. On aurait imprime
-          des PAGES BLANCHES, sans erreur ni avertissement.
-
-          Pas de fenetre a part pour autant : il faudrait y recopier la feuille de
-          style, donc entretenir deux verites sur l'apparence du document, dont une
-          qui derive. Le portail garde une seule feuille et sort le planning de la
-          branche masquee. */}
+      {/* Le planning imprimable vit dans un PORTAIL sur `document.body` : un
+          ancetre masque a l'impression retirerait ses descendants du rendu, et
+          on imprimerait des pages blanches. */}
       {aImprimer !== null &&
         createPortal(
           <div className="hors-champ" aria-hidden="true">
@@ -765,152 +761,90 @@ export function Saisie() {
           document.body
         )}
 
-      <div className="saisie-corps">
-        <aside className="liste-vendeurs" ref={curseur.conteneur}>
-          {/* Le curseur est le PREMIER enfant : il doit peindre sous les lignes.
-              `absent` quand le vendeur retenu est hors du filtre courant. */}
-          <span
-            className={`curseur-liste${indexVendeur < 0 ? ' absent' : ''}`}
-            aria-hidden="true"
-            ref={curseur.indicateur}
-          />
-          {origines.utile && (
-            <Segmente
-              className="origine-saisie"
-              etiquette="Qui afficher"
-              valeur={origineEffective}
-              onChange={changerOrigine}
-              options={[
-                {
-                  valeur: 'table' as const,
-                  libelle: 'Ma table',
-                  detail: String(origines.table.length),
-                },
-                {
-                  valeur: 'equipe' as const,
-                  libelle: 'Mon équipe',
-                  detail: String(origines.equipe.length),
-                },
-                {
-                  valeur: 'tout' as const,
-                  libelle: 'Tout',
-                  detail: String(donnees.vendeurs.length),
-                },
-              ]}
-            />
-          )}
+      <div className="saisie-v2">
+        <aside className="liste-v2 card enter" style={{ ['--i' as string]: 1 }}>
+          <div className="liste-tete">
+            <div className="total-v2">
+              <Compteur valeur={totalOrigine} />
+              <span>{libelleTotal}</span>
+            </div>
+            {origines.utile && (
+              <div className="seg seg-plein" ref={segOrigine.conteneur} role="radiogroup" aria-label="Qui afficher">
+                <span className="pouce" ref={segOrigine.indicateur} aria-hidden="true" />
+                {(
+                  [
+                    ['table', 'Ma table', origines.table.length],
+                    ['equipe', 'Mon équipe', origines.equipe.length],
+                    ['tout', 'Tout', donnees.vendeurs.length],
+                  ] as const
+                ).map(([valeur, libelle, n], i) => (
+                  <button key={valeur} type="button" ref={segOrigine.cible(i)} aria-pressed={origineEffective === valeur} onClick={() => changerOrigine(valeur)}>
+                    {libelle} <span className="faint num">{n}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {donnees.vendeurs.length >= 8 && (
+              <label className="recherche-v2">
+                <Icone nom="recherche" petite />
+                <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Vendeur, site…" spellCheck={false} />
+                {recherche !== '' && <span className="faint num">{vendeursAffiches.length}</span>}
+              </label>
+            )}
+            {absents.length > 0 && (
+              <label className="bascule-absents">
+                <input type="checkbox" className="interrupteur-v2" checked={voirAbsents} onChange={(e) => setVoirAbsents(e.target.checked)} />
+                <span>Absents <span className="faint num">({absents.length})</span></span>
+              </label>
+            )}
+          </div>
 
-          {/* LE BOUTON D'IMPRESSION N'EXISTE QUE SUR « MON EQUIPE ». C'est
-              l'encadrant qui suit son equipe au mur ; un chef de table qui
-              imprime « ma table » imprimerait des vendeurs d'autres concessions,
-              que personne ne suit chez lui.
+          <div className="liste-corps" ref={curseur.conteneur}>
+            <span className={`curseur-v2${indexVendeur < 0 ? ' absent' : ''}`} aria-hidden="true" ref={curseur.indicateur} />
+            {vendeursAffiches.length === 0 && (
+              <div className="empty" style={{ padding: 20 }}>
+                {recherche !== '' ? `Aucun vendeur ne correspond à « ${recherche} ».` : 'Aucun vendeur ici.'}
+              </div>
+            )}
+            {vendeursAffiches.map((v, i) => {
+              const c = compteurs.get(v.id);
+              return (
+                <button
+                  type="button"
+                  key={v.id}
+                  ref={curseur.cible(i)}
+                  className={`vendeur-v2${v.id === vendeurId ? ' actif' : ''}`}
+                  onClick={() => setVendeurId(v.id)}
+                >
+                  <span className="nom">{v.nom}</span>
+                  <span className="site">{v.siteCode}{v.typeVehicule === 'VO' ? ' · VO' : ''}</span>
+                  <span className="n"><Compteur valeur={c?.total ?? 0} /></span>
+                </button>
+              );
+            })}
+          </div>
 
-              Il est pose JUSTE SOUS le selecteur d'origine, la ou le choix vient
-              d'etre fait : le lien de cause a effet se voit. Son intitule dit
-              l'objet ET le geste — « Exporter » ne dit ni l'un ni l'autre. */}
+          {/* L'impression n'existe que sur « mon equipe » : c'est l'encadrant qui
+              suit son equipe au mur. */}
           {origineEffective === 'equipe' && vendeursOrigine.length > 0 && (
-            <button
-              type="button"
-              className="principal bouton-impression"
-              onClick={() => setDialogue(true)}
-            >
+            <button type="button" className="btn" style={{ margin: '0 8px 8px' }} onClick={() => setDialogue(true)}>
               Imprimer les plannings de l’équipe
             </button>
           )}
-
-          {/* D11 : les absents declares a l'ecran Effectifs, masques par defaut. */}
-          {absents.length > 0 && (
-            <label className="v2 bascule-absents">
-              <input type="checkbox" className="interrupteur-v2" checked={voirAbsents} onChange={(e) => setVoirAbsents(e.target.checked)} />
-              <span>
-                Afficher les absents <span className="faint num">({absents.length})</span>
-              </span>
-            </label>
-          )}
-
-          {/* Le champ n'apparait qu'a partir de huit vendeurs : sur une table de
-              six, il occuperait de la place sans rien resoudre. */}
-          {donnees.vendeurs.length >= 8 && (
-            <div className="recherche-vendeur">
-              <input
-                value={recherche}
-                onChange={(e) => setRecherche(e.target.value)}
-                placeholder="Chercher un vendeur, un site…"
-                aria-label="Chercher un vendeur"
-                spellCheck={false}
-              />
-              {recherche !== '' && (
-                <button
-                  type="button"
-                  className="effacer"
-                  onClick={() => setRecherche('')}
-                  aria-label="Effacer la recherche"
-                  title="Effacer"
-                >
-                  ×
-                </button>
-              )}
-              {recherche !== '' && (
-                <span className="compte">
-                  {vendeursAffiches.length} sur {donnees.vendeurs.length}
-                </span>
-              )}
-            </div>
-          )}
-
-          {vendeursAffiches.length === 0 && (
-            <p className="note" style={{ padding: '0.6rem' }}>
-              {recherche !== ''
-                ? `Aucun vendeur ne correspond à « ${recherche} ».`
-                : origineEffective === 'table'
-                  ? 'Aucun vendeur dans les tables que vous animez.'
-                  : 'Aucun vendeur dans les sites que vous encadrez.'}
-            </p>
-          )}
-
-          {vendeursAffiches.map((v, i) => {
-            const c = compteurs.get(v.id);
-            return (
-              <button
-                type="button"
-                key={v.id}
-                ref={curseur.cible(i)}
-                className={`vendeur ${v.id === vendeurId ? 'actif' : ''}`}
-                onClick={() => setVendeurId(v.id)}
-              >
-                <span className="nom">
-                  {v.nom}
-                  <span className={`etiquette ${v.typeVehicule === 'VO' ? 'vo' : 'vn'}`}>{v.typeVehicule}</span>
-                </span>
-                <span className="detail">
-                  {v.siteCode}
-                  {v.sections.length > 1 && (
-                    <>
-                      {' · '}
-                      {v.sections
-                        .map((s) => `${s.libelle.slice(0, 3)} ${c?.parSection[s.marqueId ?? 'sansMarque'] ?? 0}`)
-                        .join(' / ')}
-                    </>
-                  )}
-                </span>
-                <span className="compteur"><Compteur valeur={c?.total ?? 0} /></span>
-              </button>
-            );
-          })}
-          <div className="total-perimetre">
-            <span>Total</span>
-            <strong>{totalOrigine}</strong>
-          </div>
         </aside>
 
-        <div className="zone-grille">
-          {/* D13 n.6 : le planning D'UN vendeur, ou la carte de chaleur de TOUS. */}
-          <div className="v2" style={{ marginBottom: 12 }}>
+        <section className="zone-v2 card enter" style={{ ['--i' as string]: 2 }}>
+          <div className="zone-tete">
             <div className="seg" ref={segVue.conteneur} role="radiogroup" aria-label="Affichage">
               <span className="pouce" ref={segVue.indicateur} aria-hidden="true" />
-              <button type="button" ref={segVue.cible(0)} aria-pressed={vue === 'vendeur'} onClick={() => setVue('vendeur')}>Planning du vendeur</button>
+              <button type="button" ref={segVue.cible(0)} aria-pressed={vue === 'vendeur'} onClick={() => setVue('vendeur')}>Planning</button>
               <button type="button" ref={segVue.cible(1)} aria-pressed={vue === 'table'} onClick={() => setVue('table')}>Carte du jour</button>
             </div>
+            {vue === 'vendeur' && vendeur && (
+              <span className="vendeur-courant">
+                <b>{vendeur.nom}</b> <span className="faint">{vendeur.siteLibelle}</span>
+              </span>
+            )}
           </div>
           {vue === 'table' ? (
             <VueTable
@@ -936,20 +870,19 @@ export function Saisie() {
               onVendeurSuivant={vendeurSuivant}
             />
           ) : (
-            <p className="note">Aucun vendeur dans ce périmètre.</p>
+            <div className="empty">Aucun vendeur dans ce périmètre.</div>
           )}
-        </div>
+        </section>
       </div>
 
-      {/* SOUS la grille, et replies par defaut. En cas d'arbitrage entre
-          l'elegance d'un tableau de bord et la fluidite de la saisie, la saisie
-          gagne toujours. */}
+      {/* Les autres tables et le classement : SOUS la saisie, replies par
+          defaut. La saisie gagne toujours. */}
       <PanneauxLive
         dashboard={dashboard}
         plaqueId={donnees.perimetre?.plaqueId ?? null}
         tableId={donnees.perimetre?.tableId ?? null}
       />
-    </section>
+    </div>
   );
 }
 

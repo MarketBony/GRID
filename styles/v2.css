@@ -767,3 +767,45 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .cartes-vendeurs > * { background: var(--box-bg); border: 0; border-radius: var(--r-lg); box-shadow: inset 0 0 0 1px var(--box-line); }
 .v2 .barre-outils { gap: 10px; }
 }
+
+@layer v2 {
+/* ------------------------------------------------------------------ SAISIE v2 (maquette) */
+.v2 .saisie-v2 { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 14px; align-items: start; }
+.v2 .liste-v2 { position: sticky; top: calc(var(--h-entete, 80px)); display: flex; flex-direction: column; max-height: calc(100vh - var(--h-entete, 80px) - 20px); padding: 0; overflow: hidden; }
+.v2 .liste-tete { display: flex; flex-direction: column; gap: 10px; padding: 14px 12px 10px; border-bottom: 1px solid var(--line); }
+.v2 .total-v2 { display: flex; align-items: baseline; gap: 8px; }
+.v2 .total-v2 .compteur-roule { font-size: 30px; font-weight: 800; letter-spacing: -.03em; color: var(--accent); }
+.v2 .total-v2 > span:last-child { color: var(--text-3); font-weight: 700; font-size: var(--fs-12); }
+.v2 .seg.seg-plein { display: flex; }
+.v2 .seg.seg-plein > button { flex: 1; padding: 0 6px; }
+.v2 .liste-v2 .recherche-v2 { min-width: 0; flex: none; }
+.v2 .liste-corps { position: relative; flex: 1; min-height: 0; overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+.v2 .curseur-v2 { position: absolute; z-index: 0; top: 0; left: 0; border-radius: 12px; background: var(--bony-grad); box-shadow: 0 10px 24px -12px rgba(247, 86, 50, .8); pointer-events: none;
+  transition: transform 560ms var(--ressort-ample), width 300ms, height 300ms, opacity 200ms; }
+.v2 .curseur-v2.absent { opacity: 0; }
+.v2 .vendeur-v2 {
+  position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'nom n' 'site n'; align-items: center; column-gap: 10px;
+  min-height: 48px; padding: 6px 12px; border: 0; border-radius: 12px; background: transparent; cursor: pointer; text-align: left;
+  font: inherit; color: var(--text); transition: color var(--t-med), background-color var(--t-fast);
+}
+.v2 .vendeur-v2:hover:not(.actif) { background: var(--ctl-bg); }
+.v2 .vendeur-v2 .nom { grid-area: nom; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .vendeur-v2 .site { grid-area: site; font-size: 11px; font-weight: 700; color: var(--text-3); }
+.v2 .vendeur-v2 .n { grid-area: n; font-weight: 800; font-size: var(--fs-16); }
+.v2 .vendeur-v2.actif { color: #fff; }
+.v2 .vendeur-v2.actif .site { color: rgba(255, 255, 255, .78); }
+.v2 .liste-v2 .bascule-absents { padding: 0; }
+
+.v2 .zone-v2 { padding: 14px; min-width: 0; }
+.v2 .zone-tete { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.v2 .vendeur-courant { font-size: var(--fs-14); }
+
+@media (max-width: 900px) {
+  .v2 .saisie-v2 { grid-template-columns: 1fr; }
+  .v2 .liste-v2 { position: static; max-height: none; }
+  .v2 .liste-corps { flex-direction: row; overflow-x: auto; gap: 6px; }
+  .v2 .curseur-v2 { display: none; }
+  .v2 .vendeur-v2 { flex: none; min-height: 44px; background: var(--ctl-bg); }
+  .v2 .vendeur-v2.actif { background: var(--bony-grad); }
+}
+}

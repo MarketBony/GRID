@@ -116,9 +116,11 @@ export default function App() {
           <Reglages />
         ) : courante === 'suivi' ? (
           <Suivi />
+        ) : courante === 'saisie' ? (
+          <Saisie />
         ) : (
           <div className="page page-ancienne">
-            {courante === 'saisie' && <Saisie />}
+
             {courante === 'tableau' && <Dashboard />}
             {courante === 'effectifs' && droits.administre && <Tables />}
             {courante === 'vendeurs' && droits.administre && <Vendeurs />}
