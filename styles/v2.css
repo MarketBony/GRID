@@ -905,3 +905,19 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .page th button:not([class]):hover:not(:disabled) { background: none; box-shadow: none; color: var(--text); }
 .v2 .card table.tableau th, .v2 .card table th { background: transparent; }
 }
+
+@layer v2 {
+/* Champs et boutons A L INTERIEUR d un controle v2 (recherche, saisie express,
+   segmente) : le controle porte le cadre, eux n en portent aucun. Sans cela, la
+   regle des champs nus dessinait un second cadre dedans. */
+.v2 .page .recherche-v2 input, .v2 .page .express input, .v2 .page .champ-mdp input:not(.input) {
+  height: auto; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; flex: 1; min-width: 0;
+}
+.v2 .page .recherche-v2 input:focus, .v2 .page .express input:focus { box-shadow: none; }
+.v2 .page .seg > button:not([class]) {
+  height: 28px; padding: 0 13px; border-radius: 99px; background: transparent; box-shadow: none; font: 600 var(--fs-12) var(--font-ui); color: var(--text-2);
+}
+.v2 .page .seg > button:not([class])[aria-pressed="true"] { color: var(--text); }
+.v2 .page .seg > button:not([class]):hover:not(:disabled) { background: transparent; box-shadow: none; color: var(--text); }
+.v2 .page .seg > button:not([class]):active { transform: none; }
+}

@@ -85,12 +85,7 @@ export function useIndicateurGlissant(
   /// Axe de l'étirement pendant le trajet. `x` pour une barre de segments,
   /// `y` pour une liste verticale : la déformation se lit dans le sens du
   /// déplacement.
-  axe: 'x' | 'y' = 'x',
-  /// `goutte` : le mouvement de la maquette de navigation (03/10/2026) — l'indicateur
-  /// s'ETIRE pour couvrir un instant l'ancienne et la nouvelle position, puis se
-  /// resserre sur la cible en ressort. Utilise par l'Ile ; les autres gardent
-  /// l'etirement d'origine.
-  effet: 'etirement' | 'goutte' = 'etirement'
+  axe: 'x' | 'y' = 'x'
 ): IndicateurGlissant {
   const refConteneur = useRef<HTMLElement | null>(null);
   const refIndicateur = useRef<HTMLElement | null>(null);
@@ -155,33 +150,10 @@ export function useIndicateurGlissant(
     const trajet = Math.abs(indexActif - precedent.current);
     precedent.current = indexActif;
     if (trajet === 0) return;
-    if (effet === 'goutte') {
-      const ind = refIndicateur.current;
-      const cible = refCibles.current[indexActif];
-      if (!ind || !cible) return;
-      const avant = { x: ind.offsetLeft + new DOMMatrix(getComputedStyle(ind).transform).m41, w: ind.offsetWidth };
-      const apres = { x: cible.offsetLeft, w: cible.offsetWidth };
-      const y = cible.offsetTop;
-      const debut = Math.min(avant.x, apres.x);
-      const union = Math.max(avant.x + avant.w, apres.x + apres.w) - debut;
-      ind.style.transition = 'none';
-      placer(1);
-      const ressort = getComputedStyle(document.documentElement).getPropertyValue('--ressort-ample').trim() || 'ease-out';
-      ind.animate(
-        [
-          { transform: `translate3d(${avant.x}px, ${y}px, 0)`, width: `${avant.w}px` },
-          { transform: `translate3d(${debut}px, ${y}px, 0)`, width: `${union}px`, offset: 0.35, easing: ressort },
-          { transform: `translate3d(${apres.x}px, ${y}px, 0)`, width: `${apres.w}px` },
-        ],
-        { duration: 680, easing: 'linear' }
-      );
-      requestAnimationFrame(() => (ind.style.transition = ''));
-      return;
-    }
     placer(1 + Math.min(trajet, 3) * 0.06);
     const t = setTimeout(() => placer(1), DUREE_ETIREMENT);
     return () => clearTimeout(t);
-  }, [indexActif, placer, effet]);
+  }, [indexActif, placer]);
 
   return {
     conteneur: (el) => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { Icone, type NomIcone } from '../ui/Icone';
-import { useIndicateurGlissant } from '../../hooks/useIndicateurGlissant';
+import { useGoutte } from '../../hooks/useGoutte';
 import { useReflet } from '../../hooks/useReflet';
 import { useTheme } from '../../contexts/ThemeContext';
 import { cleTri } from '../../backend/src/utils/tri';
@@ -87,10 +87,8 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
   const ile = useRef<HTMLElement | null>(null);
 
   const principales = rubriques.filter((r) => !r.secondaire);
-  const indexIle = Math.max(0, rubriques.findIndex((r) => r.id === active));
-  const indexBas = principales.findIndex((r) => r.id === active);
-  const goutteIle = useIndicateurGlissant(indexIle, rubriques.length, 'x', 'goutte');
-  const goutteBas = useIndicateurGlissant(Math.max(0, indexBas), principales.length, 'x', 'goutte');
+  const goutteIle = useGoutte(active);
+  const goutteBas = useGoutte(active);
 
   // LA HAUTEUR DE L'ILE EST MESUREE, PAS DEVINEE (CLAUDE.md, « aucune constante ne
   // devine la hauteur d'un element variable »). Les ecrans pas encore portes
@@ -167,18 +165,18 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
       <nav
         ref={(el) => {
           ile.current = el;
-          goutteIle.conteneur(el);
+          goutteIle.nav.current = el;
         }}
         className={`ile verre${retractee ? ' retractee' : ''}`}
         aria-label="Navigation"
         onPointerMove={reflet}
       >
         <img className="logo" src="/grid.svg" alt="GRID" />
-        <span className="goutte" ref={goutteIle.indicateur} aria-hidden="true" />
+        <span className="goutte" ref={goutteIle.goutte} aria-hidden="true" />
         {rubriques.map((r, i) => (
           <button
             key={r.id}
-            ref={goutteIle.cible(i)}
+            data-rubrique={r.id}
             type="button"
             className="item"
             aria-current={r.id === active ? 'page' : undefined}
@@ -207,12 +205,12 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
         </button>
       </nav>
 
-      <nav className={`barre-bas verre${retractee ? ' retractee' : ''}`} ref={goutteBas.conteneur} aria-label="Navigation">
-        <span className="goutte" ref={goutteBas.indicateur} aria-hidden="true" style={{ opacity: indexBas < 0 ? 0 : 1 }} />
+      <nav className={`barre-bas verre${retractee ? ' retractee' : ''}`} ref={goutteBas.nav} aria-label="Navigation">
+        <span className="goutte" ref={goutteBas.goutte} aria-hidden="true" />
         {principales.map((r, i) => (
           <button
             key={r.id}
-            ref={goutteBas.cible(i)}
+            data-rubrique={r.id}
             type="button"
             className="item"
             aria-current={r.id === active ? 'page' : undefined}
