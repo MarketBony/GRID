@@ -19,6 +19,32 @@ aujourd'hui est dans « CE QUI RESTE », en fin de fichier, et nulle part ailleu
 
 ---
 
+## 03/10/2026, nuit — Regressions de la suppression d'index.css, corrigees
+
+Le premier filtrage d'`index.css` avait une faille : les classes composees dans un
+gabarit (`declencheur-menu${...}`) n'etaient pas reconnues, et leur regle principale
+etait jetee. S'y ajoutaient les bases globales disparues (`box-sizing`, marges de
+`body` et des titres, `overflow-x: clip`). Symptomes signales par l'utilisateur,
+tous corriges et verifies au navigateur :
+
+- menus de filtre du tableau de bord ecrases ; liste des comptes desalignee ;
+  champs de la connexion qui debordaient ; cadre blanc autour de la page ;
+- part VN du graphique « par jour » : pave violet au milieu -> voile pleine
+  largeur sous une ligne pointillee ;
+- connexion en theme clair : jetons sombres forces sur l'ecran (son fond est
+  toujours la nuit), vrai verre, autoremplissage recouvert ;
+- **animations reduites** : chaque animation etait ramenee a 1 ms, et les
+  INFINIES se rejouaient mille fois par seconde (clignotement). Desormais jouees
+  une fois, fond arrete ;
+- icone Reglages : un engrenage (c'etait le dessin du soleil) ;
+- goutte de l'Ile en TROIS morceaux : bouts ronds qui translatent, milieu qui
+  s'etire — le scaleX global ecrasait les bouts en ovales.
+
+Filtre refait : tout identifiant present dans le code est garde (sur-ensemble
+volontaire), seuls les selecteurs d'element nus et les classes mortes partent.
+
+---
+
 ## 03/10/2026, soir — Sante de la base, connexion, index.css supprime
 
 - **Sante de la base** : console dans Reglages (admin, direction) — six mesures en
