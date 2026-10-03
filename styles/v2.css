@@ -666,3 +666,104 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 /* Planning imprime : initiale de la marque devant le client (une feuille par vendeur). */
 .rdv-imprime .marque-rdv { display: inline-block; min-width: 3.2mm; margin-right: 1mm; font-weight: 800; font-size: 7pt; color: #555; }
 }
+
+@layer v2 {
+/* =============================================================================
+   PORTAGE V2 DES ECRANS EXISTANTS (03/10/2026)
+   Les classes des ecrans d'origine (.carte, .principal, .etiquette,
+   .liste-vendeurs, .segments...) recoivent ICI la DA v2 : verre, controles
+   Gearbox, typographie. La mise en page d'origine est conservee (eprouvee en
+   seance), seul le rendu change. La couche v2 l'emporte sur ancien.
+   ============================================================================= */
+.v2 .ecran { gap: 14px; }
+.v2 .ecran-entete { background: none; box-shadow: none; padding: 0 0 4px; border: 0; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.v2 .ecran-entete h2 { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; font-size: 17px; letter-spacing: .03em; margin: 0; }
+.v2 .ecran-entete .note { margin: 2px 0 0; }
+.v2 .note { color: var(--text-3); font-size: var(--fs-12); line-height: 1.5; }
+.v2 .attente { padding: 40px; text-align: center; color: var(--text-3); }
+
+.v2 .carte, .v2 .panneau, .v2 .panneaux-live, .v2 .boite-dialogue {
+  background: var(--box-bg); border: 0; border-radius: var(--r-lg);
+  box-shadow: inset 0 0 0 1px var(--box-line); backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.v2 .carte { padding: 16px; }
+.v2 .carte h3 { font-size: var(--fs-14); font-weight: 800; margin: 0 0 8px; }
+
+.v2 button.principal, .v2 button.secondaire, .v2 button.retirer, .v2 .barre-outils button, .v2 .ligne-formulaire button, .v2 .actions button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 32px; padding: 0 13px; border: 0; border-radius: var(--r-sm);
+  font: 600 var(--fs-13) var(--font-ui); color: var(--text); cursor: pointer;
+  background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: transform 620ms var(--ressort-ample), background-color var(--t-fast), box-shadow var(--t-fast);
+}
+.v2 button.principal { background: var(--bony-grad); color: #fff; box-shadow: none; }
+.v2 button.principal:hover:not(:disabled) { background: var(--bony-grad); filter: brightness(1.08); }
+.v2 button.secondaire:hover:not(:disabled), .v2 .barre-outils button:not(.principal):hover:not(:disabled), .v2 .actions button:not(.principal):hover:not(:disabled) { background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
+.v2 button.principal:active:not(:disabled), .v2 button.secondaire:active:not(:disabled) { transform: scale(.95); transition-duration: 90ms; }
+.v2 button.danger, .v2 button.destructif, .v2 button.retirer { color: var(--danger); }
+.v2 button:disabled { opacity: .45; cursor: default; }
+.v2 .lien { color: var(--text-2); text-decoration: none; font-weight: 600; }
+.v2 .lien:hover { color: var(--accent); }
+
+.v2 .ecran input:not([type="checkbox"]):not([type="radio"]), .v2 .ecran select, .v2 .ecran textarea,
+.v2 .boite-dialogue input:not([type="checkbox"]), .v2 .recherche-vendeur input {
+  height: 34px; padding: 0 11px; border: 0; outline: 0; border-radius: var(--r-sm);
+  font: 500 var(--fs-13) var(--font-ui); color: var(--text);
+  background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: box-shadow var(--t-med) var(--ressort-vif);
+}
+.v2 .ecran input:focus, .v2 .ecran select:focus, .v2 .ecran textarea:focus, .v2 .recherche-vendeur input:focus { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--focus); }
+.v2 .ecran select option { background: var(--surface-1); color: var(--text); }
+
+.v2 .etiquette { display: inline-flex; align-items: center; height: 19px; padding: 0 7px; border-radius: 6px; border: 0; font-size: 10.5px; font-weight: 800; letter-spacing: .02em;
+  background: color-mix(in srgb, var(--text-3) 20%, transparent); color: var(--text-2); }
+.v2 .etiquette.vn { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.v2 .etiquette.vo { background: color-mix(in srgb, var(--info) 18%, transparent); color: var(--info); }
+
+.v2 .erreur-bloc, .v2 .info-bloc, .v2 .succes-bloc, .v2 .alerte { padding: 10px 14px; border: 0; border-radius: 12px; font-weight: 600; }
+.v2 .erreur-bloc { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent); }
+.v2 .info-bloc { color: var(--text-2); background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line); }
+.v2 .succes-bloc { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 35%, transparent); }
+.v2 .alerte { color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent); }
+
+.v2 table.tableau { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-13); background: none; }
+.v2 table.tableau th { position: sticky; top: 0; z-index: 1; padding: 9px 10px; text-align: left; font-size: var(--fs-11); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); background: var(--glass-strong); border: 0; box-shadow: inset 0 -1px 0 var(--line); }
+.v2 table.tableau td { padding: 0 10px; height: 40px; border: 0; border-bottom: 1px solid var(--line); background: none; }
+.v2 table.tableau tbody tr:hover td { background: var(--ctl-bg); }
+.v2 .triable { cursor: pointer; } .v2 .triable:hover { color: var(--text); } .v2 .trie { color: var(--accent); }
+
+.v2 .segments { position: relative; display: inline-flex; padding: 3px; border: 0; border-radius: 99px; background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); }
+.v2 .segments .segment { position: relative; z-index: 1; height: 28px; padding: 0 12px; border: 0; border-radius: 99px; background: transparent; box-shadow: none; font: 600 var(--fs-12) var(--font-ui); color: var(--text-2); cursor: pointer; }
+.v2 .segments .segment.actif { color: var(--text); background: transparent; }
+.v2 .segments .segment .detail { color: var(--text-3); margin-left: 4px; font-weight: 700; }
+.v2 .segments .pilule { border-radius: 99px; background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h), var(--ombre-contact); }
+
+.v2 .liste-vendeurs { background: var(--box-bg); border: 0; border-radius: var(--r-lg); box-shadow: inset 0 0 0 1px var(--box-line); padding: 8px; }
+.v2 .liste-vendeurs .vendeur { border: 0; border-radius: 12px; background: transparent; box-shadow: none; color: var(--text); transition: color var(--t-med), background-color var(--t-fast); }
+.v2 .liste-vendeurs .vendeur:hover:not(.actif) { background: var(--ctl-bg); }
+.v2 .liste-vendeurs .vendeur.actif { color: #fff; }
+.v2 .liste-vendeurs .vendeur .detail { color: var(--text-3); font-size: 11.5px; }
+.v2 .liste-vendeurs .vendeur.actif .detail { color: rgba(255, 255, 255, .78); }
+.v2 .liste-vendeurs .vendeur .compteur { font-weight: 800; font-size: var(--fs-16); }
+.v2 .curseur-liste { border-radius: 12px; background: var(--bony-grad); box-shadow: 0 10px 24px -12px rgba(247, 86, 50, .8); }
+.v2 .total-perimetre { border-top: 1px solid var(--line); padding: 10px 8px 4px; display: flex; justify-content: space-between; color: var(--text-2); font-weight: 700; }
+.v2 .total-perimetre strong { color: var(--accent); font-size: var(--fs-18); }
+
+.v2 .panneaux-live { padding: 4px 8px; }
+.v2 .bascule-panneaux { border: 0; background: none; color: var(--text-2); font: 700 var(--fs-12) var(--font-ui); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; padding: 10px 6px; }
+.v2 .liste-panneau .mienne { background: var(--sel); border-radius: 8px; }
+.v2 .graphique-jours .piste { background: var(--ctl-bg); border-radius: 8px; }
+.v2 .graphique-jours .barre { background: var(--bony-grad); border-radius: 8px 8px 4px 4px; transform-origin: bottom; animation: v2-pousse 900ms var(--ressort-ample) both; }
+.v2 .graphique-jours .barre.part { background: color-mix(in srgb, var(--bony-violet) 70%, transparent); }
+@keyframes v2-pousse { from { transform: scaleY(0); } }
+.v2 .bandeau-kpi > * { background: var(--box-bg); border: 0; border-radius: var(--r-lg); box-shadow: inset 0 0 0 1px var(--box-line); }
+
+.v2 .panneau-menu, .v2 .glass-menu { background: var(--glass-strong); border: 0; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--line-2), var(--ombre); backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8); }
+.v2 .option-menu { border-radius: 8px; }
+.v2 .option-menu:hover, .v2 .option-menu.survolee { background: var(--ctl-bg-h); }
+.v2 .declencheur-menu { height: 32px; border: 0; border-radius: var(--r-sm); background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); color: var(--text); font: 600 var(--fs-12) var(--font-ui); }
+.v2 .voile-dialogue { background: rgba(5, 6, 12, .38); backdrop-filter: none; }
+.v2 .boite-dialogue { background: var(--glass-strong); backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8); border-radius: var(--r-2xl); animation: v2-palette 520ms var(--ressort-ample) both; }
+
+.v2 .cartes-vendeurs > * { background: var(--box-bg); border: 0; border-radius: var(--r-lg); box-shadow: inset 0 0 0 1px var(--box-line); }
+.v2 .barre-outils { gap: 10px; }
+}
