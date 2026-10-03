@@ -19,6 +19,28 @@ aujourd'hui est dans « CE QUI RESTE », en fin de fichier, et nulle part ailleu
 
 ---
 
+## 03/10/2026, soir — Sante de la base, connexion, index.css supprime
+
+- **Sante de la base** : console dans Reglages (admin, direction) — six mesures en
+  crans, sante globale = la PIRE mesure, alerte en clair ; pastille pour tous dans
+  l'Ile (point lumineux sur « Plus » au telephone), UNE sonde toutes les 30 s par
+  poste, arretee quand l'onglet est masque. Voir ETAT-BACKEND.
+- **Connexion** : fond anime « grille de depart » (canvas : sol en perspective,
+  halo d'horizon, trainees de vitesse, parallaxe au pointeur, fige si animations
+  reduites) ; logo anime ; **entree animee** apres une connexion reussie (le G
+  jaillit, eclats, on traverse le G) — une fois, jamais au rechargement.
+  Mise au point : `atelier-connexion.html`.
+- **Selection** : la goutte de l'Ile et `useIndicateurGlissant` n'animent plus que
+  `transform` (GPU). Width/height passaient par le fil principal, occupe a la meme
+  image par le rendu React : d'ou les saccades. Un mouvement interrompu repart de
+  la position VISIBLE. Etirement de l'Ile plafonne a x2,5.
+- **`index.css` supprime** : voir CLAUDE.md, « Deux couches CSS ».
+- Mot de passe du compte `tlabonne` reinitialise sur Supabase (minimum projet
+  ramene a 6 par l'utilisateur). **Edge Function `gerer-comptes` encore en version
+  « 12 caracteres »** : a redeployer (CLI non authentifiee sur ce poste).
+
+---
+
 ## 03/10/2026 — Interface v2 (lots 3 et 4 de `PLAN-GRID-V2.md`)
 
 Branche `feat/interface-v2`, 33 commits au-dessus de `master`. Aucune migration :

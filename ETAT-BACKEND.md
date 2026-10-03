@@ -4,6 +4,20 @@ Mise a jour : 03/10/2026, lots 1 et 2 de `PLAN-GRID-V2.md`.
 
 ---
 
+## 03/10/2026 — Sante de la base (`20261003180000_sante_base`)
+
+Reprise de l'app Forum 2026 (`sql/14_sante.sql`, `sql/25_sante_detail.sql`). Additive,
+appliquee sur les DEUX bases ; `comparer` : aucun ecart ; `test:rls` 122/122 sur Supabase.
+
+| Fonction | Qui | Rend |
+|---|---|---|
+| `relance.sante()` | tout compte connecte (refus `anon`) | heure, RDV des 10 dernieres minutes |
+| `relance.sante_detail()` | `peut_administrer()` — admin, direction | pool PostgREST (connexions ACTIVES, sonde deduite), verrous, transactions bloquees, RDV/min, taille de la base vs 500 Mo, derniere activite (pause a 7 jours) |
+
+Le temps de reponse se mesure DANS LE NAVIGATEUR (`services/sante.ts`) : c'est le seul
+chiffre qui voit le reseau du poste. `pg_stat_activity` n'est lu qu'en `security definer`
+et ne rend que des COMPTEURS. Le plafond du pool (11) est celui mesure au Forum, meme offre.
+
 ## 03/10/2026 — Robustesse de seance (`20261002204318_robustesse_seance`)
 
 Additive : l'ancien front fonctionne dessus, ce qui garde ouverte la voie du
