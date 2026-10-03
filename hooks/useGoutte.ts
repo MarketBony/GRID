@@ -43,6 +43,8 @@ export function useGoutte(cleActive: string) {
       const p = n.getBoundingClientRect();
       const r = cible.getBoundingClientRect();
       const fin = { x: r.left - p.left, w: r.width };
+      // Largeur de la pilule : les trois morceaux y calent leur degrade commun.
+      g.style.setProperty('--w', `${fin.w}px`);
       g.style.top = `${r.top - p.top}px`;
       g.style.height = `${r.height}px`;
       // Rayon des bouts : pilule pleine dans l'Ile, 24 px dans la barre du bas.

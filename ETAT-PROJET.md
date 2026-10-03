@@ -43,6 +43,16 @@ tous corriges et verifies au navigateur :
 Filtre refait : tout identifiant present dans le code est garde (sur-ensemble
 volontaire), seuls les selecteurs d'element nus et les classes mortes partent.
 
+Deuxieme passe, meme nuit :
+- **Ile** : `left: 50%` bornait sa largeur naturelle a la moitie de l'ecran — le
+  bouton de deconnexion en sortait. `width: max-content` ;
+- **goutte** : les trois morceaux partagent UN degrade dimensionne sur la pilule
+  (`--w`) — des aplats aux bouts faisaient deux pastilles collees ;
+- **icone Reglages** : des curseurs (l'engrenage au trait etait illisible) ;
+- **connexion** : verre NEUTRE (la saturation poussee virait au violet), horizon
+  abaisse sous la carte, champs en verre clair, carte compacte au telephone.
+- `atelier-connexion.html?coquille` monte la vraie Ile sans session.
+
 ---
 
 ## 03/10/2026, soir — Sante de la base, connexion, index.css supprime

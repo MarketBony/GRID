@@ -90,13 +90,15 @@ export function FondGrille() {
       point.y += (cible.y - point.y) * 0.04;
 
       const fx = l / 2 - point.x * l * 0.04;
-      const horizon = h * 0.46 - point.y * h * 0.03;
+      // Horizon BAS : la carte de connexion flotte dans le ciel, pas sur le halo
+      // (au centre, le halo teintait le verre en violet).
+      const horizon = h * (l < 700 ? 0.7 : 0.64) - point.y * h * 0.03;
       ctx.clearRect(0, 0, l, h);
 
       // --- le halo d'horizon : un soleil couchant a la charte
       const halo = ctx.createRadialGradient(fx, horizon, 0, fx, horizon, Math.max(l, h) * 0.55);
-      halo.addColorStop(0, 'rgba(247,86,50,0.34)');
-      halo.addColorStop(0.35, 'rgba(143,18,171,0.16)');
+      halo.addColorStop(0, 'rgba(247,86,50,0.26)');
+      halo.addColorStop(0.3, 'rgba(143,18,171,0.10)');
       halo.addColorStop(1, 'rgba(41,63,116,0)');
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, l, h);

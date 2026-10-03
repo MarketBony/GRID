@@ -302,6 +302,9 @@ body {
 .ile {
   position: fixed; z-index: 800; top: 14px; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 99px;
+  /* `left: 50%` borne la largeur « naturelle » a la MOITIE de l ecran : au-dela, le
+     dernier bouton (deconnexion) sortait de l Ile. On la fixe sur le contenu. */
+  width: max-content; max-width: calc(100vw - 24px);
   transition: padding 500ms var(--ressort-vif), top 500ms var(--ressort-vif);
 }
 .ile .logo { width: 30px; height: 30px; margin: 0 6px 0 4px; flex: none; }
@@ -324,10 +327,14 @@ body {
   --r: 18px;
   position: absolute; z-index: 0; top: 0; left: 0; pointer-events: none;
 }
-.goutte > i { position: absolute; top: 0; bottom: 0; will-change: transform; }
-.goutte > i:nth-child(1) { left: 0; width: calc(2 * var(--r)); border-radius: var(--r); background: #ff6a3d; }
-.goutte > i:nth-child(2) { left: var(--r); right: var(--r); transform-origin: 0 50%; background: linear-gradient(to right, #ff6a3d, #a52fce); box-shadow: 0 8px 22px -10px rgba(247, 86, 50, .9); }
-.goutte > i:nth-child(3) { right: 0; width: calc(2 * var(--r)); border-radius: var(--r); background: #a52fce; }
+/* Les trois morceaux portent LE MEME degrade, dimensionne sur la pilule entiere
+   (--w, pose par le hook) et cale sur leur position : au repos, aucune couture.
+   Des aplats aux bouts + un degrade horizontal au milieu donnaient deux pastilles
+   de couleur collees au bout de la pilule. */
+.goutte > i { position: absolute; top: 0; bottom: 0; will-change: transform; background-image: var(--bony-grad); background-size: var(--w, 100%) 100%; background-repeat: no-repeat; box-shadow: 0 8px 22px -12px rgba(247, 86, 50, .75); }
+.goutte > i:nth-child(1) { left: 0; width: calc(2 * var(--r)); border-radius: var(--r); background-position: 0 0; }
+.goutte > i:nth-child(2) { left: var(--r); right: var(--r); transform-origin: 0 50%; background-position: calc(-1 * var(--r)) 0; }
+.goutte > i:nth-child(3) { right: 0; width: calc(2 * var(--r)); border-radius: var(--r); background-position: 100% 0; }
 .ile .sep { width: 1px; height: 22px; margin: 0 4px; background: var(--line-2); flex: none; }
 .ile.retractee { padding: 4px; top: 10px; }
 .ile.retractee .item { padding: 0 11px; }
@@ -631,26 +638,37 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 @layer v2 {
 /* ------------------------------------------------------------------ CONNEXION */
 .connexion-v2 { position: relative; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; overflow: hidden; background: radial-gradient(120% 80% at 50% 0%, #1a2350 0%, #0b0e1f 55%, #05060d 100%); }
-.carte-connexion { position: relative; z-index: 1; width: min(400px, 100%); padding: 30px 28px 26px; border-radius: var(--r-2xl); animation: v2-carte-arrivee 1100ms var(--ressort-ample) 250ms both; box-shadow: 0 40px 120px -40px rgba(247, 86, 50, .55), 0 0 0 1px rgba(255, 255, 255, .08); }
+.carte-connexion { position: relative; z-index: 1; width: min(400px, 100%); padding: 30px 28px 26px; border-radius: var(--r-2xl); animation: v2-carte-arrivee 1100ms var(--ressort-ample) 250ms both; }
+@media (max-width: 480px) { .carte-connexion { padding: 24px 18px 20px; border-radius: 24px; } }
 .carte-connexion.secoue { animation: v2-secousse 520ms var(--ressort-vif); }
 /* LE VERRE DE LA CONNEXION : on doit VOIR la grille a travers. Fond presque
    transparent, flou fort, saturation poussee — c'est le flou qui rend le texte
    lisible, pas l'epaisseur du fond (CLAUDE.md, « Le verre laisse passer la
    couleur »). Theme sombre force : le fond de cet ecran est toujours la nuit. */
 .connexion-v2 .carte-connexion.verre {
+  /* VERRE NEUTRE : presque rien dans le fond, tout dans le flou et les aretes.
+     Pas de saturation poussee — c'est elle qui faisait virer la carte au violet. */
   background:
-    radial-gradient(260px circle at var(--mx, 50%) var(--my, -40%), rgba(255, 255, 255, .14), transparent 60%),
-    linear-gradient(165deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, .02) 45%, rgba(255, 255, 255, .04));
-  -webkit-backdrop-filter: blur(22px) saturate(1.8);
-  backdrop-filter: blur(22px) saturate(1.8);
-  color: var(--text);
+    radial-gradient(320px circle at var(--mx, 30%) var(--my, -30%), rgba(255, 255, 255, .16), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .03));
+  -webkit-backdrop-filter: blur(28px) saturate(1.1) brightness(1.08);
+  backdrop-filter: blur(28px) saturate(1.1) brightness(1.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .38),
+    inset 0 0 0 1px rgba(255, 255, 255, .12),
+    inset 0 -18px 40px -30px rgba(255, 255, 255, .25),
+    0 30px 80px -30px rgba(0, 0, 0, .75);
+  color: #f2f3f8;
 }
-.connexion-v2 .carte-connexion .input { background: rgba(5, 6, 13, .35); }
-.connexion-v2 .carte-connexion .input:hover { background: rgba(5, 6, 13, .45); }
+.connexion-v2 .carte-connexion .input {
+  background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); color: #f2f3f8;
+}
+.connexion-v2 .carte-connexion .input:hover { background: rgba(255, 255, 255, .09); }
+.connexion-v2 .carte-connexion .input:focus { background: rgba(255, 255, 255, .1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .45), 0 0 0 4px rgba(255, 255, 255, .08); }
 /* L'autoremplissage du navigateur peint le champ en bleu clair : on le recouvre. */
 .connexion-v2 input:-webkit-autofill, .connexion-v2 input:-webkit-autofill:hover, .connexion-v2 input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--text); caret-color: var(--text);
-  -webkit-box-shadow: 0 0 0 1px var(--ctl-line) inset, 0 0 0 100px #14162c inset;
+  -webkit-box-shadow: 0 0 0 1px rgba(255, 255, 255, .14) inset, 0 0 0 100px #1b1d33 inset;
   transition: background-color 99999s;
 }
 @keyframes v2-secousse { 15% { transform: translateX(-10px); } 35% { transform: translateX(9px); } 55% { transform: translateX(-6px); } 75% { transform: translateX(3px); } }
