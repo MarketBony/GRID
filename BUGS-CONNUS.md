@@ -20,7 +20,21 @@ que la vue d'ensemble compte, il s'APPLIQUE EN MEMOIRE (`appliquerRdv`, qui rejo
 les fonctions pures) ; un ecran = un appel (`charger_saisie`, `charger_tableau`) ; un
 RDV = un appel (`rdv_poser`, idempotent) ; file d'attente locale des poses (un RDV
 tape ne se perd plus) ; resynchronisation toutes les ~5 min, decalee par poste.
-Mesures avant/apres : `scripts/charge/`.
+Mesure le 02-03/10/2026 sur Supabase, outil `scripts/charge/` (vrai code du front,
+un poste virtuel par worker, RDV poses sur des vendeurs fictifs ensuite purges) :
+
+| | ancien code | lot 1 |
+|---|---|---|
+| Requetes par RDV pose, 25 postes | **~200** | **8 a 12** (resynchronisation comprise) |
+| Extrapole a 258 RDV/h | ~52 000 req/h | ~2 600 req/h |
+| Erreurs | 0 % | 0 % |
+| Poser un RDV (p50) | 3 requetes | 1 requete, 243-389 ms |
+| Chargement de l'ecran (p50) | ~1 000 ms | ~800 ms |
+| Temps reel (p95) | ~1 000 ms | 570-721 ms |
+
+Reserve sur la mesure de depart : l'outil posait trop peu de RDV (identifiants
+rendus par psql avec un , corrige ensuite) ; son cout PAR RDV reste lisible.
+Empreintes de juin et septembre identiques avant et apres chaque passage.
 
 ## [CORRIGE LE 03/10/2026] « Les mots de passe se reinitialisent tout seuls »
 
