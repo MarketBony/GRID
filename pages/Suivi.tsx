@@ -54,7 +54,12 @@ export function Suivi() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [vue, setVue] = useState<Vue>('a_traiter');
   const [recherche, setRecherche] = useState('');
-  const [sortants, setSortants] = useState<Set<string>>(new Set());
+  /// LES LIGNES QUALIFIEES PENDANT CETTE VISITE restent affichees dans « a
+  /// traiter », avec leur liseré de couleur, jusqu'au changement de vue. Les faire
+  /// sortir tout de suite empechait de cocher DIAC / STOCK / CS apres avoir choisi
+  /// « Commande » — constate a l'essai le 03/10 — et de rattraper un clic de travers.
+  const [gardes, setGardes] = useState<Set<string>>(new Set());
+  useEffect(() => setGardes(new Set()), [vue, campagneId]);
   const [formulaire, setFormulaire] = useState(false);
   /// PAR TRANCHES : une campagne compte ~1 000 RDV, et un telephone en showroom
   /// n'a pas a en dessiner mille d'un coup. La recherche et les vues filtrent
@@ -97,14 +102,14 @@ export function Suivi() {
   const visibles = useMemo(() => {
     const q = cleTri(recherche.trim());
     return rdvs.filter((r) => {
-      if (sortants.has(r.id)) return true; // il finit son animation de sortie
+      if (gardes.has(r.id)) return true;
       if (vue === 'a_traiter' && r.issue !== null) return false;
       if (vue === 'commandes' && r.issue !== 'commande') return false;
       if (vue === 'trafic' && r.source !== 'showroom') return false;
       if (q && !cleTri(`${r.client} ${r.vendeur} ${r.modele ?? ''}`).includes(q)) return false;
       return true;
     });
-  }, [rdvs, vue, recherche, sortants]);
+  }, [rdvs, vue, recherche, gardes]);
 
   const parJour = useMemo(() => {
     const m = new Map<string, RdvSuivi[]>();
@@ -119,16 +124,7 @@ export function Suivi() {
     const suivant = { ...r, ...modif };
     if (suivant.issue !== 'commande') Object.assign(suivant, { diac: false, stock: false, cs: false });
     setRdvs((l) => l.map((x) => (x.id === r.id ? suivant : x)));
-    // Une ligne qualifiee QUITTE la vue « a traiter » en glissant, au lieu de
-    // disparaitre d'un coup sous le doigt.
-    if (vue === 'a_traiter' && r.issue === null && suivant.issue !== null) {
-      setSortants((s) => new Set(s).add(r.id));
-      window.setTimeout(() => setSortants((s) => {
-        const n = new Set(s);
-        n.delete(r.id);
-        return n;
-      }), 650);
-    }
+    if (vue === 'a_traiter') setGardes((g) => new Set(g).add(r.id));
     try {
       await enregistrerSuivi(r.id, suivant);
       setErreur(null);
@@ -205,7 +201,7 @@ export function Suivi() {
           <section key={jour} className="suivi-jour">
             <h2 className="label">{libelleJour(jour)} · {liste.length} RDV</h2>
             {liste.map((r, k) => (
-              <LigneSuivi key={r.id} rdv={r} rang={k} figee={figee} sortant={sortants.has(r.id)} qualifier={qualifier} />
+              <LigneSuivi key={r.id} rdv={r} rang={k} figee={figee} sortant={false} qualifier={qualifier} />
             ))}
           </section>
         ))
