@@ -3,7 +3,7 @@ import { Icone } from '../components/ui/Icone';
 import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { changerMonMotDePasse } from '../services/api';
-import { Gestion } from './Gestion';
+import { Comptes } from '../components/comptes/Comptes';
 
 // ============================================================================
 // REGLAGES — les sections dependent du PALIER, a la Gearbox (D3 de
@@ -51,7 +51,7 @@ export function Reglages() {
         <div className="enter" style={{ ['--i' as string]: 2, minWidth: 0 }}>
           {section === 'compte' && <MonCompte />}
           {section === 'apparence' && <Apparence />}
-          {section === 'comptes' && droits?.gereUtilisateurs && <Gestion />}
+          {section === 'comptes' && droits?.gereUtilisateurs && <Comptes />}
         </div>
       </div>
     </div>

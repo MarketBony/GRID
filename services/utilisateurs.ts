@@ -322,3 +322,47 @@ export const libelleRoleGlobal = (roles: string[]): string => {
   if (roles.includes('lecteur')) return 'Lecteur';
   return 'Encadrant';
 };
+
+// ---------------------------------------------------------------- journal
+
+export interface EntreeJournal {
+  id: string;
+  quand: string;
+  auteurId: string | null;
+  cibleId: string;
+  cibleNom: string;
+  action: string;
+}
+
+/// Le journal des comptes (lot 2) : qui a reinitialise, desactive, reactive qui,
+/// et qui a choisi son mot de passe. Lisible par les admins seulement — la RLS en
+/// decide, pas cet ecran. Les noms d'auteur se resolvent cote ecran, avec la
+/// liste des comptes deja chargee : `cree_par` n'est pas une cle etrangere.
+export async function chargerJournal(limite = 100): Promise<EntreeJournal[]> {
+  const lignes = verifier(
+    await supabase
+      .from('journal_compte')
+      .select('id, cree_le, cree_par, cible_id, action, cible:utilisateur(nom)')
+      .order('id', { ascending: false })
+      .limit(limite)
+  ) as unknown as { id: number; cree_le: string; cree_par: number | null; cible_id: number; action: string; cible: { nom: string } | null }[];
+  return lignes.map((l) => ({
+    id: txt(l.id),
+    quand: l.cree_le,
+    auteurId: l.cree_par === null ? null : txt(l.cree_par),
+    cibleId: txt(l.cible_id),
+    cibleNom: l.cible?.nom ?? '?',
+    action: l.action,
+  }));
+}
+
+export const libelleAction = (a: string): string =>
+  a === 'reinitialisation'
+    ? 'a réinitialisé le mot de passe de'
+    : a === 'changement_mot_de_passe'
+      ? 'a choisi son mot de passe'
+      : a === 'desactivation'
+        ? 'a désactivé'
+        : a === 'reactivation'
+          ? 'a réactivé'
+          : a;

@@ -638,3 +638,26 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .chaleur-case.n2 { background: var(--bony-grad); }
 .chaleur .total-jour { text-align: center; font-weight: 800; color: var(--text-2); }
 }
+
+@layer v2 {
+/* ------------------------------------------------------------------ COMPTES (lot 7) */
+.v2 .liste-comptes { display: grid; gap: 4px; }
+.v2 .ligne-compte {
+  display: grid; grid-template-columns: auto minmax(160px, 1fr) auto minmax(80px, auto) auto; align-items: center; gap: 12px;
+  padding: 8px 10px; border: 0; border-radius: 12px; background: transparent; cursor: pointer; text-align: left; color: var(--text); font: inherit;
+  transition: background-color var(--t-fast), transform 560ms var(--ressort-ample);
+}
+.v2 .ligne-compte:hover { background: var(--ctl-bg-h); }
+.v2 .ligne-compte:active { transform: scale(.99); }
+.v2 .ligne-compte.inactif { opacity: .55; }
+.v2 .ligne-compte .identite { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
+.v2 .ligne-compte .details { font-size: 12px; text-align: right; }
+.v2 .avatar-v2.petit { width: 34px; height: 34px; font-size: 12px; }
+.v2 .ligne-journal { display: grid; grid-template-columns: 130px 1fr; gap: 10px; padding: 6px 4px; font-size: 12.5px; border-bottom: 1px solid var(--line); }
+.v2 .mdp-a-noter { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--ok) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 40%, transparent); }
+.v2 .mdp-a-noter code { font: 700 15px ui-monospace, monospace; padding: 4px 10px; border-radius: 8px; background: var(--ctl-bg-h); }
+@media (max-width: 760px) {
+  .v2 .ligne-compte { grid-template-columns: auto 1fr auto; }
+  .v2 .ligne-compte .details { display: none; }
+}
+}
