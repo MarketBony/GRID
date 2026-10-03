@@ -661,3 +661,8 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
   .v2 .ligne-compte .details { display: none; }
 }
 }
+
+@layer v2 {
+/* Planning imprime : initiale de la marque devant le client (une feuille par vendeur). */
+.rdv-imprime .marque-rdv { display: inline-block; min-width: 3.2mm; margin-right: 1mm; font-weight: 800; font-size: 7pt; color: #555; }
+}

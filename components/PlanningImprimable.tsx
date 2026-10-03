@@ -1,5 +1,5 @@
 import { libelleJour } from '../utils/grille';
-import type { RdvSaisie, SectionVendeur, VendeurSaisie } from '../services/saisie';
+import type { RdvSaisie, VendeurSaisie } from '../services/saisie';
 import { cleRdv } from '../utils/grille';
 
 // ============================================================================
@@ -40,9 +40,11 @@ import { cleRdv } from '../utils/grille';
 // suivi, « ce rendez-vous est venu ».
 // ============================================================================
 
+/// UNE FEUILLE PAR VENDEUR, toutes marques (03/10/2026, decision de
+/// l'utilisateur) : le planning suit la grille unique de la saisie. Un RDV porte
+/// l'initiale de sa marque quand le vendeur en a plusieurs.
 export interface PagePlanning {
   vendeur: VendeurSaisie;
-  section: SectionVendeur;
 }
 
 /// Une page par couple (vendeur, section). L'ordre est celui de la liste des
@@ -51,7 +53,7 @@ export interface PagePlanning {
 export function paginer(vendeurs: VendeurSaisie[]): PagePlanning[] {
   const pages: PagePlanning[] = [];
   for (const vendeur of vendeurs) {
-    for (const section of vendeur.sections) pages.push({ vendeur, section });
+    pages.push({ vendeur });
   }
   return pages;
 }
@@ -83,20 +85,17 @@ export function PlanningImprimable({
 }) {
   return (
     <div className="planning-imprimable">
-      {pages.map(({ vendeur, section }) => {
+      {pages.map(({ vendeur }) => {
         const pour = rdvs.get(vendeur.id);
-        const total = creneaux.reduce(
-          (n, c) =>
-            n +
-            jours.reduce(
-              (m, j) => m + (pour?.get(cleRdv(section.marqueId, c.code, j.jour))?.length ?? 0),
-              0
-            ),
-          0
-        );
+        const sections = vendeur.sections;
+        const rdvsDe = (code: string, jour: string) =>
+          sections.flatMap((s) =>
+            (pour?.get(cleRdv(s.marqueId, code, jour)) ?? []).map((r) => ({ r, s }))
+          );
+        const total = creneaux.reduce((n, c) => n + jours.reduce((m, j) => m + rdvsDe(c.code, j.jour).length, 0), 0);
 
         return (
-          <section className="page-planning" key={`${vendeur.id}-${section.marqueId ?? 'vo'}`}>
+          <section className="page-planning" key={vendeur.id}>
             <header className="entete-planning">
               <div className="qui">
                 <h1>{vendeur.nom}</h1>
@@ -105,7 +104,7 @@ export function PlanningImprimable({
                 </p>
               </div>
               <div className="quoi">
-                <span className="marque-planning">{section.libelle}</span>
+                <span className="marque-planning">{sections.map((s) => s.libelle).join(' · ')}</span>
                 <p>{campagne.libelle}</p>
               </div>
             </header>
@@ -130,14 +129,15 @@ export function PlanningImprimable({
                   <tr key={c.code}>
                     <th className="col-creneau">{c.libelle}</th>
                     {jours.map((j) => {
-                      const liste = pour?.get(cleRdv(section.marqueId, c.code, j.jour)) ?? [];
+                      const liste = rdvsDe(c.code, j.jour);
                       return (
                         <td key={j.jour} className={liste.length > 0 ? 'remplie' : undefined}>
-                          {liste.map((r) => (
+                          {liste.map(({ r, s }) => (
                             <span className="rdv-imprime" key={r.id}>
                               {/* LA PASTILLE EST LE GESTE DU SUIVI : on la coche
                                   au stylo quand le client est venu. */}
                               <span className="pastille" aria-hidden="true" />
+                              {sections.length > 1 && <span className="marque-rdv">{s.libelle.slice(0, 1)}</span>}
                               <span className="nom-client">{r.client}</span>
                             </span>
                           ))}
