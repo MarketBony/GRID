@@ -829,3 +829,7 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .classement-complet .detail { color: var(--text-3); font-size: 12px; }
 .v2 .classement-complet strong { font-size: var(--fs-16); }
 }
+
+@layer v2 {
+.v2 .carte h3, .v2 .card h3 { font-family: var(--font-ui); text-transform: none; letter-spacing: -.01em; font-size: var(--fs-14); font-weight: 800; }
+}
