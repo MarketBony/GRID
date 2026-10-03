@@ -56,6 +56,12 @@ export function Suivi() {
   const [recherche, setRecherche] = useState('');
   const [sortants, setSortants] = useState<Set<string>>(new Set());
   const [formulaire, setFormulaire] = useState(false);
+  /// PAR TRANCHES : une campagne compte ~1 000 RDV, et un telephone en showroom
+  /// n'a pas a en dessiner mille d'un coup. La recherche et les vues filtrent
+  /// AVANT la tranche, donc rien n'est cache a qui cherche.
+  const TRANCHE = 60;
+  const [limite, setLimite] = useState(TRANCHE);
+  useEffect(() => setLimite(TRANCHE), [vue, recherche, campagneId]);
 
   useEffect(() => {
     chargerCampagnes()
@@ -102,9 +108,9 @@ export function Suivi() {
 
   const parJour = useMemo(() => {
     const m = new Map<string, RdvSuivi[]>();
-    for (const r of visibles) m.set(r.jour, [...(m.get(r.jour) ?? []), r]);
+    for (const r of visibles.slice(0, limite)) m.set(r.jour, [...(m.get(r.jour) ?? []), r]);
     return [...m.entries()];
-  }, [visibles]);
+  }, [visibles, limite]);
 
   /// Qualifier, EN MEMOIRE d'abord : la ligne change tout de suite ; si la base
   /// refuse, elle revient a son etat et on dit pourquoi.
@@ -203,6 +209,12 @@ export function Suivi() {
             ))}
           </section>
         ))
+      )}
+
+      {!chargement && visibles.length > limite && (
+        <button type="button" className="btn" style={{ alignSelf: 'center' }} onClick={() => setLimite((l) => l + TRANCHE * 2)}>
+          Afficher plus · {visibles.length - limite} restants
+        </button>
       )}
 
       {formulaire && campagneId && (
