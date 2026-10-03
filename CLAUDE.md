@@ -97,7 +97,7 @@ arborescence, même pipeline, même discipline documentaire.
 - **Les artefacts de mise au point vivent A LA RACINE** : `atelier.html` pour la
   couche visuelle, `patron-export.html` pour le planning imprimable. Vite les sert
   en développement et `vite build` ne prend que `index.html` en entrée, donc ils ne
-  partent jamais dans `dist` — vérifié à chaque lot, `dist` doit contenir 4 fichiers
+  partent jamais dans `dist` — vérifié à chaque lot, `dist` contient exactement `index.html`, `grid.svg`, `manifest.webmanifest`, `sw.js` et `assets/` (depuis la PWA, 03/10/2026)
 - **Tout ce qui est dans `public/` part TEL QUEL dans `dist`**, donc en production. Une
   page de développement posée là s'y retrouve — constaté avec le banc d'essai liquid
   glass. Un fichier HTML à la RACINE, lui, est servi en développement et **exclu du
@@ -116,6 +116,28 @@ dans ce fichier comme un fait acquis, et il a motivé plusieurs décisions
 d'architecture. **Mesuré le 31/08/2026 : les trois hôtes Supabase répondent.**
 Migrations, seed et suites tournent donc depuis le poste. À re-mesurer avant de
 rebâtir quoi que ce soit sur cette hypothèse — elle a déjà été fausse une fois.
+
+## Interface v2 — ce qui a changé le 03/10/2026
+
+Lots 3 et 4 de `PLAN-GRID-V2.md`. À lire avant de toucher à l'interface.
+
+- **DA Gearbox OS, sans son moteur** : jetons, matière liquid glass (`.verre`),
+  primitives aux noms de Gearbox (`.btn`, `.seg`, `.chip`, `.card`, `.kpi`, `.tbl`…),
+  dans `styles/v2.css`. Clair ET sombre, toujours en verre.
+- **Deux couches CSS** : `index.css` vit dans `@layer ancien`, `styles/v2.css` dans
+  `@layer v2`, déclarée après — la v2 l'emporte quelle que soit la spécificité. Un
+  **pont** redéfinit les anciens jetons dans `.v2` : un écran pas encore porté prend
+  la palette v2 sans une ligne à toucher. `index.css` disparaîtra avec le dernier écran.
+- **Navigation** : l'Île en haut au bureau, la barre flottante en bas au téléphone
+  (`components/coquille/Coquille.tsx`). La goutte est `useIndicateurGlissant` — pas
+  un troisième mécanisme. Recherche par la loupe ou `Ctrl K`.
+- **Réglages par palier** : mon compte (changer son mot de passe), apparence,
+  comptes (admin). Un compte réinitialisé choisit son mot de passe à la connexion.
+- **PWA** : `public/sw.js`, écrit à la main. La page passe par le réseau (un
+  `wrangler rollback` atteint les postes), les `/assets` hashés par le cache,
+  **jamais Supabase**. Une nouvelle version s'annonce, elle ne recharge jamais seule.
+- **Code découpé** : la saisie part au premier chargement, le reste à la demande ;
+  l'export Excel (874 Ko) ne se charge qu'au clic.
 
 ## Charte Bony
 
