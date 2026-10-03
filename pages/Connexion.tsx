@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useSession } from '../contexts/SessionContext';
 import { Icone } from '../components/ui/Icone';
 import { useReflet } from '../hooks/useReflet';
+import { FondGrille } from '../components/connexion/FondGrille';
+import { armerIntro } from '../components/connexion/IntroGrid';
 
 // ============================================================================
 // CONNEXION — la premiere chose que voit un utilisateur, en DA v2 : le fond
@@ -28,6 +30,7 @@ export function Connexion() {
     setErreur(null);
     setEnvoi(true);
     try {
+      armerIntro();
       await connexion(loginId.trim(), motDePasse);
     } catch (err) {
       setErreur(err instanceof Error ? err.message : 'Connexion impossible.');
@@ -39,11 +42,7 @@ export function Connexion() {
 
   return (
     <div className="v2 connexion-v2">
-      <div className="fond-vivant" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-      </div>
+      <FondGrille />
       <form
         key={secousse}
         className={`carte-connexion verre fort${secousse > 0 ? ' secoue' : ''}`}
@@ -51,7 +50,9 @@ export function Connexion() {
         onPointerMove={reflet}
       >
         <div className="marque-connexion">
-          <img src="/grid.svg" alt="" aria-hidden="true" />
+          <span className="logo-anime">
+            <img src="/grid.svg" alt="" aria-hidden="true" />
+          </span>
           <span className="mot">GRID</span>
         </div>
         <p className="faint" style={{ margin: '4px 0 22px', textAlign: 'center' }}>

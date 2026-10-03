@@ -1,8 +1,9 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Rempart } from './components/Rempart';
 import { Coquille, type Rubrique } from './components/coquille/Coquille';
 import { useSession } from './contexts/SessionContext';
 import { Connexion } from './pages/Connexion';
+import { IntroGrid, consommerIntro } from './components/connexion/IntroGrid';
 import { Saisie } from './pages/Saisie';
 import { ChoisirMotDePasse } from './pages/Reglages';
 
@@ -60,6 +61,11 @@ const TOUTES: Record<Id, Rubrique> = {
 export default function App() {
   const { session, chargement, deconnexion } = useSession();
   const [active, setActive] = useState<Id>('saisie');
+  // L'entree animee : seulement apres une connexion reussie, une seule fois.
+  const [intro, setIntro] = useState(false);
+  useEffect(() => {
+    if (session && consommerIntro()) setIntro(true);
+  }, [session]);
 
   if (chargement) return <div className="attente">Chargement...</div>;
   if (!session) return <Connexion />;
@@ -100,6 +106,8 @@ export default function App() {
   const palier = droits.admin ? 'admin' : droits.direction ? 'direction' : droits.lecteur ? 'lecteur' : 'encadrant';
 
   return (
+    <>
+    {intro && <IntroGrid onFin={() => setIntro(false)} />}
     <Coquille
       rubriques={rubriques}
       active={courante}
@@ -137,5 +145,6 @@ export default function App() {
         </Suspense>
       </Rempart>
     </Coquille>
+    </>
   );
 }
