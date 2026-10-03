@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { Icone, type NomIcone } from '../ui/Icone';
+import { PastilleSante, useSondeLegere } from '../sante/Sante';
 import { useGoutte } from '../../hooks/useGoutte';
 import { useReflet } from '../../hooks/useReflet';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -94,6 +95,7 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
   const principales = rubriques.filter((r) => !r.secondaire);
   const goutteIle = useGoutte(active);
   const goutteBas = useGoutte(active);
+  const sante = useSondeLegere();
 
   // LA HAUTEUR DE L'ILE EST MESUREE, PAS DEVINEE (CLAUDE.md, « aucune constante ne
   // devine la hauteur d'un element variable »). Les ecrans pas encore portes
@@ -196,6 +198,7 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
           </button>
         ))}
         <span className="sep" aria-hidden="true" />
+        <PastilleSante {...sante} />
         <button type="button" className="icon-btn" onClick={() => setPaletteOuverte(true)} title="Rechercher (Ctrl K)" aria-label="Rechercher">
           <Icone nom="recherche" />
         </button>
@@ -230,6 +233,7 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
         ))}
         <button type="button" className="item" onClick={() => setPlusOuvert(true)} aria-haspopup="dialog">
           <Icone nom="grille" />
+          <PastilleSante {...sante} compacte />
           <span className="lib">Plus</span>
         </button>
       </nav>

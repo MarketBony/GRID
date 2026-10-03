@@ -4,6 +4,7 @@ import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { changerMonMotDePasse } from '../services/api';
 import { Comptes } from '../components/comptes/Comptes';
+import { ConsoleSante } from '../components/sante/Sante';
 
 // ============================================================================
 // REGLAGES — les sections dependent du PALIER, a la Gearbox (D3 de
@@ -12,7 +13,7 @@ import { Comptes } from '../components/comptes/Comptes';
 // (interdit n.5) : chaque action reste revalidee par la base.
 // ============================================================================
 
-type Section = 'compte' | 'apparence' | 'comptes';
+type Section = 'compte' | 'apparence' | 'comptes' | 'sante';
 
 const CLE_ANIMATIONS = 'grid.animations-reduites';
 
@@ -23,6 +24,7 @@ export function Reglages() {
     { id: 'compte', libelle: 'Mon compte', couleur: 'var(--info)' },
     { id: 'apparence', libelle: 'Apparence', couleur: 'var(--bony-violet)' },
     ...(droits?.gereUtilisateurs ? [{ id: 'comptes' as const, libelle: 'Comptes', couleur: 'var(--bony-orange)' }] : []),
+    ...(droits?.administre ? [{ id: 'sante' as const, libelle: 'Santé de la base', couleur: 'var(--ok)' }] : []),
   ];
   const [section, setSection] = useState<Section>('compte');
 
@@ -52,6 +54,7 @@ export function Reglages() {
           {section === 'compte' && <MonCompte />}
           {section === 'apparence' && <Apparence />}
           {section === 'comptes' && droits?.gereUtilisateurs && <Comptes />}
+          {section === 'sante' && droits?.administre && <ConsoleSante />}
         </div>
       </div>
     </div>

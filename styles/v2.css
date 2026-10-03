@@ -1253,3 +1253,49 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
   .v2 .barre-v2 .espace { display: none; }
 }
 }
+
+@layer v2 {
+/* ------------------------------------------------------------------ SANTE DE LA BASE */
+.pastille-sante { --ton: var(--ok); display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: 99px; flex: none; cursor: default; color: var(--text-3); font-size: 11px; font-weight: 800; }
+.pastille-sante.tiede { --ton: var(--warn); }
+.pastille-sante.chaud, .pastille-sante.coupe { --ton: var(--danger); }
+.pastille-sante > i { position: relative; width: 8px; height: 8px; border-radius: 50%; background: var(--ton); box-shadow: 0 0 10px color-mix(in srgb, var(--ton) 70%, transparent); }
+.pastille-sante > i::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--ton); animation: v2-onde-sante 2.4s ease-out infinite; }
+.pastille-sante.coupe > i::after { animation-duration: .9s; }
+.pastille-sante.attente > i { background: var(--text-3); box-shadow: none; }
+.pastille-sante.attente > i::after { display: none; }
+.pastille-sante .ms::after { content: ' ms'; font-weight: 700; opacity: .7; }
+.pastille-sante.compacte { position: absolute; top: 4px; right: 10px; height: auto; padding: 0; }
+@keyframes v2-onde-sante { 0% { transform: scale(1); opacity: .6; } 80%, 100% { transform: scale(2.8); opacity: 0; } }
+.barre-bas .item { position: relative; }
+@media (max-width: 900px) { .ile .pastille-sante .ms { display: none; } }
+
+.console-sante { display: grid; gap: 14px; }
+.console-sante .card-titre { margin: 0; }
+.console-sante .card-titre .heure { margin-left: auto; font-weight: 700; font-size: var(--fs-12); }
+.console-sante .card-titre .pastille-sante { padding: 0; height: auto; }
+.console-sante .mesures { display: grid; gap: 4px; }
+.mesure-sante { --ton: var(--ok); display: grid; grid-template-columns: minmax(130px, 180px) 1fr auto; align-items: center; gap: 14px; padding: 8px 12px; border-radius: 12px; background: var(--box-bg); box-shadow: inset 0 0 0 1px var(--box-line); }
+.mesure-sante.tiede { --ton: var(--warn); }
+.mesure-sante.chaud, .mesure-sante.coupe { --ton: var(--danger); }
+.mesure-sante .nom { font-weight: 700; font-size: var(--fs-13); }
+.mesure-sante .valeur { min-width: 90px; text-align: right; font-weight: 800; color: var(--ton); }
+.crans { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; }
+.crans > i { height: 10px; border-radius: 3px; background: var(--ctl-bg-h); transition: background-color 420ms ease calc(var(--k) * 25ms), box-shadow 420ms ease calc(var(--k) * 25ms); }
+.crans > i.on { background: var(--ton, var(--ok)); box-shadow: 0 0 8px color-mix(in srgb, var(--ton, var(--ok)) 55%, transparent); }
+.crans.tiede > i.on { background: var(--warn); }
+.crans.chaud > i.on, .crans.coupe > i.on { background: var(--danger); }
+.global-sante { --ton: var(--ok); display: grid; gap: 8px; padding: 14px 16px; border-radius: 14px; background: color-mix(in srgb, var(--ton) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ton) 30%, transparent); }
+.global-sante.tiede { --ton: var(--warn); }
+.global-sante.chaud, .global-sante.coupe { --ton: var(--danger); }
+.global-sante .ligne { display: flex; align-items: baseline; justify-content: space-between; font-weight: 800; }
+.global-sante b { font-size: 32px; letter-spacing: -.03em; color: var(--ton); }
+.global-sante b i { font-style: normal; font-size: 16px; margin-left: 2px; }
+.jauge-globale { height: 6px; border-radius: 99px; background: var(--ctl-bg-h); overflow: hidden; }
+.jauge-globale > span { display: block; height: 100%; border-radius: inherit; background: var(--ton); transform-origin: left; transition: transform 800ms var(--ressort-ample); }
+.global-sante .verdict { font-size: var(--fs-12); font-weight: 700; color: var(--text-2); }
+@media (max-width: 560px) {
+  .mesure-sante { grid-template-columns: 1fr auto; }
+  .mesure-sante .crans { grid-column: 1 / -1; grid-row: 2; }
+}
+}

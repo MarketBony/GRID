@@ -931,6 +931,28 @@ async function main() {
   // retrouve sans droits en septembre. Les deux campagnes sont donc testees.
   // =========================================================================
 
+  // --- La sante de la base (03/10/2026) : la pastille pour tous les comptes,
+  // la console pour l'administration seule. pg_stat_activity ne doit jamais
+  // atteindre un encadrant.
+  await doitRefuser('anon  sonde de sante', 'anonyme', DROIT_INSUFFISANT, (tx) =>
+    tx.$queryRawUnsafe('SELECT relance.sante()')
+  );
+  await doitAccepter('lecteur  sonde de sante (pastille)', { login: LECTEUR }, (tx) =>
+    tx.$queryRawUnsafe('SELECT relance.sante()')
+  );
+  await doitRefuser('encadrant  console de sante', { login: ENCADRANT }, DROIT_INSUFFISANT, (tx) =>
+    tx.$queryRawUnsafe('SELECT relance.sante_detail()')
+  );
+  await doitRefuser('anon  console de sante', 'anonyme', DROIT_INSUFFISANT, (tx) =>
+    tx.$queryRawUnsafe('SELECT relance.sante_detail()')
+  );
+  await doitAccepter('direction  console de sante', { login: DIRECTION }, (tx) =>
+    tx.$queryRawUnsafe('SELECT relance.sante_detail()')
+  );
+  await doitAccepter('admin  console de sante', { login: ADMIN }, (tx) =>
+    tx.$queryRawUnsafe('SELECT relance.sante_detail()')
+  );
+
   await doitAccepter('encadrant  saisit sur son site — JUIN', { login: ENCADRANT }, (tx) =>
     tx.rdv.create({ data: rdvDecor(decor.vendeurEncadre, decor.campagne1) })
   );
