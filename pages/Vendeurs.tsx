@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useReferentiels } from '../hooks/useReferentiels';
+import { useIndicateurGlissant } from '../hooks/useIndicateurGlissant';
+import { Icone } from '../components/ui/Icone';
 import {
   analyserImport,
   appliquerImport,
@@ -96,7 +98,18 @@ export function Vendeurs() {
   /// cartes : un effectif qui change quand on cherche un nom serait un piege —
   /// c'est la meme regle que le total du perimetre dans le module C.
   const [recherche, setRecherche] = useState('');
-  const [plaqueFiltre, setPlaqueFiltre] = useState('');
+
+  /// LE SITE AFFICHE. La page empilait les 20 cartes sur 8 900 px ; elle n'en
+  /// montre plus qu'une, choisie dans le rail — sauf pendant une recherche, qui
+  /// montre toutes les cartes concernees.
+  const [siteSel, setSiteSel] = useState<string | null>(null);
+  const rail = index?.vendeursParSite ?? [];
+  const siteCourant = rail.some((c) => c.site.id === siteSel) ? siteSel : (rail[0]?.site.id ?? null);
+  const curseurSite = useIndicateurGlissant(
+    Math.max(0, rail.findIndex((c) => c.site.id === siteCourant)),
+    rail.length,
+    'y'
+  );
 
   /// Incremente a chaque archivage. Le volet Archivage s'en sert comme signal de
   /// relecture : sans lui, archiver un vendeur pendant que le volet est ouvert le
@@ -104,8 +117,17 @@ export function Vendeurs() {
   /// les archives. Constate a l'essai.
   const [versionArchives, setVersionArchives] = useState(0);
 
-  if (chargement) return <div className="attente">Chargement des référentiels…</div>;
-  if (erreur) return <div className="erreur-bloc">{erreur}</div>;
+  if (chargement)
+    return (
+      <div className="page">
+        <div className="skel" style={{ height: 40, width: 260 }} />
+        <div className="vend-v2">
+          <div className="skel" style={{ height: 480 }} />
+          <div className="skel" style={{ height: 480 }} />
+        </div>
+      </div>
+    );
+  if (erreur) return <div className="page"><div className="bandeau-v2 erreur">{erreur}</div></div>;
   if (!donnees || !index) return null;
 
   const agir = async (id: string, action: () => Promise<string | void>) => {
@@ -200,7 +222,6 @@ export function Vendeurs() {
   /// « AMELIE » et « AMÉLIE » sont le meme nom ici comme ailleurs.
   const q = cleTri(recherche.trim());
   const cartesVisibles = index.vendeursParSite.filter(({ site, vendeurs }) => {
-    if (plaqueFiltre !== '' && site.plaqueId !== plaqueFiltre) return false;
     if (q === '') return true;
     return (
       cleTri(site.libelle).includes(q) ||
@@ -229,23 +250,28 @@ export function Vendeurs() {
   return (
     <div className="page">
       <div className="app-head enter">
-        <div>
-          <h2>Vendeurs</h2>
-        </div>
-        <div className="progression">
-          <strong>{actifs.length}</strong>
-          <span>
-            en poste — {actifs.filter((v) => v.typeVehicule === 'VN').length} VN /{' '}
-            {actifs.filter((v) => v.typeVehicule === 'VO').length} VO
-          </span>
+        <h1>Vendeurs</h1>
+        <span className="sub">
+          {actifs.length} en poste · {actifs.filter((v) => v.typeVehicule === 'VN').length} VN ·{' '}
+          {actifs.filter((v) => v.typeVehicule === 'VO').length} VO
+        </span>
+        <div className="droite">
+          <button
+            type="button"
+            className="btn primary"
+            onClick={() => {
+              setAjoutGlobal((o) => !o);
+              setSiteEnAjout(null);
+            }}
+          >
+            <Icone nom={ajoutGlobal ? 'fermer' : 'plus'} petite /> {ajoutGlobal ? 'Fermer' : 'Vendeur'}
+          </button>
         </div>
       </div>
 
-      {/* BARRE COLLANTE. Elle porte le seul chemin court vers « ajouter un
-          vendeur » et le filtre qui reduit les 19 cartes : les deux ne servent a
-          rien s'il faut remonter 8 900 px pour les atteindre. */}
-      <div className="barre-outils collante">
-        <div className="recherche-vendeur en-barre">
+      <div className="barre-v2 enter" style={{ ['--i' as string]: 1 }}>
+        <label className="recherche-v2">
+          <Icone nom="recherche" petite />
           <input
             value={recherche}
             onChange={(e) => setRecherche(e.target.value)}
@@ -254,57 +280,21 @@ export function Vendeurs() {
             spellCheck={false}
           />
           {recherche !== '' && (
-            <button
-              type="button"
-              className="effacer"
-              onClick={() => setRecherche('')}
-              aria-label="Effacer la recherche"
-              title="Effacer"
-            >
-              ×
+            <button type="button" className="icon-btn" onClick={() => setRecherche('')} aria-label="Effacer la recherche">
+              <Icone nom="fermer" petite />
             </button>
           )}
-        </div>
-
-        {/* Les plaques viennent du referentiel — aucune n'est ecrite ici
-            (interdit n.3). */}
-        <select
-          value={plaqueFiltre}
-          onChange={(e) => setPlaqueFiltre(e.target.value)}
-          aria-label="Filtrer par plaque"
-        >
-          <option value="">Toutes les plaques</option>
-          {donnees.plaques.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.libelle}
-            </option>
-          ))}
-        </select>
-
-        <button
-          type="button"
-          className="principal"
-          onClick={() => {
-            setAjoutGlobal((o) => !o);
-            setSiteEnAjout(null);
-          }}
-        >
-          {ajoutGlobal ? 'Fermer' : '+ Ajouter un vendeur'}
-        </button>
-
-        <label className="interrupteur">
-          <input
-            type="checkbox"
-            checked={afficherSortis}
-            onChange={(e) => setAfficherSortis(e.target.checked)}
-          />
-          Vendeurs sortis
         </label>
-        <button type="button" className="secondaire" onClick={() => setZoneCollage((o) => !o)}>
-          {zoneCollage ? 'Fermer l’import' : 'Importer les marques'}
+        <label className="bascule-absents">
+          <input type="checkbox" className="interrupteur-v2" checked={afficherSortis} onChange={(e) => setAfficherSortis(e.target.checked)} />
+          <span>Sortis</span>
+        </label>
+        <span className="espace" />
+        <button type="button" className={`btn${zoneCollage ? ' actif' : ''}`} onClick={() => setZoneCollage((o) => !o)}>
+          <Icone nom="grille" petite /> Importer les marques
         </button>
-        <button type="button" className="lien" onClick={() => setZoneArchives((o) => !o)}>
-          {zoneArchives ? 'Fermer l’archivage' : 'Archivage'}
+        <button type="button" className={`btn ghost${zoneArchives ? ' actif' : ''}`} onClick={() => setZoneArchives((o) => !o)}>
+          <Icone nom="corbeille" petite /> Archivage
         </button>
       </div>
 
@@ -327,8 +317,8 @@ export function Vendeurs() {
         />
       )}
 
-      {messageErreur && <div className="erreur-bloc">{messageErreur}</div>}
-      {succes && <div className="succes-bloc">{succes}</div>}
+      {messageErreur && <div className="bandeau-v2 erreur" role="alert">{messageErreur}</div>}
+      {succes && <div className="bandeau-v2 ok" role="status">{succes}</div>}
 
       {zoneArchives && (
         <ZoneArchivage
@@ -343,8 +333,8 @@ export function Vendeurs() {
       )}
 
       {zoneCollage && (
-        <div className="carte volet">
-          <h3>Import des marques par collage</h3>
+        <div className="card pad carte-action enter">
+          <h3 className="card-titre"><Icone nom="grille" petite /> Import des marques par collage</h3>
           {/* CELLE-CI RESTE : elle dit ce qu'on peut coller, et sans elle le champ
               est un textarea vide. C'est de l'aide a l'action, pas de la
               presentation de produit. */}
@@ -355,16 +345,17 @@ export function Vendeurs() {
             validation, et le métier VN/VO n’est pas touché.
           </p>
           <textarea
+            className="textarea"
             value={collage}
             onChange={(e) => setCollage(e.target.value)}
             rows={6}
             spellCheck={false}
             placeholder={'CLF\tVALENTIN PARPINELLI\tRENAULT DACIA'}
           />
-          <div className="actions">
+          <div className="actions-v2">
             <button
               type="button"
-              className="principal"
+              className="btn primary"
               onClick={lancerAnalyse}
               disabled={analyseEnCours || !collage.trim()}
             >
@@ -413,14 +404,14 @@ export function Vendeurs() {
                 </tbody>
               </table>
 
-              <div className="actions">
-                <button type="button" className="principal" onClick={appliquer} disabled={changements === 0}>
+              <div className="actions-v2">
+                <button type="button" className="btn ghost" onClick={() => setApercu(null)}>
+                  Annuler
+                </button>
+                <button type="button" className="btn primary" onClick={appliquer} disabled={changements === 0}>
                   {changements === 0
                     ? 'Aucun changement à appliquer'
                     : `Appliquer ${changements} ligne${changements > 1 ? 's' : ''}`}
-                </button>
-                <button type="button" className="secondaire" onClick={() => setApercu(null)}>
-                  Annuler
                 </button>
               </div>
             </div>
@@ -428,13 +419,41 @@ export function Vendeurs() {
         </div>
       )}
 
-      {cartesVisibles.length === 0 && (
-        <p className="note">
-          Aucun site ni vendeur ne correspond{recherche !== '' ? ` à « ${recherche} »` : ''}.
-        </p>
+      <div className="vend-v2">
+        <aside className="card rail-sites enter" style={{ ['--i' as string]: 2 }}>
+          <div className="rail-corps" ref={curseurSite.conteneur}>
+            <span className={`curseur-v2${q !== '' ? ' absent' : ''}`} aria-hidden="true" ref={curseurSite.indicateur} />
+            {rail.map(({ site, plaque, vendeurs }, i) => {
+              const enPoste = vendeurs.filter((v) => !v.dateSortie).length;
+              const nouvellePlaque = i === 0 || rail[i - 1].plaque?.id !== plaque?.id;
+              const touche = q === '' || cartesVisibles.some((c) => c.site.id === site.id);
+              return (
+                <Fragment key={site.id}>
+                  {nouvellePlaque && <span className="rail-groupe">{plaque?.libelle ?? 'Sans plaque'}</span>}
+                  <button
+                    type="button"
+                    ref={curseurSite.cible(i)}
+                    className={`rail-site${q === '' && site.id === siteCourant ? ' actif' : ''}${touche ? '' : ' eteint'}`}
+                    onClick={() => {
+                      setRecherche('');
+                      setSiteSel(site.id);
+                    }}
+                  >
+                    <span className="nom">{site.libelle}</span>
+                    <span className="n num">{enPoste}</span>
+                  </button>
+                </Fragment>
+              );
+            })}
+          </div>
+        </aside>
+
+        <div className="vend-detail">
+      {q !== '' && cartesVisibles.length === 0 && (
+        <div className="empty card">Aucun site ni vendeur ne correspond à « {recherche} ».</div>
       )}
 
-      {cartesVisibles.map(({ site, plaque, vendeurs }) => (
+      {(q !== '' ? cartesVisibles : rail.filter((c) => c.site.id === siteCourant)).map(({ site, plaque, vendeurs }) => (
         <CarteSite
           key={site.id}
           site={site}
@@ -495,6 +514,8 @@ export function Vendeurs() {
           }
         />
       ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -598,16 +619,20 @@ function CarteSite({
   }, [vendeurs, afficherSortis, tri, filtreNom]);
 
   return (
-    <div className="card pad enter">
-      <h3>
-        {site.libelle}
-        <span className="etiquette">{site.code}</span>
-        {plaqueLibelle && <span className="etiquette">{plaqueLibelle}</span>}
-        <span className="etiquette">
-          {enPoste.filter((v) => v.typeVehicule === 'VN').length} VN ·{' '}
-          {enPoste.filter((v) => v.typeVehicule === 'VO').length} VO
-        </span>
-      </h3>
+    <div className="card pad site-v2 enter" key={site.id}>
+      <div className="site-tete">
+        <div>
+          <h2 className="site-nom">{site.libelle}</h2>
+          <div className="site-meta">
+            <span className="badge">{site.code}</span>
+            {plaqueLibelle && <span className="badge">{plaqueLibelle}</span>}
+          </div>
+        </div>
+        <div className="site-compte">
+          <span><b className="num">{enPoste.filter((v) => v.typeVehicule === 'VN').length}</b> VN</span>
+          <span><b className="num">{enPoste.filter((v) => v.typeVehicule === 'VO').length}</b> VO</span>
+        </div>
+      </div>
 
       <BlocEncadrement
         siteId={site.id}
@@ -619,7 +644,7 @@ function CarteSite({
       />
 
       {visibles.length === 0 ? (
-        <p className="note">
+        <p className="empty">
           {vendeurs.length === 0
             ? 'Aucun vendeur sur ce site.'
             : filtreNom !== ''
@@ -627,7 +652,7 @@ function CarteSite({
               : 'Tous les vendeurs de ce site sont sortis. Cocher « Vendeurs sortis » pour les voir.'}
         </p>
       ) : (
-        <table className="tableau grille-marques">
+        <table className="table-vendeurs">
           <thead>
             <tr>
               <EnTeteTriable colonne="nom" libelle="Vendeur" tri={tri} onTrier={onTrier} />
@@ -680,11 +705,9 @@ function CarteSite({
           onCreer={onCreer}
         />
       ) : (
-        <div className="actions">
-          <button type="button" className="secondaire" onClick={onOuvrirAjout}>
-            + Ajouter un vendeur
-          </button>
-        </div>
+        <button type="button" className="ajout-vendeur" onClick={onOuvrirAjout}>
+          <Icone nom="plus" petite /> Ajouter un vendeur à {site.libelle}
+        </button>
       )}
     </div>
   );
@@ -721,13 +744,14 @@ function BlocEncadrement({
   // Un selecteur par role, dans l'ordre donne par le SERVEUR : aucune liste de
   // roles n'est ecrite ici (interdit n.3).
   return (
-    <div className="encadrement">
+    <div className="encadrement-v2">
       {roles.map((role) => {
         const titulaire = encadrements.find((e) => e.role === role) ?? null;
         return (
-          <label key={role}>
-            {libelleRoleEncadrement(role)}
+          <label key={role} className="field">
+            <span className="lbl">{libelleRoleEncadrement(role)}</span>
             <select
+              className="select"
               value={titulaire?.utilisateurId ?? ''}
               disabled={occupe}
               onChange={(e) => onChanger(siteId, role, e.target.value || null)}
@@ -801,16 +825,17 @@ function LigneVendeur({
 
   if (enEdition) {
     return (
-      <tr>
+      <tr className="ligne-edition">
         <td colSpan={marques.length + 3}>
-          <div className="champs">
-            <label>
-              Nom
-              <input value={nom} onChange={(e) => setNom(e.target.value)} />
+          <div className="edition-v2">
+          <div className="champs-v2 cinq">
+            <label className="field">
+              <span className="lbl">Nom</span>
+              <input className="input" value={nom} onChange={(e) => setNom(e.target.value)} />
             </label>
-            <label>
-              Site
-              <select value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+            <label className="field">
+              <span className="lbl">Site</span>
+              <select className="select" value={siteId} onChange={(e) => setSiteId(e.target.value)}>
                 {sites.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.libelle} ({s.code})
@@ -818,9 +843,10 @@ function LigneVendeur({
                 ))}
               </select>
             </label>
-            <label>
-              Métier
+            <label className="field">
+              <span className="lbl">Métier</span>
               <select
+                className="select"
                 value={typeVehicule}
                 onChange={(e) => setType(e.target.value as TypeVehicule)}
               >
@@ -831,17 +857,19 @@ function LigneVendeur({
                 ))}
               </select>
             </label>
-            <label>
-              Entrée
+            <label className="field">
+              <span className="lbl">Entrée</span>
               <input
+                className="input"
                 type="date"
                 value={dateEntree}
                 onChange={(e) => setDateEntree(e.target.value)}
               />
             </label>
-            <label>
-              Sortie
+            <label className="field">
+              <span className="lbl">Sortie</span>
               <input
+                className="input"
                 type="date"
                 value={dateSortie}
                 onChange={(e) => setDateSortie(e.target.value)}
@@ -850,45 +878,37 @@ function LigneVendeur({
           </div>
 
           {typeVehicule === 'VN' ? (
-            <div style={{ marginTop: '0.8rem' }}>
-              <label style={{ marginTop: 0 }}>Marques autorisées</label>
-              <div className="puces" style={{ marginTop: '0.35rem' }}>
-                {marques.map((m) => (
-                  <li key={m.id} style={{ listStyle: 'none' }}>
-                    <label className="interrupteur">
-                      <input
-                        type="checkbox"
-                        checked={marqueIds.includes(m.id)}
-                        onChange={() => setMarqueIds(bascule(marqueIds, m.id))}
-                      />
-                      {m.libelle}
-                    </label>
-                  </li>
-                ))}
-              </div>
+            <div className="marques-choix">
+              <span className="lbl">Marques autorisées</span>
+              {marques.map((m) => (
+                <button key={m.id} type="button" className="chip" aria-pressed={marqueIds.includes(m.id)} onClick={() => setMarqueIds(bascule(marqueIds, m.id))}>
+                  {marqueIds.includes(m.id) && <Icone nom="coche" petite />} {m.libelle}
+                </button>
+              ))}
             </div>
           ) : (
-            <p className="note" style={{ marginTop: '0.8rem' }}>
+            <p className="note">
               Un vendeur <strong>VO</strong> n’a aucune ventilation par marque : ses marques seront
               effacées à l’enregistrement, et sa grille de saisie n’aura qu’une seule section.
             </p>
           )}
 
-          <p className="note" style={{ marginTop: '0.6rem' }}>
-            Changer le site <strong>transfère</strong> le vendeur en conservant tout son historique :
-            les RDV pointent le vendeur, pas le site. Renseigner une date de sortie le retire des
-            classements courants sans rien effacer — l’encadrement du site se règle en haut de la
-            carte.
+          <p className="note">
+            Changer de site transfère le vendeur avec tout son historique. Une date de sortie le
+            retire des classements courants sans rien effacer.
           </p>
           {manqueMarque && (
-            <p className="note alerte">
+            <p className="note attention">
               Un vendeur VN doit avoir au moins une marque : sans elle il ne peut recevoir aucun RDV.
             </p>
           )}
-          <div className="actions">
+          <div className="actions-v2">
+            <button type="button" className="btn ghost" onClick={onEditer}>
+              Annuler
+            </button>
             <button
               type="button"
-              className="principal"
+              className="btn primary"
               disabled={occupe || !valide}
               onClick={() =>
                 onEnregistrer({
@@ -903,9 +923,7 @@ function LigneVendeur({
             >
               Enregistrer
             </button>
-            <button type="button" className="secondaire" onClick={onEditer}>
-              Annuler
-            </button>
+          </div>
           </div>
         </td>
       </tr>
@@ -916,10 +934,11 @@ function LigneVendeur({
 
   return (
     <tr className={vendeur.dateSortie ? 'sorti' : ''}>
-      <td>
-        {vendeur.nom}
+      <td className="cellule-nom">
+        <span className="avatar" aria-hidden="true">{initiales(vendeur.nom)}</span>
+        <span className="nom">{vendeur.nom}</span>
         {vendeur.dateSortie && (
-          <span className="etiquette">
+          <span className="badge">
             sorti le {vendeur.dateSortie.slice(0, 10).split('-').reverse().join('/')}
           </span>
         )}
@@ -928,38 +947,42 @@ function LigneVendeur({
       {marques.map((m) => (
         <td key={m.id} className="colonne-marque">
           {vo ? (
-            <span className="note" title="Un vendeur VO n’a aucune ventilation par marque.">
+            <span className="faint" title="Un vendeur VO n’a aucune ventilation par marque.">
               —
             </span>
           ) : (
-            <input
-              type="checkbox"
-              checked={vendeur.marqueIds.includes(m.id)}
+            <button
+              type="button"
+              className="puce-marque"
+              aria-pressed={vendeur.marqueIds.includes(m.id)}
               disabled={occupe}
-              onChange={() => onBasculerMarque(m.id)}
+              onClick={() => onBasculerMarque(m.id)}
               aria-label={`${vendeur.nom} — ${m.libelle}`}
-            />
+              title={m.libelle}
+            >
+              <Icone nom="coche" petite />
+            </button>
           )}
         </td>
       ))}
 
       <td className="colonne-type debut-groupe">
-        <span className={`etiquette ${vo ? 'vo' : 'vn'}`}>{vendeur.typeVehicule}</span>
+        <span className={`metier ${vo ? 'vo' : 'vn'}`}>{vendeur.typeVehicule}</span>
       </td>
 
       <td className="colonne-actions">
-        <button type="button" className="lien" onClick={onEditer}>
-          modifier
+        <button type="button" className="icon-btn" onClick={onEditer} aria-label={`Modifier ${vendeur.nom}`} title="Modifier">
+          <Icone nom="crayon" petite />
         </button>
         <button
           type="button"
-          className="poubelle"
+          className="icon-btn danger"
           onClick={onArchiver}
           disabled={occupe}
           title="Archiver — la ligne disparaît, ses RDV restent en base"
           aria-label={`Archiver ${vendeur.nom}`}
         >
-          🗑
+          <Icone nom="corbeille" petite />
         </button>
       </td>
     </tr>
@@ -1027,16 +1050,16 @@ function ZoneArchivage({
   };
 
   return (
-    <div className="carte volet">
-      <h3>
-        Archivage
-        <span className="etiquette">{archives?.length ?? '…'}</span>
+    <div className="card pad enter">
+      <h3 className="card-titre">
+        <Icone nom="corbeille" petite /> Archivage
+        <span className="faint num">{archives?.length ?? '…'}</span>
       </h3>
       <p className="note">
         Un vendeur archivé ne s’affiche plus nulle part, mais <strong>ses RDV restent en base</strong> :
         les totaux des campagnes passées sont intacts. Le désarchiver le remet en service.
       </p>
-      <p className="note alerte">
+      <p className="note attention">
         La <strong>purge</strong> est différente : elle supprime définitivement le vendeur et tous
         ses RDV. C’est la seule opération de l’outil qui fait bouger les totaux d’une campagne
         passée, et elle est irréversible.
@@ -1076,7 +1099,7 @@ function ZoneArchivage({
                 <td className="colonne-actions">
                   <button
                     type="button"
-                    className="lien"
+                    className="btn sm"
                     disabled={occupe === v.id}
                     onClick={() =>
                       void agir(v.id, async () => {
@@ -1089,7 +1112,7 @@ function ZoneArchivage({
                   </button>
                   <button
                     type="button"
-                    className="destructif"
+                    className="btn sm danger"
                     disabled={occupe === v.id}
                     onClick={() => {
                       // Le nom exact, tape a la main. La confirmation annonce
@@ -1169,12 +1192,13 @@ function FormulaireNouveauVendeur({
     (typeVehicule === 'VO' || marqueIds.length > 0);
 
   return (
-    <div className="apercu">
-      <h3>{site ? `Nouveau vendeur — ${site.libelle}` : 'Nouveau vendeur'}</h3>
-      <div className="champs">
-        <label>
-          Nom
+    <div className="card pad carte-action enter">
+      <h3 className="card-titre"><Icone nom="plus" petite /> {site ? `Nouveau vendeur — ${site.libelle}` : 'Nouveau vendeur'}</h3>
+      <div className="champs-v2 cinq">
+        <label className="field">
+          <span className="lbl">Nom</span>
           <input
+            className="input"
             value={nom}
             onChange={(e) => setNom(e.target.value)}
             autoFocus
@@ -1182,9 +1206,9 @@ function FormulaireNouveauVendeur({
           />
         </label>
         {sitesAuChoix && (
-          <label>
-            Site
-            <select value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+          <label className="field">
+            <span className="lbl">Site</span>
+            <select className="select" value={siteId} onChange={(e) => setSiteId(e.target.value)}>
               <option value="">à choisir</option>
               {sitesAuChoix.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -1194,9 +1218,10 @@ function FormulaireNouveauVendeur({
             </select>
           </label>
         )}
-        <label>
-          Métier
+        <label className="field">
+          <span className="lbl">Métier</span>
           <select
+            className="select"
             value={typeVehicule}
             onChange={(e) => setType(e.target.value as TypeVehicule | '')}
           >
@@ -1208,33 +1233,24 @@ function FormulaireNouveauVendeur({
             ))}
           </select>
         </label>
-        <label>
-          Entrée
-          <input type="date" value={dateEntree} onChange={(e) => setDateEntree(e.target.value)} />
+        <label className="field">
+          <span className="lbl">Entrée</span>
+          <input className="input" type="date" value={dateEntree} onChange={(e) => setDateEntree(e.target.value)} />
         </label>
       </div>
 
       {typeVehicule !== 'VO' && (
-        <div style={{ marginTop: '0.8rem' }}>
-          <label style={{ marginTop: 0 }}>Marques</label>
-          <div className="puces" style={{ marginTop: '0.35rem' }}>
-            {marques.map((m) => (
-              <li key={m.id} style={{ listStyle: 'none' }}>
-                <label className="interrupteur">
-                  <input
-                    type="checkbox"
-                    checked={marqueIds.includes(m.id)}
-                    onChange={() => setMarqueIds(bascule(marqueIds, m.id))}
-                  />
-                  {m.libelle}
-                </label>
-              </li>
-            ))}
-          </div>
+        <div className="marques-choix">
+          <span className="lbl">Marques</span>
+          {marques.map((m) => (
+            <button key={m.id} type="button" className="chip" aria-pressed={marqueIds.includes(m.id)} onClick={() => setMarqueIds(bascule(marqueIds, m.id))}>
+              {marqueIds.includes(m.id) && <Icone nom="coche" petite />} {m.libelle}
+            </button>
+          ))}
         </div>
       )}
 
-      <p className="note" style={{ marginTop: '0.7rem' }}>
+      <p className="note">
         {typeVehicule === ''
           ? 'Le métier est requis : VN ou VO. Il détermine la forme de la grille de saisie.'
           : typeVehicule === 'VO'
@@ -1242,10 +1258,13 @@ function FormulaireNouveauVendeur({
             : 'Au moins une marque est requise : sans elle, un vendeur VN ne pourrait recevoir aucun RDV.'}
       </p>
 
-      <div className="actions">
+      <div className="actions-v2">
+        <button type="button" className="btn ghost" onClick={onAnnuler}>
+          Annuler
+        </button>
         <button
           type="button"
-          className="principal"
+          className="btn primary"
           disabled={!complet}
           onClick={() =>
             onCreer({
@@ -1259,15 +1278,21 @@ function FormulaireNouveauVendeur({
         >
           Ajouter
         </button>
-        <button type="button" className="secondaire" onClick={onAnnuler}>
-          Annuler
-        </button>
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------- outils
+
+const initiales = (nom: string): string =>
+  nom
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((m) => m[0])
+    .join('')
+    .toUpperCase();
 
 const bascule = <T,>(liste: T[], v: T) =>
   liste.includes(v) ? liste.filter((x) => x !== v) : [...liste, v];
