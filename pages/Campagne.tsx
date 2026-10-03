@@ -15,6 +15,8 @@ import {
   type ImpactJour,
 } from '../services/campagnes';
 import { useReferentiels } from '../hooks/useReferentiels';
+import { chargerSuivi, versLigneSuivi } from '../services/suivi';
+import { indicateurs } from '../backend/src/utils/suivi';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 
 // ============================================================================
@@ -74,6 +76,19 @@ export function Campagne() {
   useEffect(() => {
     if (idCourant) recharger(idCourant).catch((e) => setMessage(String(e)));
   }, [idCourant, recharger]);
+
+  /// D10 : la cloture fige aussi le suivi. On compte ce qui reste « a traiter »
+  /// par la MEME fonction pure que la rubrique Suivi — pas un second comptage.
+  const [aTraiter, setATraiter] = useState<number | null>(null);
+  const [arme, setArme] = useState(false);
+  useEffect(() => {
+    setATraiter(null);
+    setArme(false);
+    if (!idCourant) return;
+    chargerSuivi(idCourant)
+      .then((rdvs) => setATraiter(indicateurs(rdvs.map(versLigneSuivi)).aTraiter))
+      .catch(() => setATraiter(null));
+  }, [idCourant]);
 
   // F-A4.1. Le modele est la campagne la plus RECENTE — `chargerCampagnes` trie
   // par date de debut decroissante. Ce que l'ecran annonce est donc exactement ce
@@ -477,20 +492,38 @@ export function Campagne() {
       <div className="carte">
         <h3>Cloture</h3>
         <p className="note">
-          Cloturer fige la campagne : plus aucune saisie, plus aucune modification de jour ni de
-          creneau. Reversible ici, mais a ne pas faire pendant une session en cours.
+          Clôturer fige la campagne : plus aucune saisie, plus aucune modification de jour ni de
+          créneau, <strong>et plus aucun suivi des RDV</strong>. On ne clôture donc qu’une fois le
+          suivi terminé. Réversible ici, mais à ne pas faire pendant une séance.
         </p>
+        {!figee && aTraiter !== null && aTraiter > 0 && (
+          <p className="note" style={{ color: 'var(--attention)' }}>
+            <strong>{aTraiter} RDV</strong> sont encore « à traiter » dans le suivi.
+          </p>
+        )}
         <button
           type="button"
-          className={figee ? 'secondaire' : ''}
-          onClick={() =>
+          className={figee ? 'secondaire' : arme ? 'danger' : ''}
+          onClick={() => {
+            // EN DEUX CLICS quand il reste du suivi a faire (D10) : le second
+            // nomme ce qui va etre fige.
+            if (!figee && (aTraiter ?? 0) > 0 && !arme) {
+              setArme(true);
+              window.setTimeout(() => setArme(false), 6000);
+              return;
+            }
+            setArme(false);
             void agir(
               () => modifierCampagne(detail.id, { cloturee: !figee }).then(() => recharger(detail.id)),
-              figee ? 'Campagne reouverte.' : 'Campagne cloturee.'
-            )
-          }
+              figee ? 'Campagne réouverte.' : 'Campagne clôturée.'
+            );
+          }}
         >
-          {figee ? 'Reouvrir la campagne' : 'Cloturer la campagne'}
+          {figee
+            ? 'Réouvrir la campagne'
+            : arme
+              ? `Clôturer quand même — ${aTraiter} RDV ne pourront plus être suivis`
+              : 'Clôturer la campagne'}
         </button>
       </div>
     </section>
