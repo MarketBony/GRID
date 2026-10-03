@@ -182,7 +182,7 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
         onPointerMove={reflet}
       >
         <img className="logo" src="/grid.svg" alt="GRID" />
-        <span className="goutte" ref={goutteIle.goutte} aria-hidden="true" />
+        <span className="goutte" ref={goutteIle.goutte} aria-hidden="true"><i /><i /><i /></span>
         {rubriques.map((r, i) => (
           <button
             key={r.id}
@@ -217,7 +217,7 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
       </nav>
 
       <nav className={`barre-bas verre${retractee ? ' retractee' : ''}`} ref={goutteBas.nav} aria-label="Navigation">
-        <span className="goutte" ref={goutteBas.goutte} aria-hidden="true" />
+        <span className="goutte" ref={goutteBas.goutte} aria-hidden="true"><i /><i /><i /></span>
         {principales.map((r, i) => (
           <button
             key={r.id}

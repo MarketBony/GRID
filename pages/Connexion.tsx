@@ -45,7 +45,7 @@ export function Connexion() {
       <FondGrille />
       <form
         key={secousse}
-        className={`carte-connexion verre fort${secousse > 0 ? ' secoue' : ''}`}
+        className={`carte-connexion verre${secousse > 0 ? ' secoue' : ''}`}
         onSubmit={soumettre}
         onPointerMove={reflet}
       >

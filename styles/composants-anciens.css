@@ -305,6 +305,23 @@ button.secondaire:hover:not(:disabled) {
   font-weight: 600;
 }
 
+button.retirer {
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.15rem 0.28rem;
+  border-radius: 4px;
+}
+
+button.retirer:hover {
+  color: var(--erreur);
+  background: var(--erreur-fond);
+}
+
 button.bascule {
   font: inherit;
   font-size: 0.95rem;
@@ -658,6 +675,30 @@ tr.sorti td {
   font-weight: 600;
 }
 
+.ligne-probleme td {
+  background: var(--attention-fond);
+}
+
+.puces {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+}
+
+.puces li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--rayon-petit);
+  font-size: 0.82rem;
+  background: var(--bg-input);
+}
+
 .liste-creneaux .code {
   font-family: ui-monospace, Consolas, monospace;
   min-width: 7rem;
@@ -687,6 +728,23 @@ tr.sorti td {
 
 .actions-ligne button:hover:not(:disabled) {
   border-color: var(--bony-orange);
+}
+
+.droits {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.4rem 1.2rem;
+  margin: 1.1rem 0;
+  font-size: 0.85rem;
+}
+
+.droits dt {
+  font-weight: 600;
+}
+
+.droits dd {
+  margin: 0;
+  color: var(--text-muted);
 }
 
 .erreur-bloc,
@@ -726,6 +784,17 @@ tr.sorti td {
   font-size: 0.85rem;
   margin: 0 0 0.8rem;
   line-height: 1.55;
+}
+
+.conflit {
+  border-color: var(--attention);
+}
+
+.impacts {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+  line-height: 1.65;
 }
 
 .saisie-corps {
@@ -1135,6 +1204,11 @@ tr.sorti td {
 .colonne-table.cible {
   border-color: var(--bony-orange);
   cursor: pointer;
+}
+
+.colonne-table.survolee {
+  border-color: var(--bony-violet);
+  box-shadow: 0 0 0 2px rgba(143, 18, 171, 0.25);
 }
 
 .cartes-vendeurs .carte-vendeur.selectionne {
@@ -1598,6 +1672,23 @@ html.dark .apercu {
   backdrop-filter: blur(26px) saturate(190%);
   -webkit-backdrop-filter: blur(26px) saturate(190%);
 }
+
+.segments {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--bg-input);
+  /* Le rail est du verre lui aussi : c'est ce qui fait que la pastille a l'air
+     de flotter DANS quelque chose, et non posee sur un aplat. */
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
 .segments .pilule {
   position: absolute;
   z-index: 0;
@@ -1656,6 +1747,11 @@ html.dark .apercu {
   transform: none;
 }
 
+.segments:has(.segment:active) {
+  transform: scale(0.978);
+  transition: transform var(--duree-vif) var(--ressort-vif);
+}
+
 .segments .segment .detail {
   display: block;
   font-size: 0.62rem;
@@ -1665,6 +1761,9 @@ html.dark .apercu {
 @media (prefers-reduced-motion: reduce) {
   .segments .pilule {
     transition: none;
+  }
+  .segments:has(.segment:active) {
+    transform: none;
   }
 }
 
@@ -2138,6 +2237,10 @@ html.dark input[type='date'] {
   .ecran {
     animation: none;
   }
+
+  .segments:has(.segment:active) {
+    transform: none;
+  }
   .liste-vendeurs .curseur-liste,
   .segments .pilule,
   .pilule-onglet,
@@ -2270,6 +2373,42 @@ html.dark .tableau-grille .case.remplie:hover:not(.figee) {
   color: var(--text-muted);
 }
 
+.menu-multiple {
+  /* Le panneau ne s'ancre plus ici — il vit dans un portail — mais l'enveloppe
+     reste le repere du clic « dedans / dehors ». */
+  display: inline-flex;
+}
+
+.declencheur-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.6rem 0.45rem 0.7rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background-color: var(--glass-bg);
+  /* L'ARC SPECULAIRE, en couche de fond : la meme construction que `.glass`, et
+     c'est lui qui donne l'arete lumineuse en haut a gauche. Sans lui le verre se
+     lit comme un aplat gris — le reproche que ce fichier fait deja aux fonds
+     trop opaques. */
+  background-image:
+    radial-gradient(135% 110% at 6% -14%, rgba(255, 255, 255, 0.5), transparent 46%),
+    radial-gradient(85% 65% at 110% 114%, rgba(255, 255, 255, 0.16), transparent 56%);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  box-shadow:
+    0 6px 18px -8px rgba(16, 18, 32, 0.28),
+    0 1px 3px -1px rgba(16, 18, 32, 0.14),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+  color: var(--text-main);
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition:
+    border-color var(--duree-vif) ease-out,
+    box-shadow var(--duree) var(--ressort-vif),
+    transform var(--duree-vif) var(--ressort-vif);
+}
+
 html.dark .declencheur-menu {
   background-image:
     radial-gradient(135% 110% at 6% -14%, rgba(255, 255, 255, 0.14), transparent 46%),
@@ -2279,11 +2418,30 @@ html.dark .declencheur-menu {
     0 1px 3px -1px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
 }
+.declencheur-menu:hover:not(:disabled) {
+  border-color: var(--bony-orange);
+  background-color: var(--glass-bg-strong);
+  background-image:
+    radial-gradient(135% 110% at 6% -14%, rgba(255, 255, 255, 0.6), transparent 46%),
+    radial-gradient(85% 65% at 110% 114%, rgba(255, 255, 255, 0.2), transparent 56%);
+}
 
 html.dark .declencheur-menu:hover:not(:disabled) {
   background-image:
     radial-gradient(135% 110% at 6% -14%, rgba(255, 255, 255, 0.2), transparent 46%),
     radial-gradient(85% 65% at 110% 114%, rgba(255, 255, 255, 0.08), transparent 56%);
+}
+.declencheur-menu:focus-visible {
+  outline: none;
+  border-color: var(--bony-orange);
+  box-shadow:
+    0 0 0 3.5px rgba(247, 86, 50, 0.2),
+    0 6px 18px -8px rgba(16, 18, 32, 0.28),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+}
+
+.declencheur-menu:active:not(:disabled) {
+  transform: scale(0.972);
 }
 
 .declencheur-menu .etiquette-menu {
@@ -2365,8 +2523,28 @@ html.dark .panneau-menu {
   outline: none;
 }
 
+.option-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.42rem 0.5rem;
+  border-radius: var(--rayon-petit);
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition:
+    background-color var(--duree-vif) ease-out,
+    color var(--duree-vif) ease-out;
+}
+.option-menu.survolee {
+  background-color: var(--glass-bg-strong);
+}
+
 html.dark .option-menu.survolee {
   background-color: rgba(255, 255, 255, 0.08);
+}
+.option-menu.cochee {
+  font-weight: 600;
+  background-color: rgba(247, 86, 50, 0.09);
 }
 
 html.dark .option-menu.cochee {
@@ -2434,8 +2612,14 @@ html.dark .option-menu.cochee {
     animation: none;
   }
 
-  .declencheur-menu .chevron {
+  .declencheur-menu,
+  .declencheur-menu .chevron,
+  .option-menu {
     transition: none;
+  }
+
+  .declencheur-menu:active:not(:disabled) {
+    transform: none;
   }
 
   .option-menu .coche svg {

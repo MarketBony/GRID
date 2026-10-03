@@ -45,6 +45,8 @@ export function useGoutte(cleActive: string) {
       const fin = { x: r.left - p.left, w: r.width };
       g.style.top = `${r.top - p.top}px`;
       g.style.height = `${r.height}px`;
+      // Rayon des bouts : pilule pleine dans l'Ile, 24 px dans la barre du bas.
+      g.style.setProperty('--r', `${Math.min(r.height / 2, n.classList.contains('barre-bas') ? 24 : r.height / 2)}px`);
       const avant = etat.current;
       // RIEN NE BOUGE (second appel du meme rendu, redimensionnement sans
       // effet) : on ne touche a rien. Rejouer une animation « de la cible vers la
@@ -52,38 +54,52 @@ export function useGoutte(cleActive: string) {
       if (avant && Math.abs(avant.x - fin.x) < 0.5 && Math.abs(avant.w - fin.w) < 0.5) return;
       etat.current = fin;
       const reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.classList.contains('animations-reduites');
+      const morceaux = [...g.children] as HTMLElement[];
       if (!anime || !avant || reduit) {
-        g.getAnimations().forEach((a) => a.cancel());
+        morceaux.forEach((m) => m.getAnimations().forEach((a) => a.cancel()));
         g.style.left = `${fin.x}px`;
         g.style.width = `${fin.w}px`;
         return;
       }
       // Exactement la maquette : etirement vers l'union, puis resserrement en
-      // rebond. EN TRANSFORM SEUL (03/10/2026) : left/width passaient par le fil
-      // principal, que le changement de rubrique occupe a la meme image — la
-      // goutte saccadait precisement quand on la regardait.
-      // Interrompue en vol, elle repart de la ou on la VOIT.
+      // rebond — EN TRANSFORM SEUL, donc compose par le GPU (le changement de
+      // rubrique occupe le fil principal a la meme image).
+      //
+      // LA GOUTTE EST EN TROIS MORCEAUX (03/10/2026). Un scaleX sur la pilule
+      // entiere ecrasait ses bouts ronds en ovales — « trop arrondi a la
+      // transition », a dit l'utilisateur. Ici les deux bouts ne font que
+      // TRANSLATER (ils restent ronds), et seul le milieu, rectangulaire,
+      // s'etire : aucune deformation visible.
+      const [gauche, milieu, droite] = morceaux;
+      if (!gauche || !milieu || !droite) return;
       let depuis = avant;
-      if (g.getAnimations().some((x) => x.playState === 'running')) {
-        const rg = g.getBoundingClientRect();
-        depuis = { x: rg.left - p.left, w: rg.width };
+      if (morceaux.some((m) => m.getAnimations().some((x) => x.playState === 'running'))) {
+        const rg = gauche.getBoundingClientRect();
+        const rd = droite.getBoundingClientRect();
+        depuis = { x: rg.left - p.left, w: rd.right - rg.left };
       }
-      g.getAnimations().forEach((x) => x.cancel());
+      morceaux.forEach((m) => m.getAnimations().forEach((x) => x.cancel()));
       g.style.left = `${fin.x}px`;
       g.style.width = `${fin.w}px`;
-      g.style.transformOrigin = '0 50%';
-      // Union PLAFONNEE a 2,5 fois la cible : d'un bout a l'autre de l'Ile, la
-      // goutte s'etirait a x4,7 et ses bouts ronds devenaient des ovales.
+      // Union PLAFONNEE a 2,5 fois la cible.
       const plafond = fin.w * 2.5;
       const debut = depuis.x < fin.x ? Math.max(depuis.x, fin.x + fin.w - plafond) : fin.x;
       const union = Math.min(Math.max(depuis.x + depuis.w, fin.x + fin.w), Math.max(debut + plafond, fin.x + fin.w)) - debut;
-      const cadre = (x: number, w: number) => ({ transform: `translateX(${x - fin.x}px) scaleX(${w / fin.w})` });
+      const rayon = gauche.offsetWidth / 2;
+      const corps = Math.max(1, fin.w - 2 * rayon);
+      const poses = (x: number, w: number) => [
+        { transform: `translateX(${x - fin.x}px)` },
+        { transform: `translateX(${x - fin.x}px) scaleX(${Math.max(0, w - 2 * rayon) / corps})` },
+        { transform: `translateX(${x + w - (fin.x + fin.w)}px)` },
+      ];
+      const pDepart = poses(depuis.x, depuis.w);
+      const pEtire = poses(debut, union);
+      const pFin = poses(fin.x, fin.w);
       const etirement = SNAPPY.ms + 120;
-      g.animate([cadre(depuis.x, depuis.w), { ...cadre(debut, union), offset: 0.35 }, cadre(fin.x, fin.w)], {
-        duration: etirement,
-        easing: 'ease-out',
+      [gauche, milieu, droite].forEach((m, i) => {
+        m.animate([pDepart[i], { ...pEtire[i], offset: 0.35 }, pFin[i]], { duration: etirement, easing: 'ease-out' });
+        m.animate([pEtire[i], pFin[i]], { duration: BOUNCY.ms, easing: BOUNCY.css, delay: etirement * 0.35 });
       });
-      g.animate([cadre(debut, union), cadre(fin.x, fin.w)], { duration: BOUNCY.ms, easing: BOUNCY.css, delay: etirement * 0.35 });
     },
     [cleActive]
   );

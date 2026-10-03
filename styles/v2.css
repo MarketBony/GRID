@@ -62,7 +62,7 @@
 }
 
 /* THEME SOMBRE — classe `dark` sur <html>, posee par `contexts/ThemeContext.tsx`. */
-html.dark {
+html.dark, .connexion-v2, .intro-grid {
   --bg: #0a0e1f;
   --surface-0: #0e1328; --surface-1: #121831; --surface-2: #19213f; --surface-3: #232c4f; --surface-4: #2d375e;
   --line: rgba(170, 185, 255, .1); --line-2: rgba(170, 185, 255, .17); --line-3: rgba(170, 185, 255, .26);
@@ -84,6 +84,18 @@ html.dark {
 }
 
 /* ------------------------------------------------------------------ BASE */
+/* BASES REPRISES DE L'ANCIEN index.css (supprime le 03/10/2026). Sans elles :
+   un cadre de 8 px autour de chaque page (marge du navigateur), des titres
+   espaces au hasard, et — le plus grave — plus d'`overflow-x: clip` : la page
+   redevient defilable en largeur. `clip` et JAMAIS `hidden` (CLAUDE.md : hidden
+   desarme tout `position: sticky`). Les titres en :where(), donc a specificite
+   nulle : toute classe les remplace. */
+html, body { margin: 0; padding: 0; max-width: 100%; overflow-x: clip; }
+body { min-height: 100vh; }
+:where(h1) { margin: 0; font-size: 1.1rem; font-weight: 700; }
+:where(h2) { margin: 0 0 .35rem; font-size: .96rem; font-weight: 700; }
+:where(h3) { margin: 0 0 .85rem; font-size: .8rem; font-weight: 700; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+:where(input, select, textarea, button) { font: inherit; }
 html, body { background: var(--bg); color: var(--text); }
 body {
   font: 400 var(--fs-13) / 1.45 var(--font-ui);
@@ -91,6 +103,10 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 ::selection { background: var(--sel); }
+/* La boite inclut bordure et marge interne. Cette regle vivait dans l'ancien
+   index.css : sa disparition faisait deborder les champs de 100 % (connexion). */
+*, *::before, *::after { box-sizing: border-box; }
+.v2 select option { background: var(--surface-1); color: var(--text); }
 * { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
@@ -300,11 +316,18 @@ body {
 .ile .item .lib { display: inline-block; max-width: 160px; overflow: hidden; transition: max-width 500ms var(--ressort-vif), opacity 300ms; }
 /* Geometrie posee EN DUR par `useIndicateurGlissant` (une variable CSS dans
    `transform` ne s'interpole pas — CLAUDE.md, mesure le 04/09). */
+/* LA GOUTTE EN TROIS MORCEAUX (useGoutte) : deux bouts ronds qui ne font que
+   translater, un milieu rectangulaire qui s'etire. Un scaleX sur la pilule
+   entiere ecrasait les bouts en ovales. Le conteneur ne porte que la geometrie
+   finale ; --r (rayon des bouts) est pose par le hook. */
 .ile .goutte, .barre-bas .goutte {
-  position: absolute; z-index: 0; top: 0; left: 0; border-radius: 99px; pointer-events: none;
-  background: var(--bony-grad); box-shadow: 0 8px 22px -10px rgba(247, 86, 50, .9);
-  transition: transform 560ms var(--ressort-ample), width 560ms var(--ressort-ample), height 500ms var(--ressort-vif), opacity var(--t-med);
+  --r: 18px;
+  position: absolute; z-index: 0; top: 0; left: 0; pointer-events: none;
 }
+.goutte > i { position: absolute; top: 0; bottom: 0; will-change: transform; }
+.goutte > i:nth-child(1) { left: 0; width: calc(2 * var(--r)); border-radius: var(--r); background: #ff6a3d; }
+.goutte > i:nth-child(2) { left: var(--r); right: var(--r); transform-origin: 0 50%; background: linear-gradient(to right, #ff6a3d, #a52fce); box-shadow: 0 8px 22px -10px rgba(247, 86, 50, .9); }
+.goutte > i:nth-child(3) { right: 0; width: calc(2 * var(--r)); border-radius: var(--r); background: #a52fce; }
 .ile .sep { width: 1px; height: 22px; margin: 0 4px; background: var(--line-2); flex: none; }
 .ile.retractee { padding: 4px; top: 10px; }
 .ile.retractee .item { padding: 0 11px; }
@@ -328,7 +351,7 @@ body {
   }
   .barre-bas .item[aria-current='page'] { color: #fff; }
   .barre-bas .item .lib { transition: opacity 250ms; }
-  .barre-bas .goutte { border-radius: 24px; }
+  .barre-bas .goutte { --r: 24px; }
   .barre-bas.retractee { left: 64px; right: 64px; bottom: calc(12px + env(safe-area-inset-bottom)); }
   .barre-bas.retractee .item { height: 40px; }
   .barre-bas.retractee .lib { opacity: 0; font-size: 0; }
@@ -378,10 +401,17 @@ html.vt-theme::view-transition-new(root) { animation: v2-disque 700ms var(--ease
   to { clip-path: circle(var(--or, 150vmax) at var(--ox, 50%) var(--oy, 0)); }
 }
 
+/* ANIMATIONS REDUITES. Ramener une animation a 1 ms ne suffit PAS : une
+   animation INFINIE (fond vivant, battements, ondes) se rejoue alors mille fois
+   par seconde — l'ecran clignote, l'inverse exact de ce qu'on demande (constate
+   le 03/10/2026). On la joue UNE fois, et le fond, lui, s'arrete net. */
 @media (prefers-reduced-motion: reduce) {
-  .v2 *, .v2 *::before, .v2 *::after, .ile, .barre-bas, .fond-vivant i { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+  .v2 *, .v2 *::before, .v2 *::after, .ile, .barre-bas, .ile *, .barre-bas * { animation-duration: 1ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; transition-duration: 1ms !important; }
+  .fond-vivant i { animation: none !important; }
 }
-html.animations-reduites .v2 *, html.animations-reduites .fond-vivant i { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+html.animations-reduites .v2 *, html.animations-reduites .v2 *::before, html.animations-reduites .v2 *::after,
+html.animations-reduites .ile *, html.animations-reduites .barre-bas * { animation-duration: 1ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; transition-duration: 1ms !important; }
+html.animations-reduites .fond-vivant i { animation: none !important; }
 
 } /* @layer v2 */
 
@@ -603,6 +633,26 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .connexion-v2 { position: relative; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; overflow: hidden; background: radial-gradient(120% 80% at 50% 0%, #1a2350 0%, #0b0e1f 55%, #05060d 100%); }
 .carte-connexion { position: relative; z-index: 1; width: min(400px, 100%); padding: 30px 28px 26px; border-radius: var(--r-2xl); animation: v2-carte-arrivee 1100ms var(--ressort-ample) 250ms both; box-shadow: 0 40px 120px -40px rgba(247, 86, 50, .55), 0 0 0 1px rgba(255, 255, 255, .08); }
 .carte-connexion.secoue { animation: v2-secousse 520ms var(--ressort-vif); }
+/* LE VERRE DE LA CONNEXION : on doit VOIR la grille a travers. Fond presque
+   transparent, flou fort, saturation poussee — c'est le flou qui rend le texte
+   lisible, pas l'epaisseur du fond (CLAUDE.md, « Le verre laisse passer la
+   couleur »). Theme sombre force : le fond de cet ecran est toujours la nuit. */
+.connexion-v2 .carte-connexion.verre {
+  background:
+    radial-gradient(260px circle at var(--mx, 50%) var(--my, -40%), rgba(255, 255, 255, .14), transparent 60%),
+    linear-gradient(165deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, .02) 45%, rgba(255, 255, 255, .04));
+  -webkit-backdrop-filter: blur(22px) saturate(1.8);
+  backdrop-filter: blur(22px) saturate(1.8);
+  color: var(--text);
+}
+.connexion-v2 .carte-connexion .input { background: rgba(5, 6, 13, .35); }
+.connexion-v2 .carte-connexion .input:hover { background: rgba(5, 6, 13, .45); }
+/* L'autoremplissage du navigateur peint le champ en bleu clair : on le recouvre. */
+.connexion-v2 input:-webkit-autofill, .connexion-v2 input:-webkit-autofill:hover, .connexion-v2 input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text); caret-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1px var(--ctl-line) inset, 0 0 0 100px #14162c inset;
+  transition: background-color 99999s;
+}
 @keyframes v2-secousse { 15% { transform: translateX(-10px); } 35% { transform: translateX(9px); } 55% { transform: translateX(-6px); } 75% { transform: translateX(3px); } }
 .marque-connexion { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .marque-connexion .logo-anime { position: relative; display: grid; place-items: center; width: 56px; height: 56px; animation: v2-logo-flotte 5s ease-in-out 1.4s infinite; }
@@ -654,15 +704,16 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 /* ------------------------------------------------------------------ COMPTES (lot 7) */
 .v2 .liste-comptes { display: grid; gap: 4px; }
 .v2 .ligne-compte {
-  display: grid; grid-template-columns: auto minmax(160px, 1fr) auto minmax(80px, auto) auto; align-items: center; gap: 12px;
+  display: grid; width: 100%; grid-template-columns: 34px minmax(160px, 1fr) 120px 140px 24px; align-items: center; gap: 12px;
   padding: 8px 10px; border: 0; border-radius: 12px; background: transparent; cursor: pointer; text-align: left; color: var(--text); font: inherit;
   transition: background-color var(--t-fast), transform 560ms var(--ressort-ample);
 }
 .v2 .ligne-compte:hover { background: var(--ctl-bg-h); }
 .v2 .ligne-compte:active { transform: scale(.99); }
 .v2 .ligne-compte.inactif { opacity: .55; }
-.v2 .ligne-compte .identite { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
+.v2 .ligne-compte .identite { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; margin: 0; font-size: inherit; text-align: left; }
 .v2 .ligne-compte .details { font-size: 12px; text-align: right; }
+.v2 .ligne-compte > .badge { justify-self: start; }
 .v2 .avatar-v2.petit { width: 34px; height: 34px; font-size: 12px; }
 .v2 .ligne-journal { display: grid; grid-template-columns: 130px 1fr; gap: 10px; padding: 6px 4px; font-size: 12.5px; border-bottom: 1px solid var(--line); }
 .v2 .mdp-a-noter { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--ok) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 40%, transparent); }
@@ -761,9 +812,12 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .panneaux-live { padding: 4px 8px; }
 .v2 .bascule-panneaux { border: 0; background: none; color: var(--text-2); font: 700 var(--fs-12) var(--font-ui); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; padding: 10px 6px; }
 .v2 .liste-panneau .mienne { background: var(--sel); border-radius: 8px; }
-.v2 .graphique-jours .piste { background: var(--ctl-bg); border-radius: 8px; }
-.v2 .graphique-jours .barre { background: var(--bony-grad); border-radius: 8px 8px 4px 4px; transform-origin: bottom; animation: v2-pousse 900ms var(--ressort-ample) both; }
-.v2 .graphique-jours .barre.part { background: color-mix(in srgb, var(--bony-violet) 70%, transparent); }
+.v2 .graphique-jours .piste { height: 9.5rem; background: var(--ctl-bg); border-radius: 12px; }
+.v2 .graphique-jours .barre { background: linear-gradient(to top, var(--bony-violet), var(--bony-orange)); border-radius: 12px 12px 4px 4px; transform-origin: bottom; animation: v2-pousse 900ms var(--ressort-ample) both; }
+/* La part VN : un VOILE sur toute la largeur, sous une ligne pointillee — la
+   barre reste UNE barre, sa partie basse se lit « VN », la haute « VO ». Le pave
+   violet plante au milieu se lisait comme une seconde barre. */
+.v2 .graphique-jours .barre.part { left: 0; right: 0; background: linear-gradient(to top, rgba(255, 255, 255, .2), rgba(255, 255, 255, .07)); border-top: 1.5px dashed rgba(255, 255, 255, .6); border-radius: 0 0 4px 4px; }
 @keyframes v2-pousse { from { transform: scaleY(0); } }
 .v2 .bandeau-kpi > * { background: var(--box-bg); border: 0; border-radius: var(--r-lg); box-shadow: inset 0 0 0 1px var(--box-line); }
 
