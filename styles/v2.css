@@ -833,3 +833,25 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 @layer v2 {
 .v2 .carte h3, .v2 .card h3 { font-family: var(--font-ui); text-transform: none; letter-spacing: -.01em; font-size: var(--fs-14); font-weight: 800; }
 }
+
+@layer v2 {
+/* L'ILE, comme la maquette : AUCUN contour autour des rubriques. L'ancienne
+   feuille donnait a CHAQUE bouton une bordure et un backdrop-filter : huit flous
+   recalcules a chaque image pendant la retraction — d'ou le lag. Tout est annule
+   ici, dans la navigation. */
+.ile button, .barre-bas button, .ile .icon-btn {
+  border: 0; box-shadow: none; outline-offset: -2px;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.ile .item, .barre-bas .item { background: transparent; }
+.ile .item:hover:not([aria-current='page']), .barre-bas .item:hover:not([aria-current='page']) { background: transparent; color: var(--text); }
+.ile .item:active, .barre-bas .item:active { transform: none; }
+/* La goutte est portee par l'animation (useIndicateurGlissant, effet « goutte ») :
+   pas de transition CSS par-dessus, qui la ferait trainer. */
+.ile .goutte, .barre-bas .goutte { transition: opacity var(--t-med); }
+/* La retraction : seuls les libelles se replient, sur une courbe simple et
+   courte. La barre elle-meme ne change que de padding. */
+.ile { transition: padding 280ms var(--ease-out), top 280ms var(--ease-out); }
+.ile .item { transition: color var(--t-med), padding 280ms var(--ease-out); }
+.ile .item .lib { transition: max-width 280ms var(--ease-out), opacity 180ms; }
+}

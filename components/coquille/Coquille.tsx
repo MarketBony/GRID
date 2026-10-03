@@ -89,8 +89,8 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
   const principales = rubriques.filter((r) => !r.secondaire);
   const indexIle = Math.max(0, rubriques.findIndex((r) => r.id === active));
   const indexBas = principales.findIndex((r) => r.id === active);
-  const goutteIle = useIndicateurGlissant(indexIle, rubriques.length);
-  const goutteBas = useIndicateurGlissant(Math.max(0, indexBas), principales.length);
+  const goutteIle = useIndicateurGlissant(indexIle, rubriques.length, 'x', 'goutte');
+  const goutteBas = useIndicateurGlissant(Math.max(0, indexBas), principales.length, 'x', 'goutte');
 
   // LA HAUTEUR DE L'ILE EST MESUREE, PAS DEVINEE (CLAUDE.md, « aucune constante ne
   // devine la hauteur d'un element variable »). Les ecrans pas encore portes

@@ -7,8 +7,7 @@ import { VueTable } from '../components/saisie/VueTable';
 import { cleRdv, libelleJour } from '../utils/grille';
 import { cleTri } from '../backend/src/utils/tri';
 import { useTempsReel } from '../hooks/useTempsReel';
-import { PanneauxLive } from '../components/PanneauxLive';
-import { appliquerRdv, chargerDashboard, type Dashboard, type EvenementRdv } from '../services/dashboard';
+import { appliquerRdv, type Dashboard, type EvenementRdv } from '../services/dashboard';
 import {
   delaiAvantEssai,
   ecrireFile,
@@ -166,15 +165,10 @@ export function Saisie() {
       });
   }, []);
 
-  const rechargerVueDEnsemble = useCallback((id: string) => {
-    chargerDashboard(id)
-      .then(setDashboard)
-      .catch(() => {
-        // La vue d'ensemble est un CONFORT. Si elle echoue, la saisie continue :
-        // c'est le coeur du produit, il ne depend de rien.
-        setDashboard(null);
-      });
-  }, []);
+  /// LA VUE D'ENSEMBLE A QUITTE LA SAISIE (03/10/2026, decision de l'utilisateur :
+  /// le panneau « ne sert a rien » ici, le tableau de bord le fait). On ne la
+  /// charge donc plus : autant de requetes en moins par poste pendant une seance.
+  const rechargerVueDEnsemble = useCallback((_id: string) => undefined, []);
 
   /// LA FILE D'ATTENTE des poses non encore acceptees par la base — voir
   /// `services/fileAttente.ts`. Une ref et non un etat : elle ne se dessine pas,
@@ -875,13 +869,6 @@ export function Saisie() {
         </section>
       </div>
 
-      {/* Les autres tables et le classement : SOUS la saisie, replies par
-          defaut. La saisie gagne toujours. */}
-      <PanneauxLive
-        dashboard={dashboard}
-        plaqueId={donnees.perimetre?.plaqueId ?? null}
-        tableId={donnees.perimetre?.tableId ?? null}
-      />
     </div>
   );
 }
