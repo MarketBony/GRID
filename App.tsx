@@ -67,7 +67,7 @@ export default function App() {
     if (session && consommerIntro()) setIntro(true);
   }, [session]);
 
-  if (chargement) return <div className="attente">Chargement...</div>;
+  if (chargement) return <div className="chargement-initial" role="status" aria-label="Chargement" />;
   if (!session) return <Connexion />;
 
   const { utilisateur, droits } = session;

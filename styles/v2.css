@@ -1352,7 +1352,7 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 
 @layer v2 {
 /* Le chargement initial : le G qui respire au centre, sur le fond de la connexion. */
-.attente { position: fixed; inset: 0; display: grid; place-items: center; color: transparent; font-size: 0; background: radial-gradient(120% 80% at 50% 0%, #1a2350 0%, #0b0e1f 55%, #05060d 100%); }
-.attente::before { content: ''; width: 72px; height: 72px; background: url('/grid.svg') center / contain no-repeat; filter: drop-shadow(0 0 24px rgba(247, 86, 50, .6)); animation: v2-respire 1.4s ease-in-out infinite; }
+.chargement-initial { position: fixed; inset: 0; display: grid; place-items: center; color: transparent; font-size: 0; background: radial-gradient(120% 80% at 50% 0%, #1a2350 0%, #0b0e1f 55%, #05060d 100%); }
+.chargement-initial::before { content: ''; width: 72px; height: 72px; background: url('/grid.svg') center / contain no-repeat; filter: drop-shadow(0 0 24px rgba(247, 86, 50, .6)); animation: v2-respire 1.4s ease-in-out infinite; }
 @keyframes v2-respire { 50% { transform: scale(.9); opacity: .6; } }
 }
