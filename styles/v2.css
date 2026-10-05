@@ -1433,3 +1433,28 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .chargement-initial::before { content: ''; width: 72px; height: 72px; background: url('/grid.svg') center / contain no-repeat; filter: drop-shadow(0 0 24px rgba(247, 86, 50, .6)); animation: v2-respire 1.4s ease-in-out infinite; }
 @keyframes v2-respire { 50% { transform: scale(.9); opacity: .6; } }
 }
+
+/* ---------------------------------------------------------------- tableau des ventes (05/10/2026)
+   La forme du tableau VPP / VD / VO de l'equipe : une carte par bloc, une ligne
+   par site, la ligne DIAC dessous en plus petit. */
+.v2 .ventes { display: grid; gap: 14px; }
+.v2 .ventes-outils { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.v2 .ventes-ref { display: inline-flex; align-items: center; gap: 8px; }
+.v2 .ventes-grille { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); align-items: start; }
+.v2 .ventes-bloc { padding: 0; overflow: hidden; }
+.v2 .ventes-titre { display: flex; align-items: baseline; gap: 10px; padding: 12px 14px 8px; }
+.v2 .ventes-titre b { font-family: 'Syncopate', sans-serif; font-size: var(--fs-13); letter-spacing: .06em; }
+.v2 .ventes-marque { font-size: var(--fs-12, 12px); font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--ctl-bg); }
+.v2 .ventes-bloc.marque-renault .ventes-marque { background: var(--brand-renault); color: #1a1500; }
+.v2 .ventes-bloc.marque-dacia .ventes-marque { background: var(--brand-dacia); color: #fff; }
+.v2 .ventes-tbl { font-size: 12px; }
+.v2 .ventes-tbl td { height: 26px; padding: 0 8px; }
+.v2 .ventes-tbl th { padding: 7px 8px; }
+.v2 .ventes-tbl .total { font-weight: 700; }
+.v2 .ventes-plaque-titre td { height: 22px; font-size: var(--fs-11); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); background: var(--ctl-bg); }
+.v2 .ventes-site td:first-child { font-weight: 600; }
+.v2 .ventes-diac td { height: 20px; font-size: 11px; color: var(--info); border-bottom-color: var(--line); }
+.v2 .ventes-diac td:first-child { text-align: right; font-weight: 600; }
+.v2 .ventes-tbl .atteint { color: var(--ok); font-weight: 700; }
+.v2 .ventes-total td { font-weight: 700; background: var(--ctl-bg); }
+.v2 .ventes-tbl .input.objectif { width: 56px; height: 22px; padding: 0 6px; text-align: right; font-size: 12px; }

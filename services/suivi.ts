@@ -30,6 +30,8 @@ export interface RdvSuivi {
   diac: boolean;
   stock: boolean;
   cs: boolean;
+  /// Vehicule de demonstration : seulement sur une commande STOCK d'un RDV VN.
+  vd: boolean;
   modele: string | null;
   commentaire: string | null;
 }
@@ -54,6 +56,7 @@ interface Ligne {
   diac: boolean;
   stock: boolean;
   cs: boolean;
+  vd: boolean;
   modele: string | null;
   commentaire: string | null;
 }
@@ -82,6 +85,7 @@ export async function chargerSuivi(campagneId: string): Promise<RdvSuivi[]> {
     diac: l.diac,
     stock: l.stock,
     cs: l.cs,
+    vd: l.vd ?? false,
     modele: l.modele,
     commentaire: l.commentaire,
   }));
@@ -106,6 +110,7 @@ export interface Qualification {
   diac: boolean;
   stock: boolean;
   cs: boolean;
+  vd: boolean;
   modele: string | null;
   commentaire: string | null;
 }
@@ -125,6 +130,7 @@ export async function enregistrerSuivi(rdvId: string, q: Qualification): Promise
       p_cs: commande && q.cs,
       p_modele: q.modele,
       p_commentaire: q.commentaire,
+      p_vd: commande && q.stock && q.vd,
     })
   );
 }

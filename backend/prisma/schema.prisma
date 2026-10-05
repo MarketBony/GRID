@@ -217,6 +217,8 @@ model Site {
   encadrants    EncadrementSite[]
   rolesCampagne RoleCampagne[]
 
+  objectifsVente ObjectifVente[]
+
   @@map("site")
 }
 
@@ -239,6 +241,8 @@ model Marque {
   vendeurs VendeurMarque[]
   rdvs     Rdv[]
   tables   TablePhoning[]
+
+  objectifsVente ObjectifVente[]
 
   @@map("marque")
 }
@@ -376,6 +380,8 @@ model Campagne {
   rdvs          Rdv[]
   rolesCampagne RoleCampagne[]
   mobilisations Mobilisation[]
+
+  objectifsVente ObjectifVente[]
 
   @@map("campagne")
 }
@@ -626,6 +632,9 @@ model RdvSuivi {
   diac        Boolean   @default(false)
   stock       Boolean   @default(false)
   cs          Boolean   @default(false)
+  /// Vehicule de DEMONSTRATION vendu : un stock particulier (05/10/2026). N'existe
+  /// que sur une commande STOCK d'un RDV VN — CHECK `rdv_suivi_vd_check`.
+  vd          Boolean   @default(false)
   modele      String?
   commentaire String?
   creeLe      DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
@@ -665,6 +674,27 @@ model Mobilisation {
 /// `security definer` (auteur = `utilisateur_courant()`), lisible par les admins.
 /// Le journal d'audit de Supabase etait vide en base : on ne pouvait pas savoir
 /// qui avait reinitialise quel mot de passe. Liste valide : `ACTIONS_JOURNAL`.
+/// Objectif de ventes VPP d'un site pour une marque, sur une campagne (« vs Obj
+/// OPO » du tableau des ventes). Une DONNEE saisie, pas un agregat (interdit n.2).
+/// `ventes` nul = pas d'objectif : une ligne ne se supprime pas (interdit n.1).
+model ObjectifVente {
+  id         BigInt    @id @default(autoincrement())
+  campagneId BigInt    @map("campagne_id")
+  siteId     BigInt    @map("site_id")
+  marqueId   BigInt    @map("marque_id")
+  ventes     Int?
+  creeLe     DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar    BigInt?   @map("cree_par")
+  modifieLe  DateTime? @map("modifie_le") @db.Timestamptz(6)
+
+  campagne Campagne @relation(fields: [campagneId], references: [id], onDelete: Restrict)
+  site     Site     @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  marque   Marque   @relation(fields: [marqueId], references: [id], onDelete: Restrict)
+
+  @@unique([campagneId, siteId, marqueId])
+  @@map("objectif_vente")
+}
+
 model JournalCompte {
   id      BigInt   @id @default(autoincrement())
   creeLe  DateTime @default(now()) @map("cree_le") @db.Timestamptz(6)

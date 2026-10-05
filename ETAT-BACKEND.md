@@ -1,8 +1,21 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 05/10/2026, issue « no show ».
+Mise a jour : 05/10/2026, tableau des ventes.
 
 ---
+
+## 05/10/2026 — Tableau des ventes (`20261005114344_ventes_vd_objectifs`)
+
+| Objet | Role |
+|---|---|
+| `rdv_suivi.vd` | vehicule de demonstration. CHECK `rdv_suivi_vd_check` : `NOT vd OR stock` ; `suivi_enregistrer` refuse un VD sur un RDV VO (P0001) |
+| `suivi_enregistrer(..., p_vd boolean DEFAULT false)` | 8e parametre EN DERNIER avec defaut ; l'ancienne signature a 7 est supprimee (PostgREST verrait deux surcharges) |
+| `charger_suivi` | rend `vd` |
+| table `objectif_vente` | objectif VPP par campagne x site x marque, `ventes` nul = pas d'objectif. RLS : lecture tout compte actif, ecriture `peut_administrer()`. Aucun DELETE (trigger + aucun droit) |
+| vue `relance.vente` | une ligne par commande du Suivi : site, marque, jour, type, DIAC / STOCK / CS / VD. **Hors RLS, comme `rdv_agrege`, et c'est voulu** : chiffres GLOBAUX pour tout compte (decision de l'utilisateur). Ni client, ni vendeur, ni modele — un controle de `test:rls` le verifie sur le catalogue. Son filtre `utilisateur_courant() IS NOT NULL` ferme la porte a `anon` |
+
+Les totaux se font dans `backend/src/utils/ventes.ts` (fonction pure `tableauVentes`,
+`test:suivi`). `test:rls` **122 -> 131**.
 
 ## 05/10/2026 — Issue de suivi « no show » (`20261005090000_suivi_no_show`)
 

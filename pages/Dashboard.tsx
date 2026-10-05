@@ -35,6 +35,7 @@ import {
 // Tri des libelles SANS dependre de la locale du navigateur. Source unique.
 import { cleTri, comparerLibelle } from '../backend/src/utils/tri';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
+import { TableauVentes } from '../components/TableauVentes';
 
 // ============================================================================
 // ECRAN DASHBOARD — module D.
@@ -92,6 +93,8 @@ export function Dashboard() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [exportEnCours, setExportEnCours] = useState(false);
+  /// « Ventes » : le tableau VPP / VD / VO tire du Suivi (05/10/2026).
+  const [vueTableau, setVueTableau] = useState<'phoning' | 'ventes'>('phoning');
 
   const { donnees: referentiels } = useReferentiels();
 
@@ -355,7 +358,7 @@ export function Dashboard() {
     <div className="page">
       <div className="app-head enter">
         <h1>Tableau de bord</h1>
-        <span className="sub">{donnees.campagne.libelle} · phoning uniquement</span>
+        <span className="sub">{donnees.campagne.libelle} · {vueTableau === 'ventes' ? 'ventes du Suivi' : 'phoning uniquement'}</span>
         <div className="droite">
           <select
             className="select"
@@ -371,14 +374,26 @@ export function Dashboard() {
               </option>
             ))}
           </select>
-          <button type="button" className="btn primary" onClick={() => void exporter()} disabled={exportEnCours}>
+          <Segmente
+            etiquette="Vue"
+            valeur={vueTableau}
+            onChange={setVueTableau}
+            options={[
+              { valeur: 'phoning' as const, libelle: 'Phoning' },
+              { valeur: 'ventes' as const, libelle: 'Ventes' },
+            ]}
+          />
+          {vueTableau === 'phoning' && <button type="button" className="btn primary" onClick={() => void exporter()} disabled={exportEnCours}>
             {exportEnCours ? 'Export…' : 'Exporter en Excel'}
-          </button>
+          </button>}
         </div>
       </div>
 
       {erreur && <div className="bandeau-v2 erreur">{erreur}</div>}
 
+      {vueTableau === 'ventes' && campagneId ? (
+        <TableauVentes campagneId={campagneId} campagnes={campagnes} jours={donnees.campagne.jours} />
+      ) : (<>
       {/* LES CHIFFRES CLES EN PREMIER. Le total se cachait dans un coin de
           l'en-tete pendant que la moitie de l'ecran restait vide. */}
       <div className="kpis">
@@ -570,6 +585,7 @@ export function Dashboard() {
           </ol>
         )}
       </div>
+      </>)}
     </div>
   );
 }

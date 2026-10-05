@@ -1783,6 +1783,74 @@ async function main() {
     (tx) => tx.$executeRawUnsafe(`DELETE FROM relance.rdv_suivi`),
     deuxRdv
   );
+
+  // --- TABLEAU DES VENTES (05/10/2026) : VD, vue `vente`, objectifs ---
+  //
+  // Les vendeurs du decor sont VO : un VD y est donc refuse par la fonction.
+  await doitRefuser(
+    'VENTES  VD sur un RDV VO est refuse',
+    { login: ADMIN },
+    ERREUR_METIER,
+    (tx) =>
+      tx.$queryRawUnsafe(
+        `SELECT relance.suivi_enregistrer($1, 'commande', false, true, false, NULL, NULL, true)`,
+        rdvTable
+      ),
+    deuxRdv
+  );
+  await doitRefuser(
+    'VENTES  VD sans STOCK est refuse (CHECK)',
+    { login: ADMIN },
+    '23514',
+    (tx) => tx.$executeRawUnsafe(`INSERT INTO relance.rdv_suivi (rdv_id, issue, vd) VALUES (${rdvTable}, 'commande', true)`),
+    deuxRdv
+  );
+  const uneVente = async (tx: Tx) => {
+    await deuxRdv(tx);
+    await tx.$executeRawUnsafe(`INSERT INTO relance.rdv_suivi (rdv_id, issue) VALUES (${rdvHors}, 'commande')`);
+  };
+  await doitValoir(
+    'VENTES  la vue est GLOBALE : un lecteur voit une vente hors de tout perimetre',
+    { login: LECTEUR },
+    1,
+    (tx) => nombre(tx, `SELECT count(*) AS n FROM relance.vente WHERE rdv_id = ${rdvHors}`),
+    uneVente
+  );
+  await doitRefuser(
+    'VENTES  anon ne lit pas la vue des ventes',
+    'anonyme',
+    DROIT_INSUFFISANT,
+    (tx) => tx.$queryRawUnsafe(`SELECT count(*) FROM relance.vente`)
+  );
+  await doitEtreVrai(
+    'VENTES  la vue ne porte ni client, ni vendeur, ni modele',
+    `NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'relance'
+                   AND table_name = 'vente' AND column_name IN ('client', 'commentaire', 'modele', 'vendeur_id'))`,
+    true
+  );
+  const objectif = (tx: Tx) =>
+    tx.$executeRawUnsafe(
+      `INSERT INTO relance.objectif_vente (campagne_id, site_id, marque_id, ventes)
+       SELECT ${decor.campagne1.id}, ${decor.siteA}, (SELECT min(id) FROM relance.marque), 12`
+    );
+  await doitRefuser('VENTES  un encadrant ne pose pas d objectif', { login: ENCADRANT }, DROIT_INSUFFISANT, objectif);
+  await doitAccepter('VENTES  un admin pose un objectif', { login: ADMIN }, objectif);
+  await doitValoir(
+    'VENTES  un lecteur lit les objectifs',
+    { login: LECTEUR },
+    1,
+    (tx) => nombre(tx, `SELECT count(*) AS n FROM relance.objectif_vente WHERE site_id = ${decor.siteA}`),
+    async (tx) => {
+      await objectif(tx);
+    }
+  );
+  await doitRefuser(
+    'VENTES  aucun DELETE sur les objectifs',
+    { login: ADMIN },
+    DROIT_INSUFFISANT,
+    (tx) => tx.$executeRawUnsafe(`DELETE FROM relance.objectif_vente`)
+  );
+
   await doitValoir(
     'SHOWROOM  le chef pose un RDV de trafic naturel, marque showroom',
     { login: CHEF },

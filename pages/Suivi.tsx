@@ -134,7 +134,8 @@ export function Suivi() {
   const qualifier = async (r: RdvSuivi, modif: Partial<RdvSuivi>) => {
     if (figee) return;
     const suivant = { ...r, ...modif };
-    if (suivant.issue !== 'commande') Object.assign(suivant, { diac: false, stock: false, cs: false });
+    if (suivant.issue !== 'commande') Object.assign(suivant, { diac: false, stock: false, cs: false, vd: false });
+    if (!suivant.stock || suivant.typeVehicule !== 'VN') suivant.vd = false;
     setRdvs((l) => l.map((x) => (x.id === r.id ? suivant : x)));
     if (vue === 'a_traiter') setGardes((g) => new Set(g).add(r.id));
     try {
@@ -383,6 +384,20 @@ function LigneSuivi({
               {a === 'cs' ? 'CS' : a.toUpperCase()}
             </button>
           ))}
+          {r.stock && r.typeVehicule === 'VN' && (
+            // Un vehicule de demonstration est un stock : la case n'existe qu'ici.
+            <button
+              type="button"
+              className="avantage"
+              aria-pressed={r.vd}
+              disabled={figee}
+              title="Véhicule de démonstration"
+              onClick={() => void qualifier(r, { vd: !r.vd })}
+            >
+              {r.vd && <Icone nom="coche" petite />}
+              VD
+            </button>
+          )}
           {estSeche(r) && <span className="seche">Commande sèche</span>}
         </div>
       )}
@@ -445,7 +460,7 @@ function FormulaireTraficNaturel({
         cle: cle.current,
       });
       if (modele.trim()) {
-        await enregistrerSuivi(id, { issue: null, diac: false, stock: false, cs: false, modele: modele.trim(), commentaire: null });
+        await enregistrerSuivi(id, { issue: null, diac: false, stock: false, cs: false, vd: false, modele: modele.trim(), commentaire: null });
       }
       await apres();
     } catch (err) {

@@ -1735,9 +1735,39 @@ et `DEPLOIEMENT.md` annoncaient `test:agregats` a **27** tests ; la suite en ren
   indicateurs en tete d'ecran.
 - **Edge Function `gerer-comptes` v4** deployee (minimum 6), voir `DEPLOIEMENT.md`.
 
-**Prochain chantier annonce** : rapprocher le tableau de bord global du tableau de
-l'equipe (VPP / VD / VO, Renault / Dacia / cumul, par site × jour, DIAC, vs A-1,
-vs objectif). Non commence.
+**Tableau des ventes** — fait le meme jour, voir la section suivante.
+
+## 05/10/2026 — Le tableau des ventes (VPP / VD / VO)
+
+Tableau de bord → segmente **Phoning | Ventes**. La forme du tableau Excel de
+l'equipe : VPP par marque (vs A-1, vs objectif), cumul VPP (Tx DIAC), VD par marque,
+VO (Tx DIAC). Une ligne par site GRID (20), groupees par plaque, la ligne DIAC sous
+chaque site, total BONY en pied.
+
+**Regles arretees par l'utilisateur :**
+- une vente = un RDV qualifie « Commande » dans le Suivi, phoning ET trafic naturel,
+  comptee au jour du RDV ; DIAC = la case DIAC ;
+- VPP = VN ; **VD = vehicule de demonstration, un stock** : dans le Suivi, la case VD
+  apparait sur une commande STOCK d'un RDV VN ;
+- vs A-1 = contre une campagne GRID choisie dans l'ecran, pre-remplie avec celle du
+  meme mois l'an passe (aucune en 2026 : « — ») ;
+- objectifs VPP saisis par site × marque, par admin / direction, depuis le tableau
+  (« Saisir les objectifs VPP ») ;
+- chiffres GLOBAUX lisibles par tout compte (vue `relance.vente`, sans nom) ;
+- les pourcentages d'en-tete de l'Excel (10 % / 4,9 %) sont ignores.
+
+Une marque n'a ses tables que si elle a une vente (cette campagne ou la reference)
+ou un objectif : sans quoi Alpine poserait deux tableaux vides.
+
+**Ecart assume avec l'Excel** : ses lignes regroupent Albi + Carmaux et Rodez + VDR,
+et n'ont ni Alpine ni Lavaur. GRID montre ses 20 sites, sur decision de
+l'utilisateur.
+
+**Ce qui a tourne, en local** : migration appliquee ; `test:rls` 131/131 (9 nouveaux),
+`test:suivi` 29/29 (5 nouveaux), garde-fous 39/39, invariants 13/13, import 19/19,
+agregats 39/39, repartition 20/20 ; `tsc` front et backend ; build, `dist` conforme.
+**Pas encore vu au navigateur** : le front de developpement attaque Supabase, qui n'a
+pas la migration.
 
 ## CE QUI RESTE, au 02/10/2026
 

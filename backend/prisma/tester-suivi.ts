@@ -22,6 +22,7 @@ import {
   type LigneSuivi,
 } from '../src/utils/suivi';
 import type { IssueSuivi } from '../src/auth/roles';
+import { rapport, tableauVentes, type LigneVente } from '../src/utils/ventes';
 
 const resultats: { nom: string; ok: boolean; detail: string }[] = [];
 const verifier = (nom: string, ok: boolean, detail: string) => resultats.push({ nom, ok, detail });
@@ -151,6 +152,38 @@ verifier(
     'no show : compte a part, traite, distinct de annule',
     n.noShows === 1 && n.annules === 1 && n.traites === 3 && n.commandes === 1 && n.aTraiter === 1,
     `noShows ${n.noShows} · annules ${n.annules} · traites ${n.traites}`
+  );
+}
+
+// ---------------------------------------------------------------- tableau des ventes
+// Donnees synthetiques : le fichier de suivi de juin ne distingue ni VD ni marque.
+{
+  const v = (siteId: string, marqueId: string | null, jour: string, typeVehicule: 'VN' | 'VO', diac: boolean, vd = false): LigneVente =>
+    ({ siteId, marqueId, jour, typeVehicule, diac, vd });
+  const lignes = [
+    v('A', 'R', 'j1', 'VN', true), v('A', 'R', 'j1', 'VN', false), v('A', 'R', 'j2', 'VN', true),
+    v('A', 'D', 'j1', 'VN', true), v('B', 'R', 'j2', 'VN', false),
+    v('A', 'R', 'j2', 'VN', false, true), // VD
+    v('A', null, 'j1', 'VO', true), v('B', null, 'j2', 'VO', false, true), // VO, meme coche VD
+  ];
+  const vppR = tableauVentes(lignes, { categorie: 'VPP', marqueId: 'R' });
+  verifier(
+    'ventes VPP Renault : site x jour, DIAC compte a part',
+    vppR.total.ventes === 4 && vppR.total.diac === 2 &&
+      vppR.sites.get('A')?.jours.get('j1')?.ventes === 2 && vppR.sites.get('B')?.total.ventes === 1 &&
+      vppR.jours.get('j2')?.ventes === 2,
+    `total ${vppR.total.ventes} · diac ${vppR.total.diac}`
+  );
+  const cumul = tableauVentes(lignes, { categorie: 'VPP' });
+  verifier('cumul VPP : toutes marques, VD exclu', cumul.total.ventes === 5 && cumul.total.diac === 3, `${cumul.total.ventes}`);
+  const vd = tableauVentes(lignes, { categorie: 'VD', marqueId: 'R' });
+  verifier('VD : seulement un VN coche VD', vd.total.ventes === 1, `${vd.total.ventes}`);
+  const vo = tableauVentes(lignes, { categorie: 'VO' });
+  verifier('VO : tout RDV VO, la coche VD n y change rien', vo.total.ventes === 2 && vo.total.diac === 1, `${vo.total.ventes}`);
+  verifier(
+    'rapport : reference nulle ou absente -> pas de pourcentage',
+    rapport(3, 0) === null && rapport(3, null) === null && rapport(3, 4) === 0.75,
+    'null · null · 0,75'
   );
 }
 
