@@ -381,7 +381,7 @@ restauration, les `auth_uid` du dump pointent vers des identites disparues : c'e
 |---|---|
 | Reecriture des 7 `services/*.ts` sur `supabase-js` | **fait** (01/09) |
 | `hooks/useTempsReel.ts` + trigger de diffusion | **fait**, diffusion prouvee dans le navigateur |
-| Edge Function `gerer-comptes` | **deployee** (version 3, `verify_jwt`). Refus verifie pour la cle publique, un encadrant et `direction` ; creation, connexion et suppression eprouvees de bout en bout |
+| Edge Function `gerer-comptes` | **deployee** (version 4 le 05/10/2026, `verify_jwt`, minimum de mot de passe ramene a 6). Version 4 : 401 sans jeton, 403 avec la cle publique seule, verifies. Deploiement : `npx supabase login` (par l utilisateur), puis `npx supabase functions deploy gerer-comptes --project-ref ganeczlhcprljuazldpp --use-api` — sans Docker. La creation d un compte en 6 caracteres reste a eprouver depuis l ecran Comptes |
 | Workflows `keep-alive` et `backup` | **verts en CI**. Secret `SUPABASE_DB_URL` cree ; un dump de 24 Ko produit, restaure et commite |
 | Les 1107 RDV de juin en base | **fait** — recoupes au classeur par `importer-juin` |
 | Comptes `.test` archives | **fait**, `test:rls` etant devenue autonome |
