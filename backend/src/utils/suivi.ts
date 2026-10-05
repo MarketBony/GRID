@@ -49,6 +49,8 @@ export interface Indicateurs {
   commandes: number;
   offres: number;
   annules: number;
+  /// Client qui ne s'est pas presente, sans prevenir. Distinct d'un RDV annule.
+  noShows: number;
   clos: number;
   /// Parmi les commandes. Se recouvrent : une commande DIAC+CS compte dans les deux.
   avecDiac: number;
@@ -68,6 +70,7 @@ export function indicateurs(lignes: LigneSuivi[]): Indicateurs {
     commandes: 0,
     offres: 0,
     annules: 0,
+    noShows: 0,
     clos: 0,
     avecDiac: 0,
     avecStock: 0,
@@ -89,6 +92,7 @@ export function indicateurs(lignes: LigneSuivi[]): Indicateurs {
       if (estSeche(l)) r.seches++;
     } else if (l.issue === 'offre_en_cours') r.offres++;
     else if (l.issue === 'annule') r.annules++;
+    else if (l.issue === 'no_show') r.noShows++;
     else if (l.issue === 'clos_sans_suite') r.clos++;
   }
   r.tauxTransformation = r.traites === 0 ? null : r.commandes / r.traites;

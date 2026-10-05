@@ -138,6 +138,22 @@ verifier(
   'null'
 );
 
+// NO SHOW (05/10/2026) : une issue a part entiere — traitee, ni commande ni annule.
+{
+  const base = { vendeurId: 'v', vendeurNom: 'V', siteId: 's', siteLibelle: 'S', source: 'relance' as const, diac: false, stock: false, cs: false };
+  const n = indicateurs([
+    { ...base, issue: 'no_show' },
+    { ...base, issue: 'annule' },
+    { ...base, issue: 'commande' },
+    { ...base, issue: null },
+  ]);
+  verifier(
+    'no show : compte a part, traite, distinct de annule',
+    n.noShows === 1 && n.annules === 1 && n.traites === 3 && n.commandes === 1 && n.aTraiter === 1,
+    `noShows ${n.noShows} · annules ${n.annules} · traites ${n.traites}`
+  );
+}
+
 // ---------------------------------------------------------------- restitution
 const largeur = Math.max(...resultats.map((r) => r.nom.length));
 for (const r of resultats) console.log(`${r.ok ? 'OK  ' : 'ECHEC'} ${r.nom.padEnd(largeur)}  ${r.detail}`);

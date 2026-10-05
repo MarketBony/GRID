@@ -261,6 +261,10 @@ body {
 .v2 .tbl tbody tr { transition: background-color var(--t-fast); }
 .v2 .tbl tbody tr:hover { background: var(--ctl-bg); }
 .v2 .tbl .r { text-align: right; }
+.v2 .tbl .tri-entete { all: unset; cursor: pointer; border-radius: 6px; padding: 2px 4px; margin: -2px -4px; }
+.v2 .tbl .tri-entete:hover { color: var(--text); }
+.v2 .tbl .tri-entete[aria-pressed='true'] { color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+.v2 .tbl .tri-entete:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
 
 .v2 .empty { display: grid; place-items: center; gap: 6px; padding: 40px 20px; text-align: center; color: var(--text-3); }
 .v2 .skel { border-radius: 8px; background: linear-gradient(90deg, var(--ctl-bg), var(--ctl-bg-h), var(--ctl-bg)); background-size: 200% 100%; animation: v2-skel 1.2s linear infinite; }
@@ -527,6 +531,7 @@ html.animations-reduites .fond-vivant i { animation: none !important; }
 .v2 .suivi-ligne[data-issue='commande'] { box-shadow: inset 3px 0 0 var(--ok), inset 0 0 0 1px var(--box-line); }
 .v2 .suivi-ligne[data-issue='offre_en_cours'] { box-shadow: inset 3px 0 0 var(--info), inset 0 0 0 1px var(--box-line); }
 .v2 .suivi-ligne[data-issue='annule'] { box-shadow: inset 3px 0 0 var(--danger), inset 0 0 0 1px var(--box-line); }
+.v2 .suivi-ligne[data-issue='no_show'] { box-shadow: inset 3px 0 0 var(--warn), inset 0 0 0 1px var(--box-line); }
 .v2 .suivi-ligne[data-issue='clos_sans_suite'] { box-shadow: inset 3px 0 0 var(--text-3), inset 0 0 0 1px var(--box-line); }
 /* Qualifiee dans la vue « a traiter », la ligne s'en va en glissant. */
 .v2 .suivi-ligne.sortant { opacity: 0; transform: translateX(28px) scale(.98); }
@@ -547,6 +552,7 @@ html.animations-reduites .fond-vivant i { animation: none !important; }
 .v2 .issue[aria-pressed='true'][data-i='commande'] { background: var(--ok); }
 .v2 .issue[aria-pressed='true'][data-i='offre_en_cours'] { background: var(--info); }
 .v2 .issue[aria-pressed='true'][data-i='annule'] { background: var(--danger); }
+.v2 .issue[aria-pressed='true'][data-i='no_show'] { background: var(--warn); }
 .v2 .issue[aria-pressed='true'][data-i='clos_sans_suite'] { background: var(--text-3); }
 @keyframes v2-allume { 0% { transform: scale(.85); } }
 
@@ -733,7 +739,6 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 .v2 .ligne-compte .details { font-size: 12px; text-align: right; }
 .v2 .ligne-compte > .badge { justify-self: start; }
 .v2 .avatar-v2.petit { width: 34px; height: 34px; font-size: 12px; }
-.v2 .ligne-journal { display: grid; grid-template-columns: 130px 1fr; gap: 10px; padding: 6px 4px; font-size: 12.5px; border-bottom: 1px solid var(--line); }
 .v2 .mdp-a-noter { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--ok) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 40%, transparent); }
 .v2 .mdp-a-noter code { font: 700 15px ui-monospace, monospace; padding: 4px 10px; border-radius: 8px; background: var(--ctl-bg-h); }
 @media (max-width: 760px) {

@@ -77,7 +77,7 @@ export type SourceRdv = (typeof SOURCES_RDV)[number];
 
 /// L'issue d'un RDV suivi. Absente = « a traiter ». « Seche » n'est PAS une issue :
 /// c'est une commande sans DIAC, STOCK ni CS (D8).
-export const ISSUES_SUIVI = ['commande', 'offre_en_cours', 'annule', 'clos_sans_suite'] as const;
+export const ISSUES_SUIVI = ['commande', 'offre_en_cours', 'annule', 'no_show', 'clos_sans_suite'] as const;
 export type IssueSuivi = (typeof ISSUES_SUIVI)[number];
 
 /// Ce que consigne `journal_compte`.

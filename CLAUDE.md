@@ -625,7 +625,7 @@ npm --prefix backend run test:invariants    # 13 contrôles code <-> base (inter
 npm --prefix backend run test:import        # 19 tests du parseur, fonctions pures
 npm --prefix backend run test:agregats      # 36 tests des totaux, contre les 1107 RDV de juin
 npm --prefix backend run test:repartition   # 20 tests de la répartition graine 42
-npm --prefix backend run test:suivi         # 23 tests des indicateurs du suivi (fichier de suivi fictif, en mémoire)
+npm --prefix backend run test:suivi         # 24 tests des indicateurs du suivi (fichier de suivi fictif, en mémoire)
 
 # Les 1107 RDV de juin, en base depuis le 01/09/2026. SANS `--reel`, il n'écrit
 # RIEN et vérifie tout : c'est le garde-fou permanent de la pagination.

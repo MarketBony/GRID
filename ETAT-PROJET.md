@@ -1721,6 +1721,24 @@ utilisation reelle du bouton.
 et `DEPLOIEMENT.md` annoncaient `test:agregats` a **27** tests ; la suite en rend
 **35** depuis le lot du 10/09. Compteurs remis a jour avec celui de `test:rls`.
 
+## 05/10/2026 — Retours de l'equipe sur le Suivi, et le journal retire
+
+- **Reglages → Comptes : le journal est retire de l'ecran** (liste generale et fiche
+  d'un compte). L'utilisateur ne l'avait jamais demande. La table `journal_compte` reste
+  alimentee par la base — aucune migration, interdit n.1.
+- **Suivi : issue « No show »**, distincte de « Annule ». Traitee, comptee a part.
+- **Suivi : vue « Par vendeur »** — rang, RDV, traites, commandes, **taux de
+  transformation**, a traiter, offres, annules, no show. C'est `classementCommandes`
+  (`utils/suivi.ts`, deja teste) qui est affiche, jamais un comptage recode ; la
+  recherche filtre par vendeur ou site. Tri par commandes (classement documente) ou par
+  taux (a taux egal, l'ordre du classement). Phoning ET trafic naturel, comme les
+  indicateurs en tete d'ecran.
+- **Edge Function `gerer-comptes` v4** deployee (minimum 6), voir `DEPLOIEMENT.md`.
+
+**Prochain chantier annonce** : rapprocher le tableau de bord global du tableau de
+l'equipe (VPP / VD / VO, Renault / Dacia / cumul, par site × jour, DIAC, vs A-1,
+vs objectif). Non commence.
+
 ## CE QUI RESTE, au 02/10/2026
 
 **Tout est en ligne** jusqu'au lot du 10/09. Le lot du 02/10 (creation de campagne)

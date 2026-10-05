@@ -5,16 +5,13 @@ import { useIndicateurGlissant } from '../../hooks/useIndicateurGlissant';
 import { cleTri } from '../../backend/src/utils/tri';
 import {
   chargerComptes,
-  chargerJournal,
   creerCompte,
-  libelleAction,
   libelleRoleEncadrement,
   libelleRoleGlobal,
   modifierCompte,
   reinitialiserMotDePasse,
   supprimerCompte,
   type Compte,
-  type EntreeJournal,
 } from '../../services/utilisateurs';
 
 // ============================================================================
@@ -22,8 +19,9 @@ import {
 // par la base (`peut_gerer_utilisateurs`) : cet ecran ne fait qu'AFFICHER selon
 // le palier, il n'autorise rien (interdit n.5).
 //
-// Une liste qu'on filtre, une fiche en volet, et le JOURNAL : qui a reinitialise
-// le mot de passe de qui. Avant lui, on ne pouvait pas le savoir.
+// Une liste qu'on filtre, et une fiche en volet. Le journal des comptes
+// (`journal_compte`) est toujours tenu par la base, mais n'est plus affiche :
+// retire le 05/10/2026, l'utilisateur ne l'avait jamais demande.
 // ============================================================================
 
 type Filtre = 'actifs' | 'tous' | 'desactives';
@@ -41,12 +39,9 @@ const PALIERS: { valeur: string | null; libelle: string }[] = [
 
 const initiales = (nom: string) =>
   nom.split(/\s+/).filter(Boolean).map((m) => m[0]).slice(0, 2).join('').toUpperCase();
-const quand = (iso: string) =>
-  new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export function Comptes() {
   const [comptes, setComptes] = useState<Compte[]>([]);
-  const [journal, setJournal] = useState<EntreeJournal[]>([]);
   const [filtre, setFiltre] = useState<Filtre>('actifs');
   const [recherche, setRecherche] = useState('');
   const [fiche, setFiche] = useState<string | null>(null);
@@ -56,9 +51,8 @@ export function Comptes() {
   const [chargement, setChargement] = useState(true);
 
   const recharger = useCallback(async () => {
-    const [{ comptes: c }, j] = await Promise.all([chargerComptes(), chargerJournal()]);
+    const { comptes: c } = await chargerComptes();
     setComptes(c);
-    setJournal(j);
   }, []);
 
   useEffect(() => {
@@ -74,7 +68,6 @@ export function Comptes() {
       .filter((c) => !q || cleTri(`${c.nom} ${c.loginId}`).includes(q));
   }, [comptes, filtre, recherche]);
 
-  const noms = useMemo(() => new Map(comptes.map((c) => [c.id, c.nom])), [comptes]);
   const segFiltre = useIndicateurGlissant(FILTRES.findIndex((f) => f.id === filtre), FILTRES.length);
 
   /// Une action sur un compte : on la joue, on relit, et on DIT ce qui s'est passe.
@@ -160,31 +153,9 @@ export function Comptes() {
         )}
       </div>
 
-      <div className="card pad">
-        <b style={{ fontSize: 15 }}>Journal</b>
-        <p className="faint" style={{ margin: '2px 0 10px' }}>Réinitialisations, changements de mot de passe, désactivations.</p>
-        {journal.length === 0 ? (
-          <div className="empty" style={{ padding: 20 }}>Rien de consigné pour l’instant.</div>
-        ) : (
-          <div style={{ display: 'grid', gap: 2 }}>
-            {journal.slice(0, 30).map((j) => (
-              <div key={j.id} className="ligne-journal">
-                <span className="faint num">{quand(j.quand)}</span>
-                <span>
-                  <b>{j.auteurId ? (noms.get(j.auteurId) ?? 'un compte supprimé') : 'Le système'}</b> {libelleAction(j.action)}
-                  {j.action !== 'changement_mot_de_passe' && <> <b>{j.cibleNom}</b></>}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
       {compteOuvert && (
         <FicheCompte
           compte={compteOuvert}
-          journal={journal.filter((j) => j.cibleId === compteOuvert.id)}
-          noms={noms}
           fermer={() => setFiche(null)}
           agir={agir}
           noter={setANoter}
@@ -226,15 +197,11 @@ function Volet({ titre, fermer, children }: { titre: string; fermer: () => void;
 
 function FicheCompte({
   compte: c,
-  journal,
-  noms,
   fermer,
   agir,
   noter,
 }: {
   compte: Compte;
-  journal: EntreeJournal[];
-  noms: Map<string, string>;
   fermer: () => void;
   agir: (a: () => Promise<string | void>) => Promise<void>;
   noter: (n: { nom: string; motDePasse: string }) => void;
@@ -320,18 +287,6 @@ function FicheCompte({
             {c.actif ? 'Désactiver' : 'Réactiver'}
           </button>
         </div>
-
-        {journal.length > 0 && (
-          <div className="field">
-            <span className="label">Journal</span>
-            {journal.slice(0, 8).map((j) => (
-              <div key={j.id} className="ligne-journal">
-                <span className="faint num">{quand(j.quand)}</span>
-                <span>{j.auteurId ? noms.get(j.auteurId) ?? '?' : 'Le système'} {libelleAction(j.action)}</span>
-              </div>
-            ))}
-          </div>
-        )}
 
         {!c.actif && (
           <div className="field">

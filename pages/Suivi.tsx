@@ -11,7 +11,7 @@ import {
   versLigneSuivi,
   type RdvSuivi,
 } from '../services/suivi';
-import { estSeche, indicateurs } from '../backend/src/utils/suivi';
+import { classementCommandes, estSeche, indicateurs, type RangSuivi } from '../backend/src/utils/suivi';
 import { ISSUES_SUIVI, type IssueSuivi } from '../backend/src/auth/roles';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 import { cleTri } from '../backend/src/utils/tri';
@@ -33,15 +33,17 @@ const LIBELLES_ISSUE: Record<IssueSuivi, string> = {
   commande: 'Commande',
   offre_en_cours: 'Offre en cours',
   annule: 'Annulé',
+  no_show: 'No show',
   clos_sans_suite: 'Clos sans suite',
 };
 
-type Vue = 'a_traiter' | 'tous' | 'commandes' | 'trafic';
+type Vue = 'a_traiter' | 'tous' | 'commandes' | 'trafic' | 'vendeurs';
 const VUES: { id: Vue; libelle: string }[] = [
   { id: 'a_traiter', libelle: 'À traiter' },
   { id: 'tous', libelle: 'Tous' },
   { id: 'commandes', libelle: 'Commandes' },
   { id: 'trafic', libelle: 'Trafic naturel' },
+  { id: 'vendeurs', libelle: 'Par vendeur' },
 ];
 
 const pourcent = (t: number | null) => (t === null ? '—' : `${(t * 100).toFixed(1).replace('.', ',')} %`);
@@ -110,6 +112,16 @@ export function Suivi() {
       return true;
     });
   }, [rdvs, vue, recherche, gardes]);
+
+  /// PAR VENDEUR : le classement de `utils/suivi.ts` (teste par `test:suivi`),
+  /// rejoue sur les RDV que la recherche retient — jamais un comptage ecrit ici.
+  /// Phoning ET trafic naturel, comme les indicateurs en tete d'ecran.
+  const parVendeur = useMemo(() => {
+    const q = cleTri(recherche.trim());
+    const retenus = rdvs.filter((r) => !q || cleTri(`${r.vendeur} ${r.siteCode}`).includes(q));
+    return classementCommandes(retenus.map(versLigneSuivi));
+  }, [rdvs, recherche]);
+  const siteDe = useMemo(() => new Map(rdvs.map((r) => [r.vendeurId, r.siteCode])), [rdvs]);
 
   const parJour = useMemo(() => {
     const m = new Map<string, RdvSuivi[]>();
@@ -190,7 +202,9 @@ export function Suivi() {
         </label>
       </div>
 
-      {chargement ? (
+      {!chargement && vue === 'vendeurs' ? (
+        <TableauVendeurs rangs={parVendeur} siteDe={siteDe} />
+      ) : chargement ? (
         <div style={{ display: 'grid', gap: 8 }}>
           {[0, 1, 2, 3].map((i) => <div key={i} className="skel" style={{ height: 64 }} />)}
         </div>
@@ -207,7 +221,7 @@ export function Suivi() {
         ))
       )}
 
-      {!chargement && visibles.length > limite && (
+      {!chargement && vue !== 'vendeurs' && visibles.length > limite && (
         <button type="button" className="btn" style={{ alignSelf: 'center' }} onClick={() => setLimite((l) => l + TRANCHE * 2)}>
           Afficher plus · {visibles.length - limite} restants
         </button>
@@ -225,6 +239,65 @@ export function Suivi() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+type TriVendeurs = 'classement' | 'taux';
+
+function TableauVendeurs({ rangs, siteDe }: { rangs: RangSuivi[]; siteDe: Map<string, string> }) {
+  const [tri, setTri] = useState<TriVendeurs>('classement');
+  /// Le taux seul classerait premier un vendeur a 1 commande sur 1 traite. A taux
+  /// egal, on garde donc l'ordre du classement (plus de commandes d'abord).
+  const lignes = useMemo(
+    () =>
+      tri === 'classement'
+        ? rangs
+        : [...rangs].sort((a, b) => (b.tauxTransformation ?? -1) - (a.tauxTransformation ?? -1) || a.rang - b.rang),
+    [rangs, tri]
+  );
+  if (rangs.length === 0) return <div className="empty card">Aucun vendeur.</div>;
+  const entete = (cle: TriVendeurs, libelle: string) => (
+    <button type="button" className="tri-entete" aria-pressed={tri === cle} onClick={() => setTri(cle)}>
+      {libelle}
+    </button>
+  );
+  return (
+    <div className="card" style={{ overflowX: 'auto' }}>
+      <table className="tbl suivi-vendeurs">
+        <thead>
+          <tr>
+            <th className="r">#</th>
+            <th>Vendeur</th>
+            <th>Site</th>
+            <th className="r">RDV</th>
+            <th className="r">Traités</th>
+            <th className="r">{entete('classement', 'Commandes')}</th>
+            <th className="r">{entete('taux', 'Taux de transfo')}</th>
+            <th className="r">À traiter</th>
+            <th className="r">Offres</th>
+            <th className="r">Annulés</th>
+            <th className="r">No show</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lignes.map((g) => (
+            <tr key={g.cle}>
+              <td className="r num faint">{g.rang}</td>
+              <td><b>{g.libelle}</b></td>
+              <td className="faint">{siteDe.get(g.cle) ?? ''}</td>
+              <td className="r num">{g.planifies}</td>
+              <td className="r num">{g.traites}</td>
+              <td className="r num"><b>{g.commandes}</b></td>
+              <td className="r num"><b>{pourcent(g.tauxTransformation)}</b></td>
+              <td className="r num">{g.aTraiter}</td>
+              <td className="r num">{g.offres}</td>
+              <td className="r num">{g.annules}</td>
+              <td className="r num">{g.noShows}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

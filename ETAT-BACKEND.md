@@ -1,8 +1,18 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 03/10/2026, lots 1 et 2 de `PLAN-GRID-V2.md`.
+Mise a jour : 05/10/2026, issue « no show ».
 
 ---
+
+## 05/10/2026 — Issue de suivi « no show » (`20261005090000_suivi_no_show`)
+
+`rdv_suivi_issue_check` admet `no_show`, entre `annule` et `clos_sans_suite`, et
+`ISSUES_SUIVI` (`auth/roles.ts`) le suit — `test:invariants` 13/13. Un no show est
+TRAITE (il entre dans le denominateur du taux de transformation, comme un annule) et
+se compte a part (`noShows` dans `utils/suivi.ts`, `test:suivi` 24/24).
+
+Le journal des comptes (`journal_compte`) est **toujours alimente** par la base ; seul
+son affichage a ete retire de Reglages.
 
 ## 03/10/2026 — Sante de la base (`20261003180000_sante_base`)
 
