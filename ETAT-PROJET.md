@@ -1766,8 +1766,15 @@ l'utilisateur.
 **Ce qui a tourne, en local** : migration appliquee ; `test:rls` 131/131 (9 nouveaux),
 `test:suivi` 29/29 (5 nouveaux), garde-fous 39/39, invariants 13/13, import 19/19,
 agregats 39/39, repartition 20/20 ; `tsc` front et backend ; build, `dist` conforme.
-**Pas encore vu au navigateur** : le front de developpement attaque Supabase, qui n'a
-pas la migration.
+**Sur Supabase (5G)** : migration appliquee, `comparer` sans ecart (30 migrations),
+`test:rls` 131/131, `test:suivi` 29/29, `test:invariants` 13/13 ; PostgREST trouve
+`suivi_enregistrer` a 8 parametres. **Front en ligne** (`index-B1PaR6E3.js`).
+
+**Incident de l'ecart dev/prod, a retenir** : entre le commit et la migration,
+le front de DEVELOPPEMENT (qui attaque la production) appelait deja
+`suivi_enregistrer(..., p_vd)` — « Could not find the function » a chaque
+qualification. Un changement de signature de RPC casse le front de dev des
+l'enregistrement du fichier. Migrer avant d'ouvrir le front sur une RPC modifiee.
 
 ## CE QUI RESTE, au 02/10/2026
 
