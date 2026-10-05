@@ -82,8 +82,8 @@ const SELECT_VENDEUR = 'id, nom, site_id, date_entree, date_sortie, type_vehicul
 export async function chargerReferentiels(): Promise<Referentiels> {
   const [plaques, sites, marques, vendeurs, encadrements, comptes] = await Promise.all([
     supabase.from('plaque').select('id, libelle, alias, ordre').is('archive_le', null).order('ordre'),
-    supabase.from('site').select('id, code, libelle, plaque_id').is('archive_le', null).order('code'),
-    supabase.from('marque').select('id, code, libelle, ordre').is('archive_le', null).order('ordre'),
+    supabase.from('site').select('id, code, libelle, plaque_id, tableau_ventes').is('archive_le', null).order('code'),
+    supabase.from('marque').select('id, code, libelle, ordre, tableau_ventes').is('archive_le', null).order('ordre'),
     supabase.from('vendeur').select(SELECT_VENDEUR).is('archive_le', null).order('nom'),
     supabase
       .from('encadrement_site')
@@ -128,12 +128,14 @@ export async function chargerReferentiels(): Promise<Referentiels> {
       code: s.code,
       libelle: s.libelle,
       plaqueId: txt(s.plaque_id),
+      tableauVentes: s.tableau_ventes ?? true,
     })),
     marques: verifier(marques).map((m) => ({
       id: txt(m.id),
       code: m.code,
       libelle: m.libelle,
       ordre: m.ordre,
+      tableauVentes: m.tableau_ventes ?? true,
     })),
     vendeurs: (verifier(vendeurs) as unknown as LigneVendeur[]).map(versVendeur),
     encadrements: (verifier(encadrements) as unknown as LigneEncadrement[]).map((e) => ({

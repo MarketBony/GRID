@@ -46,14 +46,11 @@ export function TableauVentes({
   const [ventesRef, setVentesRef] = useState<LigneVente[] | null>(null);
   const [objectifs, setObjectifs] = useState<Map<string, number>>(new Map());
   const [saisieObjectifs, setSaisieObjectifs] = useState(false);
-  /// Marques ouvertes a la saisie d'objectifs sur une campagne encore sans vente.
-  const [marquesOuvertes, setMarquesOuvertes] = useState<Set<string>>(new Set());
   const [erreur, setErreur] = useState<string | null>(null);
 
   useEffect(() => {
     setRefId(memeMoisAnPasse(campagnes.find((c) => c.id === campagneId), campagnes));
     setVentes(null);
-    setMarquesOuvertes(new Set());
     Promise.all([chargerVentes(campagneId), chargerObjectifs(campagneId)])
       .then(([v, o]) => {
         setVentes(v);
@@ -77,21 +74,24 @@ export function TableauVentes({
       .sort((a, b) => a.ordre - b.ordre)
       .map((p) => ({
         plaque: p,
-        sites: ref.sites.filter((s) => s.plaqueId === p.id).sort((a, b) => a.libelle.localeCompare(b.libelle, 'fr')),
+        sites: ref.sites.filter((s) => s.plaqueId === p.id && s.tableauVentes !== false).sort((a, b) => a.libelle.localeCompare(b.libelle, 'fr')),
       }))
       .filter((g) => g.sites.length > 0);
   }, [ref]);
 
-  /// Une marque n'a sa table que si elle a quelque chose a montrer : une vente,
-  /// cette annee ou en A-1, ou un objectif. Sans quoi Alpine poserait deux
-  /// tableaux vides a chaque campagne.
-  const marques = useMemo(() => {
-    const presentes = new Set<string>();
-    for (const l of [...(ventes ?? []), ...(ventesRef ?? [])]) if (l.marqueId) presentes.add(l.marqueId);
-    for (const cle of objectifs.keys()) presentes.add(cle.split('|')[1]);
-    for (const id of marquesOuvertes) presentes.add(id);
-    return [...(ref?.marques ?? [])].sort((a, b) => a.ordre - b.ordre).filter((m) => presentes.has(m.id));
-  }, [ref, ventes, ventesRef, objectifs, marquesOuvertes]);
+  /// Toutes les marques retenues pour le tableau (`marque.tableau_ventes`), avec
+  /// ou sans vente : une marque sans vente est une information.
+  const marques = useMemo(
+    () => [...(ref?.marques ?? [])].sort((a, b) => a.ordre - b.ordre).filter((m) => m.tableauVentes !== false),
+    [ref]
+  );
+  /// Les ventes d'un site ou d'une marque hors tableau ne comptent pas non plus
+  /// dans les totaux : un total BONY doit etre la somme des lignes affichees.
+  const retenue = useMemo(() => {
+    const sites = new Set(groupes.flatMap((g) => g.sites.map((s) => s.id)));
+    const exclues = new Set((ref?.marques ?? []).filter((m) => m.tableauVentes === false).map((m) => m.id));
+    return (l: LigneVente) => sites.has(l.siteId) && !(l.marqueId && exclues.has(l.marqueId));
+  }, [groupes, ref]);
 
   const poserObjectif = async (siteId: string, marqueId: string, valeur: string) => {
     const v = valeur.trim() === '' ? null : Math.max(0, Math.round(Number(valeur)));
@@ -122,7 +122,7 @@ export function TableauVentes({
 
   const refLibelle = campagnes.find((c) => c.id === refId)?.libelle ?? null;
   const t = (lignes: LigneVente[] | null, categorie: 'VPP' | 'VD' | 'VO', marqueId?: string) =>
-    lignes ? tableauVentes(lignes, { categorie, marqueId }) : null;
+    lignes ? tableauVentes(lignes.filter(retenue), { categorie, marqueId }) : null;
 
   return (
     <div className="ventes">
@@ -147,15 +147,8 @@ export function TableauVentes({
 
       {erreur && <div className="bandeau-v2 erreur">{erreur}</div>}
 
-      {ventes.length === 0 && marques.length === 0 ? (
-        <div className="empty card">
-          Aucune vente pour cette campagne. Une vente est un RDV qualifié « Commande » dans le Suivi.
-          {peutSaisir && (
-            <div style={{ marginTop: 10 }}>
-              <MarquesObjectifs marques={ref.marques} onChoisir={(m) => { setMarquesOuvertes((o) => new Set(o).add(m)); setSaisieObjectifs(true); }} />
-            </div>
-          )}
-        </div>
+      {marques.length === 0 ? (
+        <div className="empty card">Aucune marque n'est retenue pour le tableau des ventes.</div>
       ) : (
         <div className="ventes-grille">
           {marques.map((m) => (
@@ -207,21 +200,6 @@ export function TableauVentes({
         </div>
       )}
     </div>
-  );
-}
-
-/// Campagne sans vente ni objectif : aucune marque n'a encore de table. On laisse
-/// choisir la marque dont on veut saisir les objectifs.
-function MarquesObjectifs({ marques, onChoisir }: { marques: Marque[]; onChoisir: (id: string) => void }) {
-  return (
-    <span className="faint">
-      Saisir les objectifs VPP :{' '}
-      {marques.map((m) => (
-        <button key={m.id} type="button" className="btn" style={{ marginLeft: 6 }} onClick={() => onChoisir(m.id)}>
-          {m.libelle}
-        </button>
-      ))}
-    </span>
   );
 }
 

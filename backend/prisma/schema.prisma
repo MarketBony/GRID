@@ -207,6 +207,9 @@ model Site {
   code      String    @unique
   libelle   String
   plaqueId  BigInt    @map("plaque_id")
+  /// Le site a-t-il sa ligne dans le tableau des ventes ? Faux pour Alpine
+  /// (decision de l'utilisateur, 05/10/2026). Une donnee, pas une exclusion en dur.
+  tableauVentes Boolean @default(true) @map("tableau_ventes")
   creeLe    DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
   creePar   BigInt?   @map("cree_par")
   archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)
@@ -234,6 +237,8 @@ model Marque {
   code      String    @unique
   libelle   String
   ordre     Int       @default(0)
+  /// La marque a-t-elle ses blocs dans le tableau des ventes ? Faux pour Alpine.
+  tableauVentes Boolean @default(true) @map("tableau_ventes")
   creeLe    DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
   creePar   BigInt?   @map("cree_par")
   archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)

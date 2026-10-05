@@ -63,6 +63,8 @@ export interface Site {
   code: string;
   libelle: string;
   plaqueId: string;
+  /// Ligne dans le tableau des ventes (faux pour Alpine).
+  tableauVentes?: boolean;
 }
 
 export interface Marque {
@@ -70,6 +72,8 @@ export interface Marque {
   code: string;
   libelle: string;
   ordre: number;
+  /// Blocs dans le tableau des ventes (faux pour Alpine).
+  tableauVentes?: boolean;
 }
 
 /// La forme complete d'un vendeur telle que l'API la renvoie vit dans

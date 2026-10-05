@@ -1756,8 +1756,13 @@ chaque site, total BONY en pied.
 - chiffres GLOBAUX lisibles par tout compte (vue `relance.vente`, sans nom) ;
 - les pourcentages d'en-tete de l'Excel (10 % / 4,9 %) sont ignores.
 
-Une marque n'a ses tables que si elle a une vente (cette campagne ou la reference)
-ou un objectif : sans quoi Alpine poserait deux tableaux vides.
+**Corrige le meme jour, a la demande de l'utilisateur** : une marque n'avait ses
+blocs que si elle avait une vente — Dacia, sans vente encore, n'apparaissait pas.
+Desormais toutes les marques retenues s'affichent, vente ou non. Ce qui est retenu
+est une DONNEE : `marque.tableau_ventes` et `site.tableau_ventes` (migration
+`20261005120818`), a faux pour Alpine, marque ET site — Alpine ne remonte pas dans
+Ventes et ne change nulle part ailleurs. Les ventes d'un site ou d'une marque hors
+tableau sortent aussi des totaux BONY : un total est la somme des lignes affichees.
 
 **Ecart assume avec l'Excel** : ses lignes regroupent Albi + Carmaux et Rodez + VDR,
 et n'ont ni Alpine ni Lavaur. GRID montre ses 20 sites, sur decision de
