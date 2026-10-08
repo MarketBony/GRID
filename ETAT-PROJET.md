@@ -1788,6 +1788,11 @@ aussi les vendeurs de SA TABLE, qui ne sont pas sur son site pendant les portes
 ouvertes. Le Suivi (liste, qualification, trafic naturel) ne montre plus que les
 vendeurs de ses sites ; la SAISIE ne change pas. Detail : `ETAT-BACKEND.md`.
 
+**Retirer un trafic naturel saisi par erreur** : bouton « Retirer » sur la ligne
+(trafic naturel seulement, campagne ouverte, avec confirmation). C'est un ARCHIVAGE
+(`archiverRdv`, le meme que la saisie) — interdit n.1 : le RDV sort du Suivi et des
+totaux, il reste en base. Un RDV du phoning se retire depuis la saisie.
+
 ## CE QUI RESTE, au 02/10/2026
 
 **Tout est en ligne** jusqu'au lot du 10/09. Le lot du 02/10 (creation de campagne)

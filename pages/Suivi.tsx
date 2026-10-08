@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Icone } from '../components/ui/Icone';
 import { useIndicateurGlissant } from '../hooks/useIndicateurGlissant';
 import { chargerCampagnes, type CampagneResume } from '../services/campagnes';
-import { chargerSaisie, nouvelleCle, type PerimetreSaisie } from '../services/saisie';
+import { archiverRdv, chargerSaisie, nouvelleCle, type PerimetreSaisie } from '../services/saisie';
 import {
   chargerSuivi,
   enregistrerSuivi,
@@ -148,6 +148,21 @@ export function Suivi() {
     }
   };
 
+  /// Un trafic naturel saisi PAR ERREUR s'archive (interdit n.1 : pas de
+  /// suppression) — il sort du Suivi et des totaux, il reste en base. Seulement
+  /// le trafic naturel : un RDV du phoning se retire depuis la saisie.
+  const retirer = async (r: RdvSuivi) => {
+    if (figee || r.source !== 'showroom') return;
+    if (!window.confirm(`Retirer le RDV de trafic naturel « ${r.client} » (${r.vendeur}) ?`)) return;
+    try {
+      await archiverRdv(r.id);
+      setRdvs((l) => l.filter((x) => x.id !== r.id));
+      setErreur(null);
+    } catch (e) {
+      setErreur(`${r.client} : ${e instanceof Error ? e.message : 'retrait impossible.'}`);
+    }
+  };
+
   const segVue = useIndicateurGlissant(VUES.findIndex((v) => v.id === vue), VUES.length);
 
   return (
@@ -217,7 +232,7 @@ export function Suivi() {
           <section key={jour} className="suivi-jour">
             <h2 className="label">{libelleJour(jour)} · {liste.length} RDV</h2>
             {liste.map((r, k) => (
-              <LigneSuivi key={r.id} rdv={r} rang={k} figee={figee} sortant={false} qualifier={qualifier} />
+              <LigneSuivi key={r.id} rdv={r} rang={k} figee={figee} sortant={false} qualifier={qualifier} retirer={retirer} />
             ))}
           </section>
         ))
@@ -310,12 +325,14 @@ function LigneSuivi({
   figee,
   sortant,
   qualifier,
+  retirer,
 }: {
   rdv: RdvSuivi;
   rang: number;
   figee: boolean;
   sortant: boolean;
   qualifier: (r: RdvSuivi, modif: Partial<RdvSuivi>) => Promise<void>;
+  retirer: (r: RdvSuivi) => Promise<void>;
 }) {
   const [modele, setModele] = useState(r.modele ?? '');
   useEffect(() => setModele(r.modele ?? ''), [r.modele]);
@@ -331,6 +348,11 @@ function LigneSuivi({
         <div className="client">
           {r.client}
           {r.source === 'showroom' && <span className="badge" style={{ ['--c' as string]: 'var(--info)' }}>Trafic naturel</span>}
+          {r.source === 'showroom' && !figee && (
+            <button type="button" className="btn sm retirer-trafic" onClick={() => void retirer(r)} aria-label={`Retirer ${r.client}`}>
+              Retirer
+            </button>
+          )}
         </div>
         <div className="meta">
           {r.vendeur} · {r.siteCode} · {r.creneau}
