@@ -8,6 +8,7 @@ import {
   chargerSuivi,
   enregistrerSuivi,
   poserTraficNaturel,
+  vendeursDuSuivi,
   versLigneSuivi,
   type RdvSuivi,
 } from '../services/suivi';
@@ -429,9 +430,9 @@ function FormulaireTraficNaturel({
   const cle = useRef(nouvelleCle());
 
   useEffect(() => {
-    chargerSaisie(campagneId)
-      .then((p) => {
-        setPerimetre(p);
+    Promise.all([chargerSaisie(campagneId), vendeursDuSuivi(campagneId)])
+      .then(([p, miens]) => {
+        setPerimetre({ ...p, vendeurs: p.vendeurs.filter((v) => miens.has(v.id)) });
         setJour(p.campagne.jours[0]?.jour ?? '');
         setCreneau(p.campagne.creneaux[0]?.code ?? '');
       })

@@ -620,7 +620,7 @@ MOT_DE_PASSE="..." npm run comptes-test
 
 # Les sept suites de vérification. Aucune ne doit passer au rouge.
 npm --prefix backend run test:garde-fous    # 39 invariants, chacun doit REFUSER
-npm --prefix backend run test:rls           # 131 contrôles des politiques ET des RPC
+npm --prefix backend run test:rls           # 135 contrôles des politiques ET des RPC
 npm --prefix backend run test:invariants    # 13 contrôles code <-> base (interdit n.6)
 npm --prefix backend run test:import        # 19 tests du parseur, fonctions pures
 npm --prefix backend run test:agregats      # 36 tests des totaux, contre les 1107 RDV de juin

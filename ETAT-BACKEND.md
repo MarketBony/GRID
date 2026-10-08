@@ -1,8 +1,24 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 05/10/2026, tableau des ventes.
+Mise a jour : 08/10/2026, perimetre du Suivi.
 
 ---
+
+## 08/10/2026 — Le Suivi s'arrete aux vendeurs de MES SITES (`20261008090000`, `20261008090100`)
+
+Retour du terrain : pendant les portes ouvertes, le chef de table n'est pas sur site
+avec sa table, il ne fait pas son suivi. **Le perimetre est COUPE EN DEUX, pas
+recopie** (interdit n.4) :
+
+| Vue | Origines |
+|---|---|
+| `perimetre_suivi` (nouvelle) | administration, chef de plaque, chef de site, encadrement de site |
+| `perimetre_saisie` | `perimetre_suivi` **UNION** l'origine par table — memes colonnes, `peut_saisir` et `charger_saisie` inchanges |
+
+Chaque origine est ecrite une fois ; seules les conditions de PRESENCE du vendeur
+(archive, dates) sont repetees dans les deux branches. Lisent `perimetre_suivi` :
+les trois politiques de `rdv_suivi`, `charger_suivi`, et `rdv_poser_showroom` (refus
+P0001 hors de mes sites). `test:rls` **131 -> 135**.
 
 ## 05/10/2026 — Tableau des ventes (`20261005114344_ventes_vd_objectifs`)
 

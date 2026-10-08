@@ -162,3 +162,13 @@ export async function poserTraficNaturel(corps: {
   ) as unknown as { id: number };
   return txt(r.id);
 }
+
+/// Les vendeurs que le Suivi me montre : ceux de MES SITES (`perimetre_suivi`),
+/// pas ceux de ma table — le chef de table n'est pas sur site avec eux pendant
+/// les portes ouvertes (08/10/2026). La base refuse de toute facon le reste.
+export async function vendeursDuSuivi(campagneId: string): Promise<Set<string>> {
+  const lignes = verifier(
+    await supabase.from('perimetre_suivi').select('vendeur_id').eq('campagne_id', Number(campagneId))
+  ) as unknown as { vendeur_id: number }[];
+  return new Set(lignes.map((l) => txt(l.vendeur_id)));
+}

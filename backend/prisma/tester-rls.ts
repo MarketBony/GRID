@@ -1742,15 +1742,40 @@ async function main() {
       diac
     );
 
-  await doitValoir(
-    'SUIVI  le chef qualifie un RDV de sa table',
+  // 08/10/2026 : le Suivi s'arrete aux vendeurs de MES SITES (`perimetre_suivi`).
+  // Le chef de table n'est pas sur site avec sa table pendant les portes ouvertes.
+  await doitRefuser(
+    'SUIVI  le chef de table ne qualifie PAS un RDV de sa table',
     { login: CHEF },
+    DROIT_INSUFFISANT,
+    (tx) => qualifier(tx, rdvTable, 'commande', true),
+    deuxRdv
+  );
+  let rdvEncadre: bigint = 0n;
+  const rdvDuSite = async (tx: Tx) => {
+    rdvEncadre = (await tx.rdv.create({ data: rdvDecor(decor.vendeurEncadre, decor.campagne1), select: { id: true } })).id;
+  };
+  await doitValoir(
+    'SUIVI  l encadrant qualifie un RDV d un vendeur de son site',
+    { login: ENCADRANT },
     1,
     async (tx) => {
-      await qualifier(tx, rdvTable, 'commande', true);
-      return nombre(tx, `SELECT count(*) AS n FROM relance.rdv_suivi WHERE rdv_id = ${rdvTable} AND issue = 'commande' AND diac`);
+      await qualifier(tx, rdvEncadre, 'commande', true);
+      return nombre(tx, `SELECT count(*) AS n FROM relance.rdv_suivi WHERE rdv_id = ${rdvEncadre} AND issue = 'commande' AND diac`);
     },
-    deuxRdv
+    rdvDuSite
+  );
+  await doitValoir(
+    'SUIVI  perimetre_suivi du chef de table : 0 vendeur (sa table n y est pas)',
+    { login: CHEF },
+    0,
+    (tx) => nombre(tx, `SELECT count(*) AS n FROM relance.perimetre_suivi WHERE campagne_id = ${decor.campagne1.id}`)
+  );
+  await doitValoir(
+    'SUIVI  perimetre_saisie du chef de table : toujours ses 2 vendeurs',
+    { login: CHEF },
+    2,
+    (tx) => nombre(tx, `SELECT count(*) AS n FROM relance.perimetre_saisie WHERE campagne_id = ${decor.campagne1.id}`)
   );
   await doitRefuser(
     'SUIVI  le chef ne qualifie PAS un RDV hors perimetre',
@@ -1851,15 +1876,29 @@ async function main() {
     (tx) => tx.$executeRawUnsafe(`DELETE FROM relance.objectif_vente`)
   );
 
-  await doitValoir(
-    'SHOWROOM  le chef pose un RDV de trafic naturel, marque showroom',
+  await doitRefuser(
+    'SHOWROOM  le chef de table ne pose PAS de trafic naturel pour sa table',
     { login: CHEF },
+    ERREUR_METIER,
+    (tx) =>
+      tx.$queryRawUnsafe(
+        `SELECT relance.rdv_poser_showroom($1, $2, $3::date, $4, NULL, 'VO', 'CLIENT SHOWROOM', $5::uuid)`,
+        decor.campagne1.id,
+        decor.vendeurDeSaTable.id,
+        decor.campagne1.jours[0],
+        decor.campagne1.creneau,
+        '00000000-0000-4000-8000-000000000042'
+      )
+  );
+  await doitValoir(
+    'SHOWROOM  l encadrant pose un RDV de trafic naturel, marque showroom',
+    { login: ENCADRANT },
     1,
     async (tx) => {
       await tx.$queryRawUnsafe(
         `SELECT relance.rdv_poser_showroom($1, $2, $3::date, $4, NULL, 'VO', 'CLIENT SHOWROOM', $5::uuid)`,
         decor.campagne1.id,
-        decor.vendeurDeSaTable.id,
+        decor.vendeurEncadre.id,
         decor.campagne1.jours[0],
         decor.campagne1.creneau,
         '00000000-0000-4000-8000-000000000043'

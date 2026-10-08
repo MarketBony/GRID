@@ -1781,6 +1781,13 @@ le front de DEVELOPPEMENT (qui attaque la production) appelait deja
 qualification. Un changement de signature de RPC casse le front de dev des
 l'enregistrement du fichier. Migrer avant d'ouvrir le front sur une RPC modifiee.
 
+## 08/10/2026 — Suivi des RDV : seulement les vendeurs de mes sites
+
+Les sessions de phoning se sont bien passees. Retour sur le Suivi : un encadrant voyait
+aussi les vendeurs de SA TABLE, qui ne sont pas sur son site pendant les portes
+ouvertes. Le Suivi (liste, qualification, trafic naturel) ne montre plus que les
+vendeurs de ses sites ; la SAISIE ne change pas. Detail : `ETAT-BACKEND.md`.
+
 ## CE QUI RESTE, au 02/10/2026
 
 **Tout est en ligne** jusqu'au lot du 10/09. Le lot du 02/10 (creation de campagne)
