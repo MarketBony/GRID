@@ -20,6 +20,10 @@ Chaque origine est ecrite une fois ; seules les conditions de PRESENCE du vendeu
 les trois politiques de `rdv_suivi`, `charger_suivi`, et `rdv_poser_showroom` (refus
 P0001 hors de mes sites). `test:rls` **131 -> 135**.
 
+**Mesure sur Supabase, compte encadrant reel (10 vendeurs)** : `perimetre_saisie` en
+UNION 2,8 a 5,5 ms d'execution, 1,3 a 1,6 ms de planification ; `perimetre_suivi`
+2,0 ms. A comparer aux 174 ms du 08/09 : aucune regression.
+
 ## 05/10/2026 — Tableau des ventes (`20261005114344_ventes_vd_objectifs`)
 
 | Objet | Role |
