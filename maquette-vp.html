@@ -1,0 +1,1057 @@
+<!doctype html>
+<!--
+  MAQUETTE — GRID/VP, la vente privee (PLAN-GRID-VP.md).
+  Page de mise au point : servie par Vite en developpement, EXCLUE du build
+  (vite build ne prend que index.html). Donnees FICTIVES, aucun appel reseau.
+  Elle charge les VRAIES feuilles de GRID (styles/composants-anciens.css et
+  styles/v2.css) : ce qu'on juge ici est ce qu'on aura. Vanilla JS a dessein :
+  on juge des ecrans et un parcours, pas une architecture.
+  Un seul etat partage : un geste fait sur la tablette se voit dans l'agenda,
+  la projection et le bilan.
+-->
+<html lang="fr" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GRID VP — maquette</title>
+<link rel="icon" type="image/svg+xml" href="/grid.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&family=Syncopate:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles/composants-anciens.css" />
+<link rel="stylesheet" href="/styles/v2.css" />
+<style>
+/* Tout ce qui suit est propre a la maquette, prefixe `vp-`. Ce qui sera retenu
+   rejoindra styles/v2.css, dans sa couche. */
+@layer v2 {
+.v2 .vp-barre { position: sticky; top: 12px; z-index: 50; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 10px 8px 14px; border-radius: 22px; margin: 12px auto 0; max-width: 120rem; width: calc(100% - 24px); }
+.v2 .vp-barre .logo { width: 28px; height: 28px; flex: none; }
+.v2 .vp-barre .titre { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.v2 .vp-barre .titre b { font-family: var(--font-display); font-size: 13px; letter-spacing: .03em; text-transform: uppercase; }
+.v2 .vp-barre .titre span { font-size: 11.5px; color: var(--text-3); font-weight: 700; }
+.v2 .vp-barre .droite { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.v2 .vp-onglets { overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+.v2 .vp-onglets > .pouce { background: var(--bony-grad); box-shadow: 0 8px 22px -12px rgba(247, 86, 50, .75); transition: transform 560ms var(--ressort-ample), width 260ms var(--ease-out); }
+.v2 .vp-onglets > button[aria-pressed='true'] { color: #fff; }
+.v2 .page.vp-page { padding-top: 18px; }
+.v2 .vp-ecran { display: none; flex-direction: column; gap: 14px; }
+.v2 .vp-ecran.actif { display: flex; animation: v2-entre 560ms var(--ressort-vif) both; }
+
+.v2 .vp-note { display: none; padding: 10px 14px; border-radius: 12px; font-size: 12.5px; color: var(--text-2); background: color-mix(in srgb, var(--info) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--info) 30%, transparent); }
+.v2.notes .vp-note { display: block; }
+.v2 .vp-note b { color: var(--text); }
+
+.v2 .vp-deux { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 14px; align-items: start; }
+@media (max-width: 1000px) { .v2 .vp-deux { grid-template-columns: 1fr; } }
+
+/* Classement en direct */
+.v2 .vp-classement { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.v2 .vp-classement li { display: grid; grid-template-columns: 30px minmax(0, 1fr) 120px 44px; align-items: center; gap: 12px; min-height: 50px; padding: 0 12px; border-radius: 12px; background: var(--ctl-bg); will-change: transform; }
+.v2 .vp-classement li.monte { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 55%, transparent); }
+.v2 .vp-classement .rang { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; font-weight: 800; font-size: 12px; background: var(--ctl-bg-h); }
+.v2 .vp-classement li:first-child .rang { background: var(--bony-grad); color: #fff; }
+.v2 .vp-classement .nom { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .vp-classement .nom small { display: block; font-size: 11px; color: var(--text-3); font-weight: 700; }
+.v2 .vp-jauge { position: relative; height: 8px; border-radius: 99px; background: var(--ctl-bg-h); overflow: hidden; }
+.v2 .vp-jauge > i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--bony-grad); transform-origin: 0 50%; transition: transform 620ms var(--ressort-ample); width: 100%; }
+.v2 .vp-jauge-lib { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-3); margin-top: 4px; }
+.v2 .vp-classement .n { font-size: 20px; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .v2 .vp-classement li { grid-template-columns: 28px minmax(0, 1fr) 40px; } .v2 .vp-classement .jauge-col { display: none; } }
+
+/* Graphiques SVG */
+.v2 .vp-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.v2 .vp-svg text { fill: var(--text-3); font: 700 11px var(--font-ui); }
+.v2 .vp-svg .grille-l { stroke: var(--line); }
+.v2 .vp-legende { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; font-weight: 700; color: var(--text-2); }
+.v2 .vp-legende i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+/* Agenda du jour J */
+.v2 .vp-agenda-cadre { overflow-x: auto; padding: 0; }
+.v2 .vp-agenda { display: grid; min-width: max-content; }
+.v2 .vp-agenda .tete { position: sticky; top: 0; z-index: 2; padding: 10px 8px; font-weight: 800; font-size: 12.5px; text-align: center; background: var(--glass-strong); box-shadow: inset 0 -1px 0 var(--line); white-space: nowrap; }
+.v2 .vp-agenda .tete small { display: block; color: var(--text-3); font-size: 11px; font-weight: 700; }
+.v2 .vp-agenda .heure { position: sticky; left: 0; z-index: 1; padding: 8px 10px; font-weight: 800; font-size: 12px; color: var(--text-3); background: var(--glass-strong); box-shadow: inset -1px 0 0 var(--line), inset 0 -1px 0 var(--line); }
+.v2 .vp-agenda .heure.maintenant { color: var(--accent); }
+.v2 .vp-agenda .case { min-height: 66px; padding: 5px; box-shadow: inset -1px 0 0 var(--line), inset 0 -1px 0 var(--line); transition: background-color var(--t-fast); }
+.v2 .vp-agenda .case.passe { background: color-mix(in srgb, var(--text-3) 5%, transparent); }
+.v2 .vp-agenda .case.libre-cible { background: color-mix(in srgb, var(--ok) 14%, transparent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ok) 60%, transparent); }
+.v2 .vp-agenda .case.double { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--warn) 70%, transparent); }
+.v2 .vp-agenda .case.double::after { content: 'Deux clients à la même heure'; display: block; margin-top: 4px; font-size: 10.5px; font-weight: 800; color: var(--warn); }
+.v2 .vp-agenda .case.survol { background: color-mix(in srgb, var(--ok) 26%, transparent); }
+.v2 .vp-rdv { display: grid; gap: 3px; width: 100%; padding: 6px 8px; border: 0; border-radius: 10px; text-align: left; cursor: grab; font: inherit; color: var(--text);
+  background: color-mix(in srgb, var(--c, var(--text-3)) 16%, var(--surface-1)); box-shadow: inset 3px 0 0 var(--c, var(--text-3)), var(--ombre-contact);
+  transition: transform 620ms var(--ressort-ample), box-shadow var(--t-fast); }
+.v2 .vp-rdv + .vp-rdv { margin-top: 4px; }
+.v2 .vp-rdv:hover { transform: translateY(-1px); }
+.v2 .vp-rdv:active { cursor: grabbing; }
+.v2 .vp-rdv .cl { font-weight: 800; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.v2 .vp-rdv .meta { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--text-2); }
+.v2 .vp-rdv .marque { height: 16px; padding: 0 5px; font-size: 9.5px; }
+
+/* Volet (detail d'un RDV) */
+.v2 .vp-volet-voile { position: fixed; inset: 0; z-index: 900; background: rgba(5, 6, 14, .35); opacity: 0; pointer-events: none; transition: opacity var(--t-med); }
+.v2 .vp-volet { position: fixed; z-index: 901; top: 12px; right: 12px; bottom: 12px; width: min(420px, calc(100vw - 24px)); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow: auto;
+  transform: translateX(calc(100% + 30px)); transition: transform 620ms var(--ressort-ample); }
+.v2.volet-ouvert .vp-volet-voile { opacity: 1; pointer-events: auto; }
+.v2.volet-ouvert .vp-volet { transform: none; }
+.v2 .vp-volet h2 { margin: 0; font-size: 18px; }
+.v2 .vp-volet .ligne { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.v2 .vp-volet .ligne span:first-child { color: var(--text-3); font-weight: 700; }
+.v2 .vp-choix { display: grid; gap: 6px; }
+.v2 .vp-choix button { display: flex; justify-content: space-between; align-items: center; }
+
+/* Accueil (tablette) */
+.v2 .vp-tablette { display: grid; gap: 14px; max-width: 1180px; width: 100%; margin: 0 auto; }
+.v2 .vp-tablette .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 700px) { .v2 .vp-tablette .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.v2 .vp-recherche { display: flex; gap: 10px; align-items: center; }
+.v2 .vp-recherche .input { height: 56px; font-size: 20px; padding: 0 18px; border-radius: 16px; }
+.v2 .vp-recherche .btn { height: 56px; padding: 0 20px; border-radius: 16px; font-size: 15px; }
+.v2 .vp-file { display: grid; gap: 8px; }
+.v2 .vp-file h3 { margin: 6px 4px 0; color: var(--text-3); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.v2 .vp-client { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 14px; border-radius: 16px; background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); }
+.v2 .vp-client .h { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.v2 .vp-client .qui { min-width: 0; }
+.v2 .vp-client .qui > b { display: block; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Enfant DIRECT : un `.qui span` attrapait l'etiquette de marque (texte gris sur jaune). */
+.v2 .vp-client .qui > span { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; color: var(--text-2); font-weight: 700; font-size: 13px; margin-top: 3px; }
+.v2 .vp-client .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.v2 .vp-client .actions .btn { height: 48px; padding: 0 18px; border-radius: 14px; font-size: 15px; }
+/* Neutres, teintes de la couleur de l'etape suivante : une ligne par client ferait sinon
+   vingt actions principales en degrade (une par ecran, deux au plus — CLAUDE.md). */
+.v2 .vp-client .actions .btn[style*='--c'] { color: color-mix(in srgb, var(--c) 80%, var(--text)); background: color-mix(in srgb, var(--c) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 40%, transparent); }
+.v2 .vp-client .actions .btn[style*='--c']:hover { background: color-mix(in srgb, var(--c) 24%, transparent); }
+.v2 .vp-client.fini { opacity: .62; }
+@media (max-width: 640px) { .v2 .vp-client { grid-template-columns: 54px minmax(0, 1fr); } .v2 .vp-client .actions { grid-column: 1 / -1; justify-content: stretch; } .v2 .vp-client .actions .btn { flex: 1; } }
+
+/* Dialogue */
+.v2 .vp-dialogue-voile { position: fixed; inset: 0; z-index: 950; display: grid; place-items: center; padding: 16px; background: rgba(5, 6, 14, .45); }
+.v2 .vp-dialogue-voile[hidden] { display: none; }
+.v2 .vp-dialogue { width: min(520px, 100%); border-radius: 22px; padding: 20px; display: grid; gap: 14px; animation: v2-entre 480ms var(--ressort-vif) both; }
+.v2 .vp-dialogue h2 { margin: 0; font-size: 18px; }
+.v2 .vp-gros-choix { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.v2 .vp-gros-choix .btn { height: 64px; font-size: 16px; border-radius: 16px; }
+.v2 .vp-cases { display: flex; gap: 8px; flex-wrap: wrap; }
+.v2 .vp-cases .chip { height: 40px; padding: 0 16px; font-size: 14px; }
+
+/* Bilan */
+.v2 .vp-tunnel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: end; }
+.v2 .vp-tunnel .etape { display: grid; gap: 6px; }
+.v2 .vp-tunnel .barre { border-radius: 12px 12px 4px 4px; background: var(--bony-grad); opacity: .9; transform-origin: 50% 100%; animation: vp-pousse 900ms var(--ressort-ample) both; }
+@keyframes vp-pousse { from { transform: scaleY(0); } }
+.v2 .vp-tunnel .v { font-size: 22px; font-weight: 800; }
+.v2 .vp-tunnel .l { font-size: 12px; font-weight: 700; color: var(--text-3); }
+.v2 .vp-tunnel .taux { font-size: 12px; font-weight: 800; color: var(--accent); }
+.v2 .tbl tr.nous td { background: var(--sel); font-weight: 800; }
+.v2 .vp-tbl-cadre { overflow-x: auto; }
+
+/* Projection */
+.v2 .vp-projection { position: relative; display: grid; gap: 22px; padding: 28px; border-radius: 28px; min-height: 70vh; }
+.v2 .vp-projection .gros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.v2 .vp-projection .gros > div { padding: 22px 24px; border-radius: 22px; background: var(--box-bg); box-shadow: inset 0 0 0 1px var(--box-line); }
+.v2 .vp-projection .gros .accent { background: var(--bony-grad); color: #fff; }
+.v2 .vp-projection .gros b { display: block; font-size: clamp(48px, 7vw, 110px); font-weight: 800; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.v2 .vp-projection .gros span { font-size: clamp(14px, 1.4vw, 22px); font-weight: 700; opacity: .8; }
+.v2 .vp-projection .podium { display: grid; gap: 8px; }
+.v2 .vp-projection .podium div { display: grid; grid-template-columns: 50px 1fr auto; align-items: center; gap: 16px; padding: 12px 18px; border-radius: 16px; background: var(--ctl-bg); font-size: clamp(16px, 1.8vw, 28px); font-weight: 800; }
+.v2 .vp-projection .podium div:first-child { background: var(--sel); }
+.v2 .vp-projection .fil { font-size: clamp(14px, 1.3vw, 20px); font-weight: 700; color: var(--text-2); }
+.v2 .vp-projection .flash { position: absolute; inset: 0; display: grid; place-items: center; border-radius: inherit; background: color-mix(in srgb, var(--bg) 70%, transparent); font-size: clamp(36px, 6vw, 90px); font-weight: 800; text-align: center; animation: vp-flash 2.6s var(--ease-out) both; pointer-events: none; }
+.v2 .vp-projection .flash small { display: block; font-size: .4em; color: var(--text-2); }
+@keyframes vp-flash { 0% { opacity: 0; transform: scale(.9); } 12% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+@media (max-width: 800px) { .v2 .vp-projection .gros { grid-template-columns: 1fr; } }
+
+/* Choix de VP et parametrage */
+.v2 .vp-choix-vp { all: unset; display: flex; flex-direction: column; line-height: 1.2; min-width: 0; cursor: pointer; padding: 4px 8px; margin: -4px -8px; border-radius: 12px; transition: background-color var(--t-fast); }
+.v2 .vp-choix-vp:hover { background: var(--ctl-bg); }
+.v2 .vp-choix-vp:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.v2 .vp-choix-vp b { display: flex; align-items: center; gap: 4px; }
+.v2 .vp-menu { position: fixed; z-index: 960; width: min(340px, calc(100vw - 24px)); padding: 8px; border-radius: 18px; display: grid; gap: 2px; animation: v2-entre 420ms var(--ressort-vif) both; }
+.v2 .vp-menu[hidden] { display: none; }
+.v2 .vp-menu .groupe { padding: 8px 10px 4px; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+.v2 .vp-menu button.ligne-vp { all: unset; display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; align-items: center; padding: 9px 10px; border-radius: 12px; cursor: pointer; }
+.v2 .vp-menu button.ligne-vp:hover, .v2 .vp-menu button.ligne-vp:focus-visible { background: var(--ctl-bg-h); }
+.v2 .vp-menu button.ligne-vp b { display: block; font-size: 13.5px; }
+.v2 .vp-menu button.ligne-vp small { color: var(--text-3); font-weight: 700; font-size: 11.5px; }
+.v2 .vp-menu .pied-menu { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; }
+.v2.encadrant [data-admin] { display: none !important; }
+
+.v2 .vp-param { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 900px) { .v2 .vp-param { grid-template-columns: 1fr; } }
+.v2 .vp-param-liste { padding: 0; overflow: hidden; }
+.v2 .vp-param-liste .liste-corps { max-height: 70vh; }
+.v2 .vp-param-liste .vendeur-v2 .n { font-size: 11px; }
+.v2 .vp-param-liste .vendeur-v2.actif .badge { background: rgba(255, 255, 255, .22); color: #fff; }
+@media (max-width: 900px) { .v2 .vp-param-liste .liste-corps { flex-direction: row; overflow-x: auto; } .v2 .vp-param-liste .vendeur-v2 { flex: none; min-width: 200px; background: var(--ctl-bg); } .v2 .vp-param-liste .vendeur-v2.actif { background: var(--bony-grad); } .v2 #curseur-vp { display: none; } }
+.v2 .vp-param-detail { display: grid; gap: 20px; }
+.v2 .vp-param-detail section { display: grid; gap: 10px; }
+.v2 .vp-param-detail .entete-vp { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.v2 .vp-param-detail .entete-vp .input { flex: 1; min-width: 220px; font-size: 16px; font-weight: 800; height: 42px; }
+.v2 .vp-tuiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 640px) { .v2 .vp-tuiles { grid-template-columns: 1fr; } }
+.v2 .vp-tuile { display: grid; gap: 6px; padding: 12px 14px; border-radius: 14px; background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); }
+.v2 .vp-tuile.vp-jour { background: var(--sel); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.v2 .vp-tuile .label { display: flex; justify-content: space-between; }
+.v2 .vp-tuile .input { height: 34px; }
+.v2 .vp-tuile small { color: var(--text-3); font-weight: 700; font-size: 11.5px; }
+.v2 .vp-alerte { font-size: 12.5px; font-weight: 700; color: var(--warn); }
+.v2 .vp-equipe { display: grid; gap: 4px; }
+.v2 .vp-equipe .ligne-v { display: grid; grid-template-columns: 96px minmax(0, 1fr) 132px minmax(0, 170px); gap: 12px; align-items: center; min-height: 48px; padding: 4px 10px; border-radius: 12px; }
+.v2 .vp-equipe .ligne-v:hover { background: var(--ctl-bg); }
+.v2 .vp-equipe .ligne-v.absent .qui { opacity: .55; }
+.v2 .vp-equipe .qui b { display: block; }
+.v2 .vp-equipe .qui small { color: var(--text-3); font-weight: 700; font-size: 11.5px; }
+.v2 .vp-equipe .chip.present[aria-pressed='true'] { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 45%, transparent); }
+.v2 .vp-equipe .chip.present[aria-pressed='false'] { color: var(--text-3); }
+.v2 .vp-pas { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 99px; background: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line); }
+.v2 .vp-pas button { width: 28px; height: 28px; border: 0; border-radius: 99px; background: transparent; color: var(--text-2); font: 800 16px var(--font-ui); cursor: pointer; transition: transform 620ms var(--ressort-ample), background-color var(--t-fast); }
+.v2 .vp-pas button:hover:not(:disabled) { background: var(--ctl-bg-h); color: var(--text); }
+.v2 .vp-pas button:active:not(:disabled) { transform: scale(.88); transition-duration: 90ms; }
+.v2 .vp-pas button:disabled { opacity: .35; cursor: default; }
+.v2 .vp-pas output { min-width: 26px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+.v2 .vp-equipe .input.sm { height: 32px; }
+@media (max-width: 640px) { .v2 .vp-equipe .ligne-v { grid-template-columns: 86px minmax(0, 1fr) auto; } .v2 .vp-equipe .ligne-v .motif { grid-column: 1 / -1; } }
+.v2 .vp-tous { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+.v2 .vp-cloture { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px; border-radius: 14px; background: color-mix(in srgb, var(--danger) 7%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 22%, transparent); }
+.v2 .vp-cloture p { margin: 0; flex: 1; min-width: 220px; color: var(--text-2); font-size: 12.5px; }
+
+/* Imprime : le papier n'a pas de theme (CLAUDE.md) — aucune variable de theme ici. */
+.vp-feuilles { display: grid; gap: 18px; justify-items: center; }
+.vp-feuille { width: 297mm; max-width: 100%; aspect-ratio: 297 / 210; background: #fff; color: #111; padding: 9mm 11mm; border-radius: 6px; box-shadow: 0 10px 40px -10px rgba(0,0,0,.6); font: 400 11px 'Albert Sans', sans-serif; overflow: hidden; display: flex; flex-direction: column; gap: 4mm; }
+.vp-feuille .en-tete { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #111; padding-bottom: 2mm; }
+.vp-feuille .en-tete b { font: 700 18px 'Syncopate', sans-serif; text-transform: uppercase; }
+.vp-feuille .en-tete span { font-size: 12px; font-weight: 700; }
+.vp-feuille table { width: 100%; border-collapse: collapse; table-layout: fixed; flex: 1; }
+.vp-feuille th { text-align: left; font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1.5px solid #111; padding: 1.5mm 2mm; }
+.vp-feuille td { border-bottom: .6px solid #999; border-right: .6px solid #ccc; padding: 0 2mm; height: 13mm; font-size: 12px; vertical-align: middle; }
+.vp-feuille td:last-child { border-right: 0; }
+.vp-feuille td.h { font-weight: 800; }
+.vp-feuille .case-coche { display: inline-block; width: 4mm; height: 4mm; border: 1px solid #111; border-radius: 1mm; margin-right: 2mm; vertical-align: -1mm; }
+.vp-feuille .pied { display: flex; justify-content: space-between; font-size: 9.5px; color: #555; }
+@media print {
+  @page { size: A4 landscape; margin: 0; }
+  body * { visibility: hidden; }
+  .vp-feuilles, .vp-feuilles * { visibility: visible; }
+  .vp-feuilles { position: absolute; inset: 0; display: block; }
+  .vp-feuille { width: 297mm; height: 210mm; aspect-ratio: auto; box-shadow: none; border-radius: 0; break-after: page; }
+}
+}
+</style>
+</head>
+<body>
+<div class="v2" id="racine">
+  <div class="fond-vivant" aria-hidden="true"><i></i><i></i><i></i></div>
+
+  <header class="vp-barre verre">
+    <img class="logo" src="/grid.svg" alt="" />
+    <button class="titre vp-choix-vp" id="choix-vp" aria-haspopup="menu" aria-expanded="false" title="Changer de VP">
+      <b><span class="t">VP · Massagettes</span><svg class="i sm" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></b><span class="s"></span>
+    </button>
+    <div class="seg vp-onglets" id="onglets" role="tablist" aria-label="Écrans">
+      <span class="pouce"></span>
+      <button aria-pressed="true" data-ecran="phoning">Phoning</button>
+      <button aria-pressed="false" data-ecran="jour">Jour J</button>
+      <button aria-pressed="false" data-ecran="accueil">Accueil</button>
+      <button aria-pressed="false" data-ecran="projection">Projection</button>
+      <button aria-pressed="false" data-ecran="bilan">Bilan</button>
+      <button aria-pressed="false" data-ecran="imprime">Imprimé</button>
+      <button aria-pressed="false" data-ecran="param" data-admin>Paramétrage</button>
+    </div>
+    <div class="droite">
+      <div class="seg" id="seg-profil" title="Maquette : voir l'écran comme un admin ou comme un encadrant"><span class="pouce"></span><button aria-pressed="true" data-profil="admin">Admin</button><button aria-pressed="false" data-profil="encadrant">Encadrant</button></div>
+      <button class="btn sm ghost" id="bascule-notes" aria-pressed="false" title="Afficher les notes de maquette">Notes</button>
+      <button class="icon-btn" id="bascule-theme" title="Thème clair / sombre" aria-label="Thème clair / sombre">
+        <svg class="i" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="page vp-page">
+
+    <!-- ================================================================ PHONING -->
+    <section class="vp-ecran actif" id="ecran-phoning">
+      <div class="vp-note"><b>J1–J2, pendant le phoning.</b> La saisie est la grille de GRID classique, inchangée, limitée aux vendeurs du site. Cet écran est ce que regarde l'encadrant VP pendant que la salle appelle. L'horloge de la maquette est bloquée au <b>27/10, 15 h 20</b>. « Simuler un RDV » montre le direct.</div>
+      <div class="app-head">
+        <h2>Phoning</h2><span class="sub" id="sub-phoning"></span>
+        <div class="droite"><button class="btn primary" id="simuler-rdv">Simuler un RDV</button></div>
+      </div>
+      <div class="kpis" id="kpis-phoning"></div>
+      <div class="vp-deux">
+        <div class="card pad">
+          <h3 class="card-titre">Classement en direct <span class="badge" id="badge-vendeurs"></span></h3>
+          <ol class="vp-classement" id="classement"></ol>
+        </div>
+        <div style="display:grid;gap:14px">
+          <div class="card pad">
+            <h3 class="card-titre" id="titre-courbe"></h3>
+            <div id="courbe"></div>
+            <div class="vp-legende" id="legende-courbe"></div>
+          </div>
+          <div class="card pad">
+            <h3 class="card-titre">Projection <span class="badge" id="badge-rythme"></span></h3>
+            <div id="projection-graphe"></div>
+            <div class="vp-legende">
+              <span><i style="background:var(--bony-orange)"></i>RDV pris</span>
+              <span><i style="background:transparent;box-shadow:inset 0 0 0 2px var(--bony-violet)"></i>au rythme des 4 dernières heures</span>
+              <span><i style="background:var(--ok)"></i>objectif</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================ JOUR J -->
+    <section class="vp-ecran" id="ecran-jour">
+      <div class="vp-note"><b>Le 28/10.</b> L'agenda remplace la grille de 5 jours : une colonne par vendeur, une ligne par heure. Un clic sur un RDV ouvre son détail. Pour le <b>réaffecter</b>, on le glisse sur une case verte, ou on passe par le détail. Les cases vertes sont celles des vendeurs libres à cette heure. L'horloge est bloquée à <b>11 h 40</b>.</div>
+      <div class="app-head">
+        <h2>Jour J</h2><span class="sub" id="sub-jour"></span>
+        <div class="droite vp-legende" id="legende-statuts"></div>
+      </div>
+      <div class="card vp-agenda-cadre"><div class="vp-agenda" id="agenda"></div></div>
+    </section>
+
+    <!-- ================================================================ ACCUEIL -->
+    <section class="vp-ecran" id="ecran-accueil">
+      <div class="vp-note"><b>La tablette de l'encadrant VP</b>, sous son compte admin. Trois lettres du nom suffisent. Chaque geste fait avancer le client d'une étape (attendu → arrivé → avec le vendeur → sortie). L'issue saisie à la sortie, c'est le Suivi qui est rempli le jour même. Un visiteur sans RDV entre en trafic naturel.</div>
+      <div class="vp-tablette">
+        <div class="kpis" id="kpis-accueil"></div>
+        <div class="vp-recherche">
+          <input class="input" id="recherche" placeholder="Nom du client…" autocomplete="off" />
+          <button class="btn" id="visiteur">+ Visiteur</button>
+        </div>
+        <div class="vp-file" id="file"></div>
+        <div style="display:flex;justify-content:flex-end"><button class="btn danger" id="clore">Clore la journée…</button></div>
+      </div>
+    </section>
+
+    <!-- ================================================================ PROJECTION -->
+    <section class="vp-ecran" id="ecran-projection">
+      <div class="vp-note"><b>Pour les sites équipés d'un écran.</b> En lecture seule, aucun bouton : on l'ouvre en plein écran et on n'y touche plus. Chaque commande saisie sur la tablette s'annonce ici. Pour essayer : Accueil → Sortie → Commande, puis revenir ici.</div>
+      <div class="app-head">
+        <h2>Projection</h2>
+        <div class="droite">
+          <div class="seg" id="seg-projection"><span class="pouce"></span><button aria-pressed="false" data-mode="phoning">Phoning</button><button aria-pressed="true" data-mode="jour">Jour J</button></div>
+          <button class="btn" id="plein-ecran">Plein écran</button>
+        </div>
+      </div>
+      <div class="vp-projection verre" id="projection"></div>
+    </section>
+
+    <!-- ================================================================ BILAN -->
+    <section class="vp-ecran" id="ecran-bilan">
+      <div class="vp-note"><b>Le bilan, une fois la journée close.</b> La maquette simule la fin du 28/10. La comparaison entre VP se fait <b>par vendeur</b> : une grosse concession vend plus parce qu'elle a plus de vendeurs, et ce n'est pas ce qu'on veut comparer.</div>
+      <div class="app-head"><h2>Bilan</h2><span class="sub" id="sub-bilan"></span></div>
+      <div class="kpis" id="kpis-bilan"></div>
+      <div class="vp-deux">
+        <div class="card pad"><h3 class="card-titre">Du phoning à la commande</h3><div class="vp-tunnel" id="tunnel"></div></div>
+        <div class="card pad"><h3 class="card-titre">Comparaison des VP <span class="badge">ventes par vendeur</span></h3><div id="comparaison"></div></div>
+      </div>
+      <div class="card pad vp-tbl-cadre"><h3 class="card-titre">Par vendeur</h3><table class="tbl" id="tbl-bilan"></table></div>
+    </section>
+
+    <!-- ================================================================ IMPRIME -->
+    <section class="vp-ecran" id="ecran-imprime">
+      <div class="vp-note"><b>Le planning qu'on colle au mur le 28.</b> Une feuille par vendeur, A4 paysage : son agenda de la journée, une ligne par heure, des cases de 13 mm pour écrire à la main. Une heure sans RDV garde sa ligne vide : c'est là qu'on note un visiteur. Pas de thème : une planche imprimée depuis l'écran sombre coûterait une cartouche par vendeur.</div>
+      <div class="app-head">
+        <h2>Imprimé</h2>
+        <div class="droite"><select class="select" id="choix-feuille" style="width:auto"></select><button class="btn primary" id="imprimer">Imprimer</button></div>
+      </div>
+      <div class="vp-feuilles" id="feuilles"></div>
+    </section>
+    <!-- ================================================================ PARAMETRAGE (admin) -->
+    <section class="vp-ecran" id="ecran-param">
+      <div class="vp-note"><b>Admin seulement</b> : le marketing et l'encadrant VP. Créer une VP, bloquer ses dates, choisir qui en est, poser l'objectif de RDV de chaque vendeur, la clôturer. Choisir une VP dans la liste la charge partout, comme le sélecteur en haut à gauche. Un encadrant ne voit ni cet onglet ni les VP des autres sites (bouton « Encadrant » de la barre).</div>
+      <div class="app-head">
+        <h2>Paramétrage</h2><span class="sub">${VPS.length} VP</span>
+        <div class="droite"><button class="btn primary" id="nouvelle-vp">+ Nouvelle VP</button></div>
+      </div>
+      <div class="vp-param">
+        <div class="card vp-param-liste"><div class="liste-corps" id="liste-vp"><div class="curseur-v2" id="curseur-vp"></div></div></div>
+        <div class="card pad vp-param-detail" id="detail-vp"></div>
+      </div>
+    </section>
+  </main>
+  <div class="vp-menu verre fort" id="menu-vp" role="menu" hidden></div>
+
+  <div class="vp-volet-voile" id="volet-voile"></div>
+  <aside class="vp-volet verre fort" id="volet" aria-label="Détail du RDV"></aside>
+  <div class="vp-dialogue-voile" id="dialogue-voile" hidden><div class="vp-dialogue verre fort" id="dialogue" role="dialog"></div></div>
+</div>
+
+<script>
+// ============================================================== DONNEES FICTIVES
+// Graine 42, comme toute repartition de GRID : la maquette est la meme a chaque ouverture.
+function graine(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+let alea = graine(42);
+const pioche = (t) => t[Math.floor(alea() * t.length)];
+
+const NOMS = ['MARTIN', 'BERNARD', 'DUBOIS', 'THOMAS', 'ROBERT', 'RICHARD', 'PETIT', 'DURAND', 'LEROUX', 'MOREAU', 'SIMON', 'LAURENT', 'LEFEBVRE', 'MICHEL', 'GARCIA', 'DAVID', 'BERTRAND', 'ROUX', 'VINCENT', 'FOURNIER', 'MOREL', 'GIRARD', 'ANDRE', 'MERCIER', 'DUPONT', 'LAMBERT', 'BONNET', 'FRANCOIS', 'MARTINEZ', 'LEGRAND', 'GARNIER', 'FAURE', 'ROUSSEAU', 'BLANC', 'GUERIN', 'MULLER', 'HENRY', 'ROUSSEL', 'NICOLAS', 'PERRIN', 'MORIN', 'MATHIEU', 'CLEMENT', 'GAUTHIER', 'DUMONT', 'LOPEZ', 'FONTAINE', 'CHEVALIER', 'ROBIN', 'MASSON', 'SANCHEZ', 'GERARD', 'NGUYEN', 'BOYER', 'DENIS', 'LEMAIRE', 'DUVAL', 'JOLY', 'GAUTIER', 'ROGER', 'ROCHE', 'ROY', 'NOEL', 'MEYER', 'LUCAS', 'MEUNIER', 'JEAN', 'PEREZ', 'MARCHAND', 'DUFOUR', 'BLANCHARD', 'MARIE', 'BARBIER', 'BRUN', 'DUMAS', 'BRUNET', 'SCHMITT', 'LEROY'];
+const PRENOMS = ['J.', 'M.', 'P.', 'C.', 'A.', 'S.', 'N.', 'F.', 'L.', 'D.', 'E.', 'G.'];
+const PRENOMS_V = ['Hugo', 'Léa', 'Karim', 'Julie', 'Thomas', 'Sarah', 'Nicolas', 'Inès', 'Maxime', 'Camille', 'Romain', 'Manon', 'Yanis', 'Chloé', 'Antoine', 'Emma', 'Lucas', 'Jade', 'Mehdi', 'Laura'];
+const NOMS_V = ['Martel', 'Fabre', 'Benali', 'Roux', 'Vidal', 'Morel', 'Brun', 'Garnier', 'Leroy', 'Picard', 'Arnaud', 'Colin', 'Lacroix', 'Barre', 'Rey', 'Marchal', 'Huet', 'Carre', 'Boucher', 'Joubert'];
+const CRENEAUX_GRID = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];   // les 11 creneaux de GRID classique, repris par defaut
+const SITES = { CENTRE: ['Clermont-Ferrand', 'Massagettes', 'Mozac', 'Ussel', 'Alpine'], NORD: ['Vichy', 'Moulins', 'Thiers'], SUD: ['Le Puy', 'Mende', 'Issoire', 'Aurillac'], 'SUD-OUEST': ['Albi', 'Gaillac', 'Carmaux', 'Lavaur', 'Rodez', 'Millau', 'Figeac', 'Villefranche'] };
+
+// Les VP en base. Une seule est « en cours » ; les closes nourrissent la comparaison.
+const VPS = [
+  { id: 'vp-mas', site: 'Massagettes', j1: '2026-10-26', j2: '2026-10-27', jour: '2026-10-28', statut: 'en_cours', graine: 42 },
+  { id: 'vp-alb', site: 'Albi', j1: '2026-11-16', j2: '2026-11-17', jour: '2026-11-18', statut: 'preparee', graine: 7, n: 11 },
+  { id: 'vp-moz', site: 'Mozac', j1: '2026-09-21', j2: '2026-09-22', jour: '2026-09-23', statut: 'close', graine: 11, n: 7 },
+  { id: 'vp-vic', site: 'Vichy', j1: '2026-04-13', j2: '2026-04-14', jour: '2026-04-15', statut: 'close', graine: 19, n: 9 },
+];
+const STATUT_VP = { en_cours: ['En cours', 'var(--ok)'], preparee: ['Préparée', 'var(--info)'], close: ['Close', 'var(--text-3)'] };
+for (const vp of VPS) vp.creneaux = vp.creneaux || [...CRENEAUX_GRID];
+
+// L'etat courant : la VP choisie, ses vendeurs, ses RDV. Tout ecran lit ceci et rien d'autre.
+let VP, TOUS = [], VENDEURS = [], V = {}, RDV = [], HEURES = CRENEAUX_GRID;
+let MAINTENANT_J = 11 + 40 / 60;                                // 28/10, 11 h 40
+const PHONING_TOTAL = 20;                                        // J1 et J2, 9 h - 19 h
+let PHONING_ECOULE = 10 + 6 + 20 / 60;                           // J2, 15 h 20
+
+// Absent = hors de la grille et des moyennes, SAUF s'il a des RDV : la regle de GRID
+// classique (mobilisation(), agregats.ts), reprise telle quelle.
+function recompterVendeurs() {
+  VENDEURS = TOUS.filter((v) => v.mobilise || RDV.some((r) => r.vendeur === v.id && r.etat !== 'retire'));
+  V = Object.fromEntries(TOUS.map((v) => [v.id, v]));
+}
+
+// Un poids par heure : le matin et le debut d'apres-midi partent d'abord.
+const POIDS_HEURE = { 8: .5, 9: 1.1, 10: 1.4, 11: 1.3, 12: .5, 13: .6, 14: 1.3, 15: 1.2, 16: 1, 17: .8, 18: .4 };
+function heureAuHasard() { const t = HEURES.reduce((s, h) => s + POIDS_HEURE[h], 0); let r = alea() * t; for (const h of HEURES) { r -= POIDS_HEURE[h]; if (r <= 0) return h; } return HEURES[HEURES.length - 1]; }
+
+let suivant = 1;
+// Le vendeur prend d'abord une heure ou il est libre ; un second client a la meme heure
+// n'arrive que rarement (5 essais), comme en vrai.
+function caseVide(vid, h) { return !RDV.some((r) => r.vendeur === vid && r.h === h && r.etat !== 'retire'); }
+function nouveauRdv(vid, prisA, opts = {}) {
+  const v = V[vid];
+  let h = opts.h ?? heureAuHasard(), essais = 0;
+  while (opts.h == null && !caseVide(vid, h) && essais++ < 5) h = heureAuHasard();
+  const r = {
+    id: suivant++, client: `${pioche(NOMS)} ${pioche(PRENOMS)}`, vendeur: vid, preneur: vid, h,
+    marque: v.type === 'VO' ? pioche(['renault', 'dacia', 'renault']) : pioche(v.marques), type: v.type,
+    prisA, source: opts.source || 'relance', etat: 'attendu', arrive: null, issue: null, cases: {},
+  };
+  RDV.push(r); return r;
+}
+
+// L'etat du jour J a l'heure de la maquette, et l'issue finale qui servira au bilan simule.
+function etatAuJour(r) {
+  const tire = alea();
+  r.issueFinale = tire < .14 ? 'noshow' : tire < .44 ? 'commande' : tire < .74 ? 'offre' : 'rien';
+  if (r.h + 1 <= MAINTENANT_J - .2) { // creneau termine
+    if (r.issueFinale === 'noshow') { r.etat = 'noshow'; return; }
+    r.etat = 'sorti'; r.issue = r.issueFinale; r.arrive = r.h + alea() * .25;
+    if (r.issue === 'commande') r.cases = { diac: alea() < .5, stock: alea() < .4 };
+    r.sortie = r.h + .9;
+  } else if (r.h <= MAINTENANT_J) { // creneau en cours
+    r.etat = r.issueFinale === 'noshow' ? 'attendu' : alea() < .65 ? 'avec' : 'arrive';
+    if (r.etat !== 'attendu') r.arrive = r.h + alea() * .3;
+  }
+}
+
+function vendeursDuSite(vp) {
+  if (vp.vendeurs) return vp.vendeurs;
+  if (vp.id === 'vp-mas') return vp.vendeurs = [
+    ['v1', 'Hugo Martel', 'VN', ['renault', 'dacia'], 10], ['v2', 'Léa Fabre', 'VN', ['renault'], 10],
+    ['v3', 'Karim Benali', 'VN', ['renault', 'dacia'], 10], ['v4', 'Julie Roux', 'VN', ['dacia'], 9],
+    ['v5', 'Thomas Vidal', 'VO', [], 8], ['v6', 'Sarah Morel', 'VN', ['renault', 'dacia'], 10],
+    ['v7', 'Nicolas Brun', 'VO', [], 8], ['v8', 'Inès Garnier', 'VN', ['renault'], 9],
+    ['v9', 'Maxime Leroy', 'VN', ['renault', 'dacia'], 10], ['v10', 'Camille Picard', 'VN', ['renault'], 10],
+  ].map(([id, nom, type, marques, objectif]) => ({ id, nom, type, marques, objectif, mobilise: id !== 'v10', motif: id === 'v10' ? 'Congés' : '' }));
+  const a = graine(vp.graine * 7 + 3), pris = new Set();
+  return vp.vendeurs = Array.from({ length: vp.n || 8 }, (_, i) => {
+    let nom; do nom = `${PRENOMS_V[Math.floor(a() * PRENOMS_V.length)]} ${NOMS_V[Math.floor(a() * NOMS_V.length)]}`; while (pris.has(nom)); pris.add(nom);
+    const vo = i % 4 === 3;
+    return { id: `${vp.id}-v${i}`, nom, type: vo ? 'VO' : 'VN', marques: vo ? [] : a() < .6 ? ['renault', 'dacia'] : ['renault'], objectif: vo ? 8 : 10, mobilise: true, motif: '' };
+  });
+}
+
+function chargerVp(vp) {
+  VP = vp; alea = graine(vp.graine); suivant = 1; RDV = []; HEURES = vp.creneaux;
+  PHONING_ECOULE = vp.statut === 'en_cours' ? 10 + 6 + 20 / 60 : vp.statut === 'close' ? PHONING_TOTAL : 0;
+  MAINTENANT_J = vp.statut === 'en_cours' ? 11 + 40 / 60 : vp.statut === 'close' ? 24 : 0;
+  TOUS = vendeursDuSite(vp); recompterVendeurs();
+  if (vp.statut !== 'preparee') {
+    // Les RDV deja pris, repartis sur le temps ecoule, un peu plus vite recemment.
+    const part = vp.statut === 'close' ? 1.05 : .78;
+    for (const v of VENDEURS) {
+      const n = Math.round(v.objectif * (part - .16 + alea() * .32));
+      for (let i = 0; i < n; i++) nouveauRdv(v.id, Math.min(PHONING_ECOULE, Math.pow(alea(), .85) * PHONING_ECOULE));
+    }
+    RDV.sort((x, y) => x.prisA - y.prisA);
+    RDV.forEach(etatAuJour);
+  }
+  recompterVendeurs();
+}
+chargerVp(VPS[0]);
+
+// ============================================================== FONCTIONS PURES
+// Dans GRID, ces calculs vivront dans backend/src/utils/ et seront testes (interdits 2 et 6).
+const actifs = () => RDV.filter((r) => r.etat !== 'retire');
+const duPhoning = () => actifs().filter((r) => r.source === 'relance');
+function classementPhoning() {
+  return VENDEURS.map((v) => {
+    const pris = duPhoning().filter((r) => r.preneur === v.id);
+    return { v, n: pris.length, recents: pris.filter((r) => r.prisA > PHONING_ECOULE - 1).length };
+  }).sort((a, b) => b.n - a.n || b.recents - a.recents || a.v.nom.localeCompare(b.v.nom));   // ex aequo : le plus recent, puis l'alphabet
+}
+function rythmeRecent(fenetre = 4) { return duPhoning().filter((r) => r.prisA > PHONING_ECOULE - fenetre).length / fenetre; }
+function projectionFinJ2() { return Math.round(duPhoning().length + rythmeRecent() * (PHONING_TOTAL - PHONING_ECOULE)); }
+const objectifTotal = () => VENDEURS.reduce((s, v) => s + v.objectif, 0);
+
+// ============================================================== OUTILS
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const hh = (h) => `${Math.floor(h)} h${Math.round((h % 1) * 60) ? ' ' + String(Math.round((h % 1) * 60)).padStart(2, '0') : ''}`;
+const MARQUE = { renault: 'Renault', dacia: 'Dacia', alpine: 'Alpine' };
+const etiquetteMarque = (m) => `<span class="marque ${m}">${MARQUE[m].toUpperCase()}</span>`;
+const STATUT = {
+  attendu: ['Attendu', 'var(--text-3)'], arrive: ['Arrivé', 'var(--info)'], avec: ['Avec le vendeur', 'var(--warn)'],
+  noshow: ['No show', 'var(--danger)'], commande: ['Commande', 'var(--ok)'], offre: ['Offre', '#b45cff'], rien: ['Sans suite', 'var(--text-3)'],
+};
+const statutDe = (r) => r.etat === 'sorti' ? r.issue : r.etat;
+const badge = (r) => { const [l, c] = STATUT[statutDe(r)]; return `<span class="badge" style="--c:${c}">${l}</span>`; };
+const kpi = (l, v, d, accent) => `<div class="kpi${accent ? ' accent' : ''}"><span class="l">${l}</span><span class="v num">${v}</span>${d ? `<span class="d">${d}</span>` : ''}</div>`;
+const pct = (a, b) => b ? Math.round(100 * a / b) + ' %' : '—';
+
+// Le pouce d'un segmente : transformation posee EN DUR (une variable CSS dans
+// `transform` ne s'interpole pas — CLAUDE.md, 04/09).
+function placerPouce(seg) {
+  const b = seg.querySelector('button[aria-pressed="true"]'), p = seg.querySelector('.pouce'); if (!b || !p) return;
+  p.style.width = b.offsetWidth + 'px'; p.style.height = b.offsetHeight + 'px';
+  p.style.transform = `translate(${b.offsetLeft}px, ${b.offsetTop}px)`;
+}
+function segmente(seg, auChoix) {
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    placerPouce(seg); auChoix(b);
+  });
+  requestAnimationFrame(() => placerPouce(seg));
+}
+
+// ============================================================== PHONING
+function rendrePhoning(anime) {
+  const n = duPhoning().length, proj = projectionFinJ2(), obj = objectifTotal();
+  $('#kpis-phoning').innerHTML =
+    kpi('RDV pris', n, `${pct(n, obj)} de l'objectif`, true) +
+    kpi('Projection fin J2', proj, proj >= obj ? 'objectif atteint' : `${obj - proj} sous l'objectif`) +
+    kpi('Objectif', obj, `${VENDEURS.length} vendeurs`) +
+    kpi('Dernière heure', duPhoning().filter((r) => r.prisA > PHONING_ECOULE - 1).length, VP.statut === 'en_cours' ? 'RDV pris depuis 14 h 20' : VP.statut === 'preparee' ? 'phoning pas commencé' : 'phoning terminé') +
+    kpi('Moyenne', (n / VENDEURS.length).toFixed(1).replace('.', ','), 'RDV par vendeur');
+  $('#badge-vendeurs').textContent = `${VENDEURS.length} vendeurs`;
+  $('#badge-rythme').textContent = `${rythmeRecent().toFixed(1).replace('.', ',')} RDV / h`;
+  rendreClassement(anime); rendreCourbe(); rendreGrapheProjection();
+}
+
+let rangsAvant = {};
+function rendreClassement(anime) {
+  const ol = $('#classement');
+  const avant = {}; ol.querySelectorAll('li').forEach((li) => { avant[li.dataset.id] = li.getBoundingClientRect().top; });
+  const lignes = classementPhoning();
+  ol.innerHTML = lignes.map(({ v, n }, i) => `
+    <li data-id="${v.id}" class="${anime && rangsAvant[v.id] > i ? 'monte' : ''}">
+      <span class="rang">${i + 1}</span>
+      <span class="nom">${esc(v.nom)}<small>${v.type}${v.marques.length ? ' · ' + v.marques.map((m) => MARQUE[m]).join(' / ') : ''}</small></span>
+      <span class="jauge-col"><div class="vp-jauge"><i style="transform:scaleX(${Math.min(1, n / v.objectif)})"></i></div><div class="vp-jauge-lib"><span>${pct(n, v.objectif)}</span><span>obj. ${v.objectif}</span></div></span>
+      <span class="n">${n}</span>
+    </li>`).join('');
+  lignes.forEach(({ v }, i) => { rangsAvant[v.id] = i; });
+  // FLIP : chaque ligne part de son ancienne place et glisse a la nouvelle.
+  if (anime) ol.querySelectorAll('li').forEach((li) => {
+    const de = avant[li.dataset.id]; if (de == null) return;
+    const dy = de - li.getBoundingClientRect().top; if (!dy) return;
+    li.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 700, easing: getComputedStyle(document.documentElement).getPropertyValue('--ressort-ample').trim() || 'ease-out' });
+  });
+}
+
+function rendreCourbe() {
+  const L = 560, H = 190, g = 26, bas = H - 22, larg = (L - g) / HEURES.length;
+  const parH = HEURES.map((h) => ({ h, vn: duPhoning().filter((r) => r.h === h && r.type === 'VN').length, vo: duPhoning().filter((r) => r.h === h && r.type === 'VO').length }));
+  const max = Math.max(4, ...parH.map((p) => p.vn + p.vo));
+  const y = (v) => bas - (v / max) * (bas - 10);
+  const creux = [...parH].sort((a, b) => (a.vn + a.vo) - (b.vn + b.vo)).slice(0, 3).map((p) => p.h);
+  let s = `<svg class="vp-svg" viewBox="0 0 ${L} ${H}" role="img" aria-label="RDV par heure le jour de la VP">`;
+  s += `<defs><linearGradient id="gvn" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#f75632"/><stop offset="1" stop-color="#a52fce"/></linearGradient></defs>`;
+  for (let k = 0; k <= max; k += Math.ceil(max / 4)) s += `<line class="grille-l" x1="${g}" x2="${L}" y1="${y(k)}" y2="${y(k)}"/><text x="0" y="${y(k) + 4}">${k}</text>`;
+  parH.forEach((p, i) => {
+    const x = g + i * larg + 5, w = larg - 10;
+    s += `<rect x="${x}" y="${y(p.vn)}" width="${w}" height="${bas - y(p.vn)}" rx="5" fill="url(#gvn)"><title>${p.h} h : ${p.vn} VN</title></rect>`;
+    if (p.vo) s += `<rect x="${x}" y="${y(p.vn + p.vo)}" width="${w}" height="${y(p.vn) - y(p.vn + p.vo) - 2}" rx="5" fill="var(--info)" opacity=".75"><title>${p.h} h : ${p.vo} VO</title></rect>`;
+    s += `<text x="${x + w / 2}" y="${H - 6}" text-anchor="middle" style="${creux.includes(p.h) ? 'fill:var(--ok)' : ''}">${p.h}h</text>`;
+    s += `<text x="${x + w / 2}" y="${y(p.vn + p.vo) - 6}" text-anchor="middle" style="fill:var(--text-2)">${p.vn + p.vo}</text>`;
+  });
+  $('#courbe').innerHTML = s + '</svg>';
+  $('#legende-courbe').innerHTML = `<span><i style="background:var(--bony-grad)"></i>VN</span><span><i style="background:var(--info)"></i>VO</span><span style="color:var(--ok)">Heures creuses : ${creux.sort((a, b) => a - b).map((h) => h + ' h').join(', ')}</span>`;
+}
+
+function rendreGrapheProjection() {
+  const L = 560, H = 190, g = 26, bas = H - 22, obj = objectifTotal(), proj = projectionFinJ2();
+  const max = Math.max(obj, proj) * 1.1;
+  const x = (t) => g + (t / PHONING_TOTAL) * (L - g - 6), y = (v) => bas - (v / max) * (bas - 8);
+  const tries = duPhoning().map((r) => r.prisA).sort((a, b) => a - b);
+  let pts = [`${x(0)},${y(0)}`]; tries.forEach((t, i) => pts.push(`${x(t)},${y(i + 1)}`)); pts.push(`${x(PHONING_ECOULE)},${y(tries.length)}`);
+  let s = `<svg class="vp-svg" viewBox="0 0 ${L} ${H}" role="img" aria-label="RDV cumulés et projection">`;
+  s += `<defs><linearGradient id="gl" x1="0" x2="1"><stop offset="0" stop-color="#f75632"/><stop offset="1" stop-color="#a52fce"/></linearGradient></defs>`;
+  s += `<line x1="${x(10)}" x2="${x(10)}" y1="6" y2="${bas}" class="grille-l" stroke-dasharray="3 4"/>`;
+  s += `<text x="${x(5)}" y="${H - 6}" text-anchor="middle">J1 · ${jj(VP.j1)}</text><text x="${x(15)}" y="${H - 6}" text-anchor="middle">J2 · ${jj(VP.j2)}</text>`;
+  s += `<line x1="${g}" x2="${L}" y1="${y(obj)}" y2="${y(obj)}" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="6 5"/><text x="${g}" y="${y(obj) - 6}" style="fill:var(--ok)">objectif ${obj}</text>`;
+  s += `<polyline points="${pts.join(' ')}" fill="none" stroke="url(#gl)" stroke-width="3" stroke-linejoin="round"/>`;
+  s += `<line x1="${x(PHONING_ECOULE)}" y1="${y(tries.length)}" x2="${x(PHONING_TOTAL)}" y2="${y(proj)}" stroke="var(--bony-violet)" stroke-width="2.5" stroke-dasharray="5 5"/>`;
+  s += `<circle cx="${x(PHONING_ECOULE)}" cy="${y(tries.length)}" r="5" fill="var(--bony-orange)"/>`;
+  s += `<text x="${x(PHONING_TOTAL)}" y="${y(proj) - 8}" text-anchor="end" style="fill:var(--text);font-size:13px">≈ ${proj} en fin de J2</text>`;
+  $('#projection-graphe').innerHTML = s + '</svg>';
+}
+
+$('#simuler-rdv').addEventListener('click', () => {
+  // Un RDV pris maintenant, plutot par quelqu'un du bas du classement : on voit une ligne monter.
+  const bas = classementPhoning().slice(-4);
+  nouveauRdv(pioche(bas).v.id, PHONING_ECOULE - .01).prisA = PHONING_ECOULE - .01;
+  rendrePhoning(true); rendreTout(false);
+});
+
+// ============================================================== JOUR J — AGENDA
+let glisse = null;
+function rendreAgenda() {
+  const ag = $('#agenda');
+  ag.style.gridTemplateColumns = `64px repeat(${VENDEURS.length}, minmax(150px, 1fr))`;
+  let s = `<div class="tete heure" style="z-index:3"></div>`;
+  for (const v of VENDEURS) { const n = actifs().filter((r) => r.vendeur === v.id).length; s += `<div class="tete">${esc(v.nom)}<small>${v.type} · ${n} RDV</small></div>`; }
+  for (const h of HEURES) {
+    s += `<div class="heure${Math.floor(MAINTENANT_J) === h ? ' maintenant' : ''}">${h} h</div>`;
+    for (const v of VENDEURS) {
+      const ici = actifs().filter((r) => r.vendeur === v.id && r.h === h);
+      // Deux clients a la meme heure chez un vendeur : GRID l'accepte a la saisie (cellules a
+      // deux RDV, 03/09), mais le jour J l'un des deux attendra. On le signale, on ne le refuse pas.
+      s += `<div class="case${h + 1 <= MAINTENANT_J ? ' passe' : ''}${ici.length > 1 && h + 1 > MAINTENANT_J ? ' double' : ''}" data-v="${v.id}" data-h="${h}">` + ici.map((r) => {
+        const [, c] = STATUT[statutDe(r)];
+        return `<button class="vp-rdv" draggable="true" data-id="${r.id}" style="--c:${c}"><span class="cl">${esc(r.client)}</span><span class="meta">${etiquetteMarque(r.marque)}${r.type}${r.source === 'naturel' ? ' · visiteur' : ''}${r.preneur !== r.vendeur ? ' · réaffecté' : ''}</span></button>`;
+      }).join('') + `</div>`;
+    }
+  }
+  ag.innerHTML = s;
+  $('#legende-statuts').innerHTML = ['attendu', 'arrive', 'avec', 'commande', 'offre', 'rien', 'noshow'].map((k) => `<span><i style="background:${STATUT[k][1]}"></i>${STATUT[k][0]}</span>`).join('');
+}
+// Un vendeur peut recevoir le client s'il est libre a cette heure ET s'il a le droit de vendre
+// ce vehicule : meme type, et la marque parmi ses marques autorisees (R-C.1 de la saisie).
+const peutRecevoir = (v, r) => v.type === r.type && (v.type === 'VO' || v.marques.includes(r.marque));
+function casesLibres(r) { return VENDEURS.filter((v) => v.id !== r.vendeur && peutRecevoir(v, r) && !actifs().some((x) => x.vendeur === v.id && x.h === r.h)); }
+function marquerCibles(r, oui) {
+  document.querySelectorAll('.vp-agenda .case').forEach((c) => c.classList.remove('libre-cible', 'survol'));
+  if (!oui) return;
+  const libres = new Set(casesLibres(r).map((v) => v.id));
+  document.querySelectorAll(`.vp-agenda .case[data-h="${r.h}"]`).forEach((c) => { if (libres.has(c.dataset.v)) c.classList.add('libre-cible'); });
+}
+function reaffecter(r, vid) { r.vendeur = vid; fermerVolet(); rendreTout(); }
+$('#agenda').addEventListener('click', (e) => { const b = e.target.closest('.vp-rdv'); if (b) ouvrirVolet(RDV.find((r) => r.id === +b.dataset.id)); });
+$('#agenda').addEventListener('dragstart', (e) => { const b = e.target.closest('.vp-rdv'); if (!b) return; glisse = RDV.find((r) => r.id === +b.dataset.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', b.dataset.id); marquerCibles(glisse, true); });
+$('#agenda').addEventListener('dragend', () => { marquerCibles(null, false); glisse = null; });
+$('#agenda').addEventListener('dragover', (e) => { const c = e.target.closest('.case.libre-cible'); document.querySelectorAll('.case.survol').forEach((x) => x !== c && x.classList.remove('survol')); if (c) { e.preventDefault(); c.classList.add('survol'); } });
+$('#agenda').addEventListener('drop', (e) => { const c = e.target.closest('.case.libre-cible'); if (c && glisse) { e.preventDefault(); reaffecter(glisse, c.dataset.v); } });
+
+function ouvrirVolet(r) {
+  const libres = casesLibres(r);
+  $('#volet').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px"><h2>${esc(r.client)}</h2><span style="margin-left:auto">${badge(r)}</span><button class="icon-btn" id="fermer-volet" aria-label="Fermer"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div>
+      <div class="ligne"><span>Heure</span><span>${jj(VP.jour)} · ${r.h} h – ${r.h + 1} h</span></div>
+      <div class="ligne"><span>Véhicule</span><span>${etiquetteMarque(r.marque)} ${r.type}</span></div>
+      <div class="ligne"><span>Reçu par</span><span>${esc(V[r.vendeur].nom)}</span></div>
+      <div class="ligne"><span>Pris par</span><span>${r.source === 'naturel' ? 'visiteur sans RDV' : esc(V[r.preneur].nom) + ' · J' + (r.prisA < 10 ? 1 : 2)}</span></div>
+      ${r.arrive ? `<div class="ligne"><span>Arrivé à</span><span>${hh(r.arrive)}</span></div>` : ''}
+    </div>
+    <div class="vp-note" style="display:block">Le phoning reste à <b>celui qui a pris</b> le RDV. La vente va à <b>celui qui reçoit</b> le client. C'est la question 1 de PLAN-GRID-VP.md.</div>
+    <div class="label">Réaffecter à un vendeur libre à ${r.h} h</div>
+    <div class="vp-choix">${libres.length ? libres.map((v) => `<button class="btn" data-vers="${v.id}"><span>${esc(v.nom)}</span><span class="faint">${v.type}</span></button>`).join('') : '<div class="faint">Aucun vendeur libre à cette heure.</div>'}</div>`;
+  $('#racine').classList.add('volet-ouvert');
+  $('#fermer-volet').onclick = fermerVolet;
+  $('#volet').querySelectorAll('[data-vers]').forEach((b) => b.onclick = () => reaffecter(r, b.dataset.vers));
+}
+function fermerVolet() { $('#racine').classList.remove('volet-ouvert'); }
+$('#volet-voile').addEventListener('click', fermerVolet);
+
+// ============================================================== ACCUEIL
+let filtre = '';
+function rendreAccueil() {
+  const j = actifs(), venus = j.filter((r) => r.arrive != null), attendus = j.filter((r) => r.source === 'relance');
+  const cmd = j.filter((r) => r.etat === 'sorti' && r.issue === 'commande').length;
+  const passes = attendus.filter((r) => r.h + 1 <= MAINTENANT_J);
+  $('#kpis-accueil').innerHTML =
+    kpi('Arrivés', `${venus.length}<span class="faint" style="font-size:16px"> / ${attendus.length}</span>`, `${j.filter((r) => r.source === 'naturel').length} visiteurs sans RDV`) +
+    kpi('Avec un vendeur', j.filter((r) => r.etat === 'avec').length, 'en ce moment') +
+    kpi('Présence', pct(passes.filter((r) => r.arrive != null).length, passes.length), 'sur les heures passées') +
+    kpi('Commandes', cmd, `${pct(cmd, venus.length)} des venus`, true);
+
+  const f = filtre.trim().toUpperCase();
+  // Le DEBUT d'un mot : « LEM » trouve LEMAIRE, pas CLEMENT. Le nom du vendeur marche aussi.
+  const commence = (t) => t.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[\s.-]+/).some((m) => m.startsWith(f));
+  const liste = j.filter((r) => !f || commence(r.client) || commence(V[r.vendeur].nom));
+  const groupes = [
+    ['Arrivés et avec un vendeur', liste.filter((r) => r.etat === 'arrive' || r.etat === 'avec')],
+    ['À venir', liste.filter((r) => r.etat === 'attendu').sort((a, b) => a.h - b.h)],
+    ['Terminés', liste.filter((r) => r.etat === 'sorti' || r.etat === 'noshow').sort((a, b) => b.h - a.h)],
+  ];
+  $('#file').innerHTML = groupes.filter(([, l]) => l.length).map(([titre, l]) => `<h3>${titre} · ${l.length}</h3>` + l.map((r) => {
+    let actions = '';
+    if (VP.statut !== 'en_cours') actions = badge(r);
+    else if (r.etat === 'attendu') actions = `<button class="btn" style="--c:var(--info)" data-geste="arrive" data-id="${r.id}">Arrivé</button>`;
+    else if (r.etat === 'arrive') actions = `<button class="btn" style="--c:var(--warn)" data-geste="avec" data-id="${r.id}">Avec ${esc(V[r.vendeur].nom.split(' ')[0])}</button>`;
+    else if (r.etat === 'avec') actions = `<button class="btn" style="--c:var(--ok)" data-geste="sortie" data-id="${r.id}">Sortie…</button>`;
+    else actions = badge(r);
+    return `<div class="vp-client${r.etat === 'sorti' || r.etat === 'noshow' ? ' fini' : ''}">
+      <span class="h">${r.h} h</span>
+      <span class="qui"><b>${esc(r.client)}</b><span>${esc(V[r.vendeur].nom)} · ${etiquetteMarque(r.marque)} ${r.type}${r.source === 'naturel' ? ' · visiteur' : ''}${r.etat === 'arrive' || r.etat === 'avec' ? ' · ' + badge(r) : ''}</span></span>
+      <span class="actions">${actions}</span></div>`;
+  }).join('')).join('') || '<div class="empty">Aucun client à ce nom.</div>';
+}
+$('#recherche').addEventListener('input', (e) => { filtre = e.target.value; rendreAccueil(); });
+$('#file').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-geste]'); if (!b) return;
+  const r = RDV.find((x) => x.id === +b.dataset.id);
+  if (b.dataset.geste === 'arrive') { r.etat = 'arrive'; r.arrive = MAINTENANT_J; rendreTout(); }
+  else if (b.dataset.geste === 'avec') { r.etat = 'avec'; rendreTout(); }
+  else dialogueSortie(r);
+});
+
+// L'horloge de la maquette est figee : chaque sortie saisie prend un instant de plus, pour
+// que « la derniere commande » soit bien la derniere ENREGISTREE, pas le dernier RDV pris.
+let tic = 0; const horlogeSortie = () => MAINTENANT_J + (tic += .001);
+function ouvrirDialogue(html) { $('#dialogue').innerHTML = html; $('#dialogue-voile').hidden = false; }
+function fermerDialogue() { $('#dialogue-voile').hidden = true; }
+$('#dialogue-voile').addEventListener('click', (e) => { if (e.target.id === 'dialogue-voile') fermerDialogue(); });
+
+function dialogueSortie(r) {
+  ouvrirDialogue(`<h2>${esc(r.client)} sort</h2><div class="muted">Avec ${esc(V[r.vendeur].nom)} · ${etiquetteMarque(r.marque)} ${r.type}</div>
+    <div class="vp-gros-choix"><button class="btn primary" data-issue="commande">Commande</button><button class="btn" data-issue="offre">Offre</button><button class="btn" data-issue="rien">Sans suite</button></div>
+    <div id="cases-commande" hidden><div class="label" style="margin-bottom:8px">La commande</div><div class="vp-cases">${['DIAC', 'CS', 'STOCK', 'VD'].map((c) => `<button class="chip" aria-pressed="false" data-case="${c.toLowerCase()}">${c}</button>`).join('')}</div>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn primary" id="valider-commande">Enregistrer la commande</button></div></div>`);
+  const d = $('#dialogue');
+  d.querySelectorAll('[data-issue]').forEach((b) => b.onclick = () => {
+    if (b.dataset.issue === 'commande') { $('#cases-commande', d).hidden = false; d.querySelectorAll('[data-issue]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); return; }
+    r.etat = 'sorti'; r.issue = b.dataset.issue; r.sortie = horlogeSortie(); fermerDialogue(); rendreTout();
+  });
+  d.querySelectorAll('[data-case]').forEach((c) => c.onclick = () => c.setAttribute('aria-pressed', String(c.getAttribute('aria-pressed') !== 'true')));
+  $('#valider-commande', d).onclick = () => {
+    r.etat = 'sorti'; r.issue = 'commande'; r.sortie = horlogeSortie();
+    d.querySelectorAll('[data-case]').forEach((c) => { r.cases[c.dataset.case] = c.getAttribute('aria-pressed') === 'true'; });
+    fermerDialogue(); rendreTout(); annoncerCommande(r);
+  };
+}
+
+$('#visiteur').addEventListener('click', () => {
+  const h = Math.floor(MAINTENANT_J);
+  const libres = VENDEURS.filter((v) => !actifs().some((r) => r.vendeur === v.id && r.h === h && (r.etat === 'avec' || r.etat === 'arrive')));
+  ouvrirDialogue(`<h2>Un visiteur sans RDV</h2>
+    <div class="field"><span class="label">Nom</span><input class="input" id="nom-visiteur" placeholder="NOM P." /></div>
+    <div class="field"><span class="label">Vendeur disponible maintenant</span><div class="vp-cases">${libres.map((v, i) => `<button class="chip" aria-pressed="${i === 0}" data-vendeur="${v.id}">${esc(v.nom)}</button>`).join('')}</div></div>
+    <div class="field"><span class="label">Véhicule</span><div class="vp-cases"><button class="chip" aria-pressed="true" data-vm="renault">Renault</button><button class="chip" aria-pressed="false" data-vm="dacia">Dacia</button></div></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" id="annuler-visiteur">Annuler</button><button class="btn primary" id="ok-visiteur">Le confier</button></div>`);
+  const d = $('#dialogue');
+  const unique = (sel) => d.querySelectorAll(sel).forEach((c) => c.onclick = () => d.querySelectorAll(sel).forEach((x) => x.setAttribute('aria-pressed', String(x === c))));
+  unique('[data-vendeur]'); unique('[data-vm]');
+  $('#nom-visiteur', d).focus();
+  $('#annuler-visiteur', d).onclick = fermerDialogue;
+  $('#ok-visiteur', d).onclick = () => {
+    const vid = d.querySelector('[data-vendeur][aria-pressed="true"]')?.dataset.vendeur; if (!vid) return;
+    const r = nouveauRdv(vid, PHONING_TOTAL, { h, source: 'naturel' });
+    r.client = ($('#nom-visiteur', d).value.trim() || 'VISITEUR').toUpperCase();
+    r.marque = d.querySelector('[data-vm][aria-pressed="true"]').dataset.vm;
+    r.etat = 'avec'; r.arrive = MAINTENANT_J;
+    fermerDialogue(); rendreTout();
+  };
+});
+
+$('#clore').addEventListener('click', () => {
+  const absents = actifs().filter((r) => r.etat === 'attendu');
+  ouvrirDialogue(`<h2>Clore la journée</h2><p class="muted" style="margin:0">${absents.length} client${absents.length > 1 ? 's' : ''} attendu${absents.length > 1 ? 's' : ''} ne ${absents.length > 1 ? 'sont' : 'est'} pas venu${absents.length > 1 ? 's' : ''}. ${absents.length > 1 ? 'Ils passent' : 'Il passe'} en <b>No show</b> dans le Suivi.</p>
+    <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" id="non-clore">Pas encore</button><button class="btn primary" id="oui-clore">Clore</button></div>`);
+  $('#non-clore').onclick = fermerDialogue;
+  $('#oui-clore').onclick = () => { absents.forEach((r) => { r.etat = 'noshow'; }); fermerDialogue(); rendreTout(); };
+});
+
+// ============================================================== PROJECTION
+let modeProjection = 'jour', dernierFlash = null;
+function rendreProjection() {
+  const el = $('#projection'), j = actifs();
+  if (modeProjection === 'phoning') {
+    const top = classementPhoning().slice(0, 5);
+    el.innerHTML = `<div class="gros">
+      <div class="accent"><b>${duPhoning().length}</b><span>RDV pris</span></div>
+      <div><b>${projectionFinJ2()}</b><span>attendus en fin de J2</span></div>
+      <div><b>${objectifTotal()}</b><span>objectif</span></div></div>
+      <div class="podium">${top.map(({ v, n }, i) => `<div><span>${i + 1}</span><span>${esc(v.nom)}</span><span class="num">${n}</span></div>`).join('')}</div>`;
+    return;
+  }
+  const cmd = j.filter((r) => r.etat === 'sorti' && r.issue === 'commande');
+  const venus = j.filter((r) => r.arrive != null).length, attendus = j.filter((r) => r.source === 'relance').length;
+  const parV = VENDEURS.map((v) => ({ v, n: cmd.filter((r) => r.vendeur === v.id).length })).sort((a, b) => b.n - a.n || a.v.nom.localeCompare(b.v.nom)).slice(0, 5);
+  const derniere = [...cmd].sort((a, b) => (a.sortie ?? 0) - (b.sortie ?? 0)).pop();
+  el.innerHTML = `<div class="gros">
+      <div class="accent"><b>${cmd.length}</b><span>commandes aujourd'hui</span></div>
+      <div><b>${venus}<span style="font-size:.4em;opacity:.6"> / ${attendus}</span></b><span>clients venus</span></div>
+      <div><b>${j.filter((r) => r.etat === 'avec').length}</b><span>avec un vendeur, maintenant</span></div></div>
+    <div class="podium">${parV.map(({ v, n }, i) => `<div><span>${i + 1}</span><span>${esc(v.nom)}</span><span class="num">${n}</span></div>`).join('')}</div>
+    ${derniere ? `<div class="fil">Dernière commande : ${esc(V[derniere.vendeur].nom)} · ${MARQUE[derniere.marque]} ${derniere.type}</div>` : ''}
+    ${dernierFlash ? `<div class="flash"><div>Commande !<small>${esc(V[dernierFlash.vendeur].nom)} · ${MARQUE[dernierFlash.marque]} ${dernierFlash.type}</small></div></div>` : ''}`;
+  dernierFlash = null;
+}
+function annoncerCommande(r) { dernierFlash = r; rendreProjection(); }
+segmente($('#seg-projection'), (b) => { modeProjection = b.dataset.mode; rendreProjection(); });
+$('#plein-ecran').addEventListener('click', () => $('#projection').requestFullscreen?.());
+
+// ============================================================== BILAN (fin de journee simulee)
+const AUTRES_VP = [
+  ['Clermont-Ferrand', '03/2026', 16, 41], ['Vichy', '04/2026', 9, 19], ['Ussel', '05/2026', 5, 8],
+  ['Albi', '05/2026', 11, 22], ['Rodez', '06/2026', 10, 17], ['Mozac', '09/2026', 7, 16],
+];
+function rendreBilan() {
+  const rel = RDV.filter((r) => r.source === 'relance' && r.etat !== 'retire');
+  const fin = (r) => r.etat === 'sorti' ? r.issue : r.issueFinale;   // ce qui est fait reste fait, le reste suit l'issue simulee
+  const venus = rel.filter((r) => fin(r) !== 'noshow'), cmd = venus.filter((r) => fin(r) === 'commande');
+  const nat = RDV.filter((r) => r.source === 'naturel'), cmdNat = nat.filter((r) => r.issue === 'commande').length;
+  const ventes = cmd.length + cmdNat, parVendeur = ventes / VENDEURS.length;
+  $('#kpis-bilan').innerHTML =
+    kpi('Ventes par vendeur', parVendeur.toFixed(1).replace('.', ','), `${ventes} commandes · ${VENDEURS.length} vendeurs`, true) +
+    kpi('RDV pris', rel.length, `${(rel.length / VENDEURS.length).toFixed(1).replace('.', ',')} par vendeur`) +
+    kpi('Présence', pct(venus.length, rel.length), `${rel.length - venus.length} no show`) +
+    kpi('Transformation', pct(cmd.length, venus.length), 'commandes / venus') +
+    kpi('Visiteurs', nat.length, `${cmdNat} commande${cmdNat > 1 ? 's' : ''}`);
+
+  const etapes = [['RDV pris', rel.length], ['Venus', venus.length], ['Offres et commandes', venus.filter((r) => fin(r) === 'offre' || fin(r) === 'commande').length], ['Commandes', cmd.length]];
+  $('#tunnel').innerHTML = etapes.map(([l, n], i) => `<div class="etape">
+      <span class="taux">${i ? pct(n, etapes[i - 1][1]) : '&nbsp;'}</span><span class="v num">${n}</span>
+      <div class="barre" style="height:${Math.max(8, 160 * n / etapes[0][1])}px;animation-delay:${i * 90}ms"></div><span class="l">${l}</span></div>`).join('');
+
+  const lignes = [...AUTRES_VP.map(([site, quand, nv, v]) => ({ site, quand, nv, v })), { site: VP.site, quand: VP.jour.slice(5, 7) + '/' + VP.jour.slice(0, 4), nv: VENDEURS.length, v: ventes, nous: true }].filter((l) => l.nous || l.site !== VP.site || l.quand !== VP.jour.slice(5, 7) + '/' + VP.jour.slice(0, 4))
+    .map((l) => ({ ...l, pv: l.v / l.nv })).sort((a, b) => b.pv - a.pv);
+  const maxPv = lignes[0].pv || 1;
+  $('#comparaison').innerHTML = `<table class="tbl"><thead><tr><th>#</th><th>VP</th><th class="r">Vendeurs</th><th class="r">Ventes</th><th class="r">Par vendeur</th></tr></thead><tbody>${lignes.map((l, i) => `
+    <tr class="${l.nous ? 'nous' : ''}"><td>${i + 1}</td><td>${l.site} <span class="faint">${l.quand}</span></td><td class="r num">${l.nv}</td><td class="r num">${l.v}</td>
+    <td class="r"><span style="display:inline-flex;align-items:center;gap:8px"><span class="vp-jauge" style="width:70px"><i style="transform:scaleX(${l.pv / maxPv})"></i></span><b class="num">${l.pv.toFixed(1).replace('.', ',')}</b></span></td></tr>`).join('')}</tbody></table>`;
+
+  const pv = VENDEURS.map((v) => {
+    const pris = rel.filter((r) => r.preneur === v.id), recus = RDV.filter((r) => r.vendeur === v.id && r.etat !== 'retire');
+    const vrecus = recus.filter((r) => r.source === 'naturel' || fin(r) !== 'noshow'), c = vrecus.filter((r) => (r.source === 'naturel' ? r.issue : fin(r)) === 'commande');
+    return { v, pris: pris.length, recus: recus.length, venus: vrecus.length, cmd: c.length, diac: c.filter((r) => r.cases.diac).length };
+  }).sort((a, b) => b.cmd - a.cmd || b.pris - a.pris);
+  $('#tbl-bilan').innerHTML = `<thead><tr><th>Vendeur</th><th class="r">RDV pris</th><th class="r">Objectif</th><th class="r">Reçus</th><th class="r">Venus</th><th class="r">Présence</th><th class="r">Commandes</th><th class="r">Transfo</th><th class="r">dont DIAC</th></tr></thead>
+    <tbody>${pv.map((l) => `<tr><td><b>${esc(l.v.nom)}</b> <span class="faint">${l.v.type}</span></td><td class="r num">${l.pris}</td><td class="r num faint">${l.v.objectif}</td><td class="r num">${l.recus}</td><td class="r num">${l.venus}</td><td class="r num">${pct(l.venus, l.recus)}</td><td class="r num"><b>${l.cmd}</b></td><td class="r num">${pct(l.cmd, l.venus)}</td><td class="r num">${l.diac}</td></tr>`).join('')}</tbody>`;
+}
+
+// ============================================================== IMPRIME
+function rendreImprime() {
+  const sel = $('#choix-feuille');
+  if (sel.dataset.vp !== VP.id) { sel.dataset.vp = VP.id; sel.innerHTML = `<option value="tous">Toutes les feuilles (${VENDEURS.length})</option>` + VENDEURS.map((v) => `<option value="${v.id}">${esc(v.nom)}</option>`).join(''); }
+  const qui = sel.value === 'tous' ? VENDEURS : [V[sel.value]];
+  $('#feuilles').innerHTML = qui.map((v) => `<div class="vp-feuille">
+    <div class="en-tete"><div><b>${esc(v.nom)}</b><br><span>${v.type}${v.marques.length ? ' · ' + v.marques.map((m) => MARQUE[m]).join(' / ') : ''}</span></div><span>VP ${esc(VP.site)} · ${jourLong(VP.jour)}</span></div>
+    <table><colgroup><col style="width:14mm"><col style="width:62mm"><col style="width:30mm"><col style="width:20mm"><col style="width:48mm"><col></colgroup>
+      <thead><tr><th>Heure</th><th>Client</th><th>Véhicule</th><th>Venu</th><th>Issue</th><th>Notes</th></tr></thead>
+      <tbody>${HEURES.map((h) => { const r = actifs().filter((x) => x.vendeur === v.id && x.h === h); const c = r.map((x) => x.client).join(' · '), m = r.map((x) => MARQUE[x.marque] + ' ' + x.type).join(' · ');
+        return `<tr><td class="h">${h} h</td><td>${esc(c)}</td><td>${esc(m)}</td><td><span class="case-coche"></span></td><td><span class="case-coche"></span>Cde <span class="case-coche"></span>Offre</td><td></td></tr>`; }).join('')}</tbody></table>
+    <div class="pied"><span>${actifs().filter((x) => x.vendeur === v.id).length} RDV au ${new Date().toLocaleDateString('fr-FR')}</span><span>GRID</span></div></div>`).join('');
+}
+$('#choix-feuille').addEventListener('change', rendreImprime);
+$('#imprimer').addEventListener('click', () => window.print());
+
+// ============================================================== DATES ET EN-TETES
+const JOURS_SEM = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const enDate = (iso) => new Date(iso + 'T12:00:00');
+const jj = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+const jjmmaaaa = (iso) => `${jj(iso)}/${iso.slice(0, 4)}`;
+const jourLong = (iso) => `${JOURS_SEM[enDate(iso).getDay()]} ${jjmmaaaa(iso)}`;
+const decaler = (iso, n) => { const d = enDate(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const libelleVp = (vp) => `VP · ${vp.site}`;
+
+function rendreEntetes() {
+  $('#choix-vp .t').textContent = libelleVp(VP);
+  $('#choix-vp .s').textContent = `Phoning ${jj(VP.j1)}–${jj(VP.j2)} · Vente privée ${jjmmaaaa(VP.jour)}`;
+  const etat = { en_cours: null, preparee: 'à venir', close: 'close' }[VP.statut];
+  $('#sub-phoning').textContent = VP.statut === 'en_cours' ? `J2 · ${jj(VP.j2)} · 15 h 20` : VP.statut === 'preparee' ? `commence le ${jourLong(VP.j1)}` : 'phoning terminé';
+  $('#sub-jour').textContent = VP.statut === 'en_cours' ? `${jj(VP.jour)} · 11 h 40` : `${jourLong(VP.jour)} · ${etat}`;
+  $('#titre-courbe').textContent = `Remplissage du ${jj(VP.jour)}, heure par heure`;
+  $('#sub-bilan').textContent = `VP ${VP.site} · ${jjmmaaaa(VP.jour)}${VP.statut === 'close' ? '' : ' · provisoire'}`;
+  $('#simuler-rdv').disabled = VP.statut !== 'en_cours';
+  $('#clore').disabled = VP.statut !== 'en_cours';
+  $('#visiteur').disabled = VP.statut !== 'en_cours';
+  document.querySelector('#ecran-param .app-head .sub').textContent = `${vpVisibles().length} VP`;
+}
+
+// ============================================================== PROFIL (maquette) ET CHOIX DE VP
+// Un admin voit toutes les VP ; un encadrant, celles de SES sites (ici : Massagettes).
+// Dans GRID, c'est la RLS qui le decide (perimetre_saisie), jamais ce filtre.
+let profil = 'admin';
+const SITES_ENCADRANT = ['Massagettes'];
+const vpVisibles = () => VPS.filter((vp) => profil === 'admin' || SITES_ENCADRANT.includes(vp.site));
+function choisirVp(vp) {
+  if (VP) VP.cache = { RDV, suivant };
+  if (vp.cache) { VP = vp; RDV = vp.cache.RDV; suivant = vp.cache.suivant; HEURES = vp.creneaux; alea = graine(vp.graine + suivant);
+    PHONING_ECOULE = vp.statut === 'en_cours' ? 10 + 6 + 20 / 60 : vp.statut === 'close' ? PHONING_TOTAL : 0;
+    MAINTENANT_J = vp.statut === 'en_cours' ? 11 + 40 / 60 : vp.statut === 'close' ? 24 : 0;
+    TOUS = vendeursDuSite(vp); recompterVendeurs();
+  } else chargerVp(vp);
+  rangsAvant = {}; fermerMenuVp(); rendreTout();
+}
+function ordreVp(a, b) { const o = { en_cours: 0, preparee: 1, close: 2 }; return o[a.statut] - o[b.statut] || (a.statut === 'close' ? b.jour.localeCompare(a.jour) : a.jour.localeCompare(b.jour)); }
+function ouvrirMenuVp() {
+  const m = $('#menu-vp'), b = $('#choix-vp').getBoundingClientRect();
+  const groupes = ['en_cours', 'preparee', 'close'].map((st) => [st, vpVisibles().filter((vp) => vp.statut === st).sort(ordreVp)]).filter(([, l]) => l.length);
+  m.innerHTML = groupes.map(([st, l]) => `<div class="groupe">${{ en_cours: 'En cours', preparee: 'Préparées', close: 'Closes' }[st]}</div>` + l.map((vp) => `
+    <button class="ligne-vp" role="menuitem" data-vp="${vp.id}">
+      <span>${vp === VP ? '<svg class="i sm" viewBox="0 0 24 24" style="color:var(--accent)"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : ''}</span>
+      <span><b>${esc(libelleVp(vp))}</b><small>${jourLong(vp.jour)}</small></span>
+      <span class="badge" style="--c:${STATUT_VP[vp.statut][1]}">${STATUT_VP[vp.statut][0]}</span></button>`).join('')).join('')
+    + (profil === 'admin' ? `<div class="pied-menu"><button class="ligne-vp" data-aller="param"><span></span><span><b>Paramétrage des VP</b><small>créer, dates, vendeurs, objectifs</small></span><span></span></button></div>` : '');
+  m.style.left = Math.max(12, b.left) + 'px'; m.style.top = (b.bottom + 10) + 'px';
+  m.hidden = false; $('#choix-vp').setAttribute('aria-expanded', 'true');
+  m.querySelector('button')?.focus();
+}
+function fermerMenuVp() { $('#menu-vp').hidden = true; $('#choix-vp').setAttribute('aria-expanded', 'false'); }
+$('#choix-vp').addEventListener('click', (e) => { e.stopPropagation(); $('#menu-vp').hidden ? ouvrirMenuVp() : fermerMenuVp(); });
+$('#menu-vp').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.aller) { fermerMenuVp(); allerA(b.dataset.aller); return; }
+  choisirVp(VPS.find((vp) => vp.id === b.dataset.vp));
+});
+document.addEventListener('click', (e) => { if (!e.target.closest('#menu-vp')) fermerMenuVp(); });
+
+segmente($('#seg-profil'), (b) => {
+  profil = b.dataset.profil;
+  $('#racine').classList.toggle('encadrant', profil === 'encadrant');
+  if (!vpVisibles().includes(VP)) choisirVp(vpVisibles()[0]);
+  if (profil === 'encadrant' && $('#ecran-param').classList.contains('actif')) allerA('phoning');
+  rendreEntetes(); requestAnimationFrame(() => placerPouce($('#onglets')));
+});
+
+// ============================================================== PARAMETRAGE
+function rendreParametrage() {
+  const liste = $('#liste-vp'), curseur = $('#curseur-vp');
+  liste.querySelectorAll('.vendeur-v2').forEach((x) => x.remove());
+  for (const vp of vpVisibles().sort(ordreVp)) {
+    const b = document.createElement('button');
+    b.className = 'vendeur-v2' + (vp === VP ? ' actif' : ''); b.dataset.vp = vp.id;
+    b.innerHTML = `<span class="nom">${esc(vp.site)}</span><span class="site">${jj(vp.j1)} → ${jjmmaaaa(vp.jour)}</span><span class="n"><span class="badge" style="--c:${STATUT_VP[vp.statut][1]}">${STATUT_VP[vp.statut][0]}</span></span>`;
+    liste.appendChild(b);
+  }
+  requestAnimationFrame(() => {
+    const a = liste.querySelector('.vendeur-v2.actif'); if (!a) { curseur.classList.add('absent'); return; }
+    curseur.classList.remove('absent');
+    curseur.style.width = a.offsetWidth + 'px'; curseur.style.height = a.offsetHeight + 'px';
+    curseur.style.transform = `translate(${a.offsetLeft}px, ${a.offsetTop}px)`;
+  });
+
+  const fige = VP.statut === 'close', mob = TOUS.filter((v) => v.mobilise).length;
+  const autres = VPS.filter((x) => x !== VP && x.site === VP.site && x.statut !== 'close');
+  const objectif = VENDEURS.reduce((s, v) => s + v.objectif, 0);
+  $('#detail-vp').innerHTML = `
+    <div class="entete-vp">
+      <input class="input" id="libelle-vp" value="${esc('VP ' + VP.site + ' · ' + ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][+VP.jour.slice(5, 7) - 1] + ' ' + VP.jour.slice(0, 4))}" ${fige ? 'disabled' : ''} aria-label="Libellé de la VP" />
+      <span class="badge" style="--c:${STATUT_VP[VP.statut][1]}">${STATUT_VP[VP.statut][0]}</span>
+    </div>
+    <section>
+      <div class="label">Dates</div>
+      <div class="vp-tuiles">
+        <label class="vp-tuile"><span class="label">J1 <span>phoning</span></span><input class="input" type="date" data-date="j1" value="${VP.j1}" ${fige ? 'disabled' : ''} /><small>${JOURS_SEM[enDate(VP.j1).getDay()]}</small></label>
+        <label class="vp-tuile"><span class="label">J2 <span>phoning</span></span><input class="input" type="date" data-date="j2" value="${VP.j2}" ${fige ? 'disabled' : ''} /><small>${JOURS_SEM[enDate(VP.j2).getDay()]}</small></label>
+        <label class="vp-tuile vp-jour"><span class="label">J3 <span>vente privée</span></span><input class="input" type="date" data-date="jour" value="${VP.jour}" ${fige ? 'disabled' : ''} /><small>${JOURS_SEM[enDate(VP.jour).getDay()]} · le jour des RDV</small></label>
+      </div>
+      ${VP.j1 >= VP.j2 || VP.j2 >= VP.jour ? '<div class="vp-alerte">Les deux jours de phoning doivent précéder le jour de la VP, dans l’ordre.</div>' : ''}
+      ${autres.length ? `<div class="vp-alerte">${esc(VP.site)} a déjà une autre VP ouverte : ${autres.map((x) => jjmmaaaa(x.jour)).join(', ')}.</div>` : ''}
+    </section>
+    <section>
+      <div class="label">Créneaux du ${jj(VP.jour)} <span class="faint" style="text-transform:none;letter-spacing:0">· un RDV dure 1 h, ceux de GRID classique par défaut</span></div>
+      <div class="vp-cases" id="creneaux-vp">${CRENEAUX_GRID.map((h) => `<button class="chip" aria-pressed="${VP.creneaux.includes(h)}" data-h="${h}" ${fige ? 'disabled' : ''}>${h} h</button>`).join('')}</div>
+      <div class="vp-alerte" id="alerte-creneau" hidden></div>
+    </section>
+    <section>
+      <div class="label">Vendeurs de ${esc(VP.site)} <span class="faint" style="text-transform:none;letter-spacing:0">· ${mob} présents sur ${TOUS.length} · objectif ${objectif} RDV</span></div>
+      ${fige ? '' : `<div class="vp-tous">Objectif pour tous <span class="vp-pas"><button data-tous="-1" aria-label="Moins">−</button><output id="obj-tous">10</output><button data-tous="1" aria-label="Plus">+</button></span><button class="btn sm" id="appliquer-tous">Appliquer aux présents</button></div>`}
+      <div class="vp-equipe">${TOUS.map((v) => {
+        const nRdv = RDV.filter((r) => r.vendeur === v.id && r.etat !== 'retire').length;
+        return `<div class="ligne-v${v.mobilise ? '' : ' absent'}" data-v="${v.id}">
+          <button class="chip present" aria-pressed="${v.mobilise}" data-presence ${fige ? 'disabled' : ''}>${v.mobilise ? 'Présent' : 'Absent'}</button>
+          <span class="qui"><b>${esc(v.nom)}</b><small>${v.type}${v.marques.length ? ' · ' + v.marques.map((m) => MARQUE[m]).join(' / ') : ''}${nRdv ? ` · ${nRdv} RDV` : ''}${!v.mobilise && nRdv ? ' · reste compté' : ''}</small></span>
+          <span class="vp-pas" title="Objectif de RDV"><button data-pas="-1" ${fige || !v.mobilise ? 'disabled' : ''} aria-label="Moins">−</button><output>${v.mobilise ? v.objectif : '—'}</output><button data-pas="1" ${fige || !v.mobilise ? 'disabled' : ''} aria-label="Plus">+</button></span>
+          <span class="motif">${v.mobilise ? '' : `<input class="input sm" placeholder="Motif (facultatif)" value="${esc(v.motif)}" data-motif ${fige ? 'disabled' : ''} />`}</span>
+        </div>`; }).join('')}</div>
+    </section>
+    <section>
+      <div class="vp-cloture">${fige
+        ? '<p><b>VP close.</b> Saisie, accueil et suivi sont figés ; le bilan est définitif.</p>'
+        : `<p><b>Clôturer</b> fige la saisie, l’accueil et le suivi. Les offres conclues après le ${jj(VP.jour)} comptent dans le bilan : on clôture une fois qu’elles sont saisies dans le Suivi.</p><button class="btn danger" id="cloturer-vp">Clôturer la VP…</button>`}</div>
+    </section>`;
+}
+
+$('#liste-vp').addEventListener('click', (e) => { const b = e.target.closest('[data-vp]'); if (b) choisirVp(VPS.find((vp) => vp.id === b.dataset.vp)); });
+$('#detail-vp').addEventListener('change', (e) => {
+  const d = e.target.dataset.date;
+  if (d && e.target.value) { VP[d] = e.target.value; rendreEntetes(); rendreParametrage(); rendreImprime(); }
+  if (e.target.hasAttribute('data-motif')) V[e.target.closest('[data-v]').dataset.v].motif = e.target.value;
+});
+$('#detail-vp').addEventListener('click', (e) => {
+  const ligne = e.target.closest('[data-v]'), v = ligne && V[ligne.dataset.v];
+  if (e.target.closest('[data-presence]')) { v.mobilise = !v.mobilise; recompterVendeurs(); rendreTout(); return; }
+  const pas = e.target.closest('[data-pas]');
+  if (pas) { v.objectif = Math.max(0, v.objectif + +pas.dataset.pas); rendreTout(); return; }
+  const tous = e.target.closest('[data-tous]');
+  if (tous) { const o = $('#obj-tous'); o.textContent = Math.max(0, +o.textContent + +tous.dataset.tous); return; }
+  if (e.target.closest('#appliquer-tous')) { const n = +$('#obj-tous').textContent; TOUS.filter((x) => x.mobilise).forEach((x) => { x.objectif = n; }); rendreTout(); return; }
+  const c = e.target.closest('#creneaux-vp [data-h]');
+  if (c) {
+    const h = +c.dataset.h, n = RDV.filter((r) => r.h === h && r.etat !== 'retire').length;
+    if (VP.creneaux.includes(h) && n) { const a = $('#alerte-creneau'); a.hidden = false; a.textContent = `${n} RDV posé${n > 1 ? 's' : ''} à ${h} h : déplace-les avant de retirer ce créneau.`; return; }
+    VP.creneaux = VP.creneaux.includes(h) ? VP.creneaux.filter((x) => x !== h) : [...VP.creneaux, h].sort((a, b) => a - b);
+    HEURES = VP.creneaux; rendreTout(); return;
+  }
+  if (e.target.closest('#cloturer-vp')) {
+    const aTraiter = RDV.filter((r) => r.etat === 'sorti' && r.issue === 'offre').length;
+    ouvrirDialogue(`<h2>Clôturer ${esc(libelleVp(VP))}</h2>
+      <p class="muted" style="margin:0">La saisie, l'accueil et le suivi seront figés. ${aTraiter ? `<b>${aTraiter} offre${aTraiter > 1 ? 's' : ''} en cours</b> n'${aTraiter > 1 ? 'ont' : 'a'} pas encore d'issue : une commande conclue après la clôture ne comptera pas.` : ''}</p>
+      <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" id="non-cloturer">Pas encore</button><button class="btn primary" id="oui-cloturer">Clôturer</button></div>`);
+    $('#non-cloturer').onclick = fermerDialogue;
+    $('#oui-cloturer').onclick = () => { VP.statut = 'close'; MAINTENANT_J = 24; fermerDialogue(); rendreTout(); };
+  }
+});
+
+$('#nouvelle-vp').addEventListener('click', () => {
+  const defaut = '2026-11-25';
+  ouvrirDialogue(`<h2>Nouvelle VP</h2>
+    <div class="field"><span class="label">Site</span><select class="select" id="site-vp">${Object.entries(SITES).map(([pl, l]) => `<optgroup label="${pl}">${l.map((x) => `<option>${x}</option>`).join('')}</optgroup>`).join('')}</select></div>
+    <div class="field"><span class="label">Jour de la vente privée</span><input class="input" type="date" id="jour-vp" value="${defaut}" /></div>
+    <div class="muted" id="resume-vp"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" id="annuler-vp">Annuler</button><button class="btn primary" id="creer-vp">Créer la VP</button></div>`);
+  const resume = () => {
+    const j = $('#jour-vp').value; if (!j) return;
+    const site = $('#site-vp').value, deja = VPS.filter((x) => x.site === site && x.statut !== 'close');
+    $('#resume-vp').innerHTML = `Phoning le ${jourLong(decaler(j, -2))} et le ${jourLong(decaler(j, -1))}, modifiable ensuite. Créneaux de GRID classique, vendeurs de ${esc(site)} tous présents, objectif 10 RDV chacun.`
+      + (deja.length ? `<div class="vp-alerte" style="margin-top:6px">${esc(site)} a déjà une VP ouverte (${deja.map((x) => jjmmaaaa(x.jour)).join(', ')}).</div>` : '');
+  };
+  $('#site-vp').onchange = resume; $('#jour-vp').oninput = resume; resume();
+  $('#annuler-vp').onclick = fermerDialogue;
+  $('#creer-vp').onclick = () => {
+    const j = $('#jour-vp').value; if (!j) return;
+    const vp = { id: 'vp-' + (VPS.length + 1), site: $('#site-vp').value, j1: decaler(j, -2), j2: decaler(j, -1), jour: j, statut: 'preparee', graine: 100 + VPS.length, n: 7 + VPS.length % 5, creneaux: [...CRENEAUX_GRID] };
+    VPS.push(vp); fermerDialogue(); choisirVp(vp);
+  };
+});
+
+// ============================================================== COQUILLE
+function rendreTout(phoning = true) { rendreEntetes(); if (phoning) rendrePhoning(false); rendreAgenda(); rendreAccueil(); rendreProjection(); rendreBilan(); rendreImprime(); rendreParametrage(); }
+function allerA(ecran) { document.querySelector(`#onglets [data-ecran="${ecran}"]`)?.click(); }
+segmente($('#onglets'), (b) => {
+  document.querySelectorAll('.vp-ecran').forEach((s) => s.classList.toggle('actif', s.id === 'ecran-' + b.dataset.ecran));
+  try { localStorage.setItem('vp.ecran', b.dataset.ecran); } catch {}
+  requestAnimationFrame(() => placerPouce($('#seg-projection')));
+});
+$('#bascule-notes').addEventListener('click', (e) => { const on = $('#racine').classList.toggle('notes'); e.currentTarget.setAttribute('aria-pressed', String(on)); });
+$('#bascule-theme').addEventListener('click', () => { document.documentElement.classList.toggle('dark'); });
+window.addEventListener('resize', () => { placerPouce($('#onglets')); placerPouce($('#seg-projection')); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { fermerVolet(); fermerDialogue(); } });
+
+rendreTout();
+try { const e = localStorage.getItem('vp.ecran'); if (e) document.querySelector(`#onglets [data-ecran="${e}"]`)?.click(); } catch {}
+if (document.fonts) document.fonts.ready.then(() => { placerPouce($('#onglets')); placerPouce($('#seg-projection')); });
+</script>
+</body>
+</html>

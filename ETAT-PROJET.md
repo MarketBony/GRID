@@ -1793,6 +1793,23 @@ vendeurs de ses sites ; la SAISIE ne change pas. Detail : `ETAT-BACKEND.md`.
 (`archiverRdv`, le meme que la saisie) — interdit n.1 : le RDV sort du Suivi et des
 totaux, il reste en base. Un RDV du phoning se retire depuis la saisie.
 
+## 20/10/2026 — GRID/VP : cadrage et maquette
+
+Branche `feat/grid-vp`. Les ventes privées : un site, 3 jours (J1–J2 de phoning, J3 la
+journée de VP). Cadrage, décisions et questions ouvertes dans `PLAN-GRID-VP.md`.
+Maquette à la racine, `maquette-vp.html`, sur les vraies feuilles de GRID et avec des
+données fictives. Elle couvre sept écrans : Phoning, Jour J, Accueil, Projection, Bilan,
+Imprimé, et Paramétrage (admin seulement). Un sélecteur permet de changer de VP. **Aucune
+migration, aucun code de l'application touché.** DA et fluidité validées par
+l'utilisateur. Le modèle est proposé dans `PLAN-GRID-VP.md` : une VP est une campagne,
+avec une nature et un site, et le périmètre gagne une condition de présence.
+
+Décidé le même jour : **pas d'API SPARK tant que SPARK n'est pas fini**. Le premier pont
+sera le référentiel vendeurs. Avant de le brancher, il faudra régler un point :
+**les totaux par site se rangent selon le site ACTUEL du vendeur** (`agregats.ts`).
+Un import qui déplace un vendeur réécrirait donc les chiffres par site des campagnes
+passées.
+
 ## CE QUI RESTE, au 02/10/2026
 
 **Tout est en ligne** jusqu'au lot du 10/09. Le lot du 02/10 (creation de campagne)
