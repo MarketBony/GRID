@@ -75,7 +75,7 @@ export function Bilan({ donnees, vps }: PropsEcranVp & { vps: VpResume[] }) {
           <Kpi l="RDV pris" v={b.rdvPris} d={`${decimal(b.effectif ? b.rdvPris / b.effectif : null)} par vendeur`} />
           <Kpi l="Présence" v={pct(b.presence)} d={`${b.noShows} no show`} />
           <Kpi l="Transformation" v={pct(b.transformation)} d="commandes / venus" />
-          <Kpi l="Visiteurs" v={b.visiteurs} d={`${b.avecDiac} commande${b.avecDiac > 1 ? 's' : ''} avec DIAC au total`} />
+          <Kpi l="Visiteurs" v={b.visiteurs} d={`${b.ventes - b.commandesPhoning} commande${b.ventes - b.commandesPhoning > 1 ? 's' : ''} · ${b.avecDiac} avec DIAC en tout`} />
         </div>
         <div className="vp-deux">
           <div className="card pad">

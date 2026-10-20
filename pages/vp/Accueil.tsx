@@ -113,10 +113,12 @@ export function Accueil({ donnees, maintenant, recharger }: PropsEcranVp) {
       <section className="vp-ecran actif">
         <div className="vp-tablette">
           <div className="kpis">
+            {/* Les RDV du phoning arrives, SUR les RDV du phoning : un visiteur
+                compte a part — mesure le 20/10, il donnait « 2 / 1 ». */}
             <Kpi
               l="Arrivés"
-              v={<>{venus.length}<span className="faint" style={{ fontSize: 16 }}> / {phoning.length}</span></>}
-              d={`${rdvs.length - phoning.length} visiteurs sans RDV`}
+              v={<>{phoning.filter(estVenu).length}<span className="faint" style={{ fontSize: 16 }}> / {phoning.length}</span></>}
+              d={`+ ${rdvs.length - phoning.length} visiteur${rdvs.length - phoning.length > 1 ? 's' : ''} sans RDV`}
             />
             <Kpi l="Avec un vendeur" v={rdvs.filter((r) => etape(r) === 'avec_vendeur').length} d="en ce moment" />
             <Kpi l="Présence" v={pct(passes.length ? passes.filter(estVenu).length / passes.length : null)} d="sur les heures passées" />

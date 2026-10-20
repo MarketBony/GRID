@@ -1825,6 +1825,35 @@ backend propres, build conforme (`dist` inchangé). **Éprouvée au navigateur s
 seulement** — aucune n'existe en base, et le front de développement attaque la
 production. Les écrans avec données restent à éprouver sur la VP de Massagettes.
 
+**Mise en ligne le 20/10/2026** : `feat/grid-vp` fusionnée sur `master` en avance
+rapide, Cloudflare sert `index-uV1vrDK9.js`, le même bundle que le build local.
+**La VP de Massagettes est créée** depuis le Paramétrage, par le compte admin de
+l'utilisateur : « VP Massagettes · oct. 2026 », phoning lundi 26 et mardi 27/10, vente
+privée mercredi 28/10, 11 créneaux repris d'Octobre 2026, aucune mobilisation posée.
+
+**Éprouvé dans le navigateur, sur elle** : un RDV d'essai posé par la Saisie (ESSAI VP,
+8 h), vu dans Phoning (classement, remplissage, projection), Jour J, Projection, Bilan,
+Imprimé ; parcours complet de la tablette (arrivé, annulation du geste, avec le
+vendeur, sortie en commande DIAC) ; un visiteur sans RDV confié à un vendeur VN ; le
+Suivi liste la VP. **Les deux RDV d'essai sont archivés** (Suppr dans la Saisie,
+« Retirer » dans le Suivi), vérifié en base. Non éprouvés à l'écran, faute de
+données : la réaffectation (Massagettes n'a qu'un VN et un VO, aucun ne peut
+recevoir le client de l'autre) et l'objectif de RDV. Ils sont couverts par `test:rls`.
+
+**À SAVOIR AVANT LE 26** : le référentiel ne compte que **2 vendeurs actifs à
+Massagettes**, Gaëtan Thomassin (VO, entré le 01/10) et Virginie Cuminal (VN). Quentin
+Vanini est sorti le 01/08. La VP montre exactement ce que la base contient : les
+vendeurs manquants s'ajoutent dans GRID classique, écran Vendeurs.
+
+**Trois défauts trouvés à l'essai, corrigés après la mise en ligne** (pas encore en
+ligne) :
+- changer d'onglet ne relisait pas les données : un RDV posé dans la Saisie
+  n'apparaissait dans Phoning qu'au rafraichissement suivant (20 s) ;
+- la tablette affichait « Arrivés 2 / 1 » : le visiteur entrait au numérateur, pas au
+  dénominateur. Désormais les RDV du phoning sur les RDV du phoning, plus les
+  visiteurs à part ;
+- le Bilan écrivait le nombre de commandes avec DIAC sous « Visiteurs ».
+
 Correction non demandée, déclarée : `avecTransition` (`Coquille.tsx`) laissait une
 promesse rejetée quand une transition de page est avortée (onglet masqué) —
 « Uncaught (in promise) InvalidStateError » dans la console. Le changement d'écran avait

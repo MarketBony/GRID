@@ -103,7 +103,7 @@ changent pas.
 |---|---|
 | Cadrage et maquette | **fait** — DA et fluidité validées |
 | Modèle de données | **fait, sur les deux bases** (20/10/2026) : migration, `auth/roles.ts`, `test:rls` 168, `test:invariants` 15, `comparer` sans écart |
-| Interface VP | **écrite** (20/10/2026), `pages/vp/` : coquille, Saisie et Suivi de GRID classique, Phoning, Jour J, Accueil, Projection, Bilan, Imprimé, Paramétrage. Entrée par le bouton « VP » de l'Île. GRID classique exclut les VP. **Éprouvée au navigateur sans VP seulement** : il n'en existe aucune en base |
+| Interface VP | **écrite** (20/10/2026), `pages/vp/` : coquille, Saisie et Suivi de GRID classique, Phoning, Jour J, Accueil, Projection, Bilan, Imprimé, Paramétrage. Entrée par le bouton « VP » de l'Île. GRID classique exclut les VP. **En ligne le 20/10/2026**, éprouvée sur la VP de Massagettes avec deux RDV d'essai, archivés depuis |
 | Fonctions pures `utils/vp.ts` et `test:vp` | **faites** : 36/36 |
 
 Écart avec la maquette, assumé : la maquette réaffecte vers un vendeur libre à la même

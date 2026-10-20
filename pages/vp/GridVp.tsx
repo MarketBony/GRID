@@ -134,6 +134,18 @@ export function GridVp({ retour, nomCompte, palier, deconnexion }: Props) {
     setDonnees(null);
     void recharger();
   }, [recharger]);
+  // Changer d'onglet RELIT : un RDV pose dans la Saisie (qui charge ses propres
+  // donnees) doit se voir aussitot dans Phoning ou Jour J — constate a l'essai le
+  // 20/10, l'onglet montrait l'etat d'avant la pose jusqu'au rafraichissement.
+  const premier = useRef(true);
+  useEffect(() => {
+    if (premier.current) {
+      premier.current = false;
+      return;
+    }
+    void recharger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ecran]);
 
   // L'horloge, et le rafraichissement des ecrans du jour J.
   const enCours = useRef(false);
