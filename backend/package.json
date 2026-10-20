@@ -20,7 +20,8 @@
     "test:agregats": "tsx prisma/tester-agregats.ts",
     "test:repartition": "tsx src/utils/repartition.verif.ts",
     "importer-juin": "tsx prisma/importer-rdv-juin.ts",
-    "test:suivi": "tsx prisma/tester-suivi.ts"
+    "test:suivi": "tsx prisma/tester-suivi.ts",
+    "test:vp": "tsx prisma/tester-vp.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",

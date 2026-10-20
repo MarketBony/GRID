@@ -103,8 +103,8 @@ changent pas.
 |---|---|
 | Cadrage et maquette | **fait** — DA et fluidité validées |
 | Modèle de données | **fait, sur les deux bases** (20/10/2026) : migration, `auth/roles.ts`, `test:rls` 168, `test:invariants` 15, `comparer` sans écart |
-| Interface VP | à faire. **Avant la première VP créée en production**, GRID classique doit exclure les VP (voir `BUGS-CONNUS.md`) |
-| Fonctions pures `utils/vp.ts` et `test:vp` | à faire, avec l'interface |
+| Interface VP | **écrite** (20/10/2026), `pages/vp/` : coquille, Saisie et Suivi de GRID classique, Phoning, Jour J, Accueil, Projection, Bilan, Imprimé, Paramétrage. Entrée par le bouton « VP » de l'Île. GRID classique exclut les VP. **Éprouvée au navigateur sans VP seulement** : il n'en existe aucune en base |
+| Fonctions pures `utils/vp.ts` et `test:vp` | **faites** : 36/36 |
 
 Écart avec la maquette, assumé : la maquette réaffecte vers un vendeur libre à la même
 heure. La base, elle, ne vérifie pas que l'heure est libre : GRID accepte deux RDV par

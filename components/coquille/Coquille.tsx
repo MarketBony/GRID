@@ -49,6 +49,8 @@ interface Props {
   nomCompte: string;
   palier: string;
   deconnexion: () => void;
+  /// Ouvre GRID/VP. Absent pour qui n'y a rien a faire (un lecteur).
+  versVp?: () => void;
   children: ReactNode;
 }
 
@@ -68,11 +70,15 @@ export function avecTransition(f: () => void, sens: 1 | -1 | 0 = 0) {
   // une rubrique situee plus loin dans l'Ile, vers la droite sinon.
   const html = document.documentElement;
   html.dataset.vtSens = sens > 0 ? 'avant' : sens < 0 ? 'arriere' : '';
-  const t = doc.startViewTransition(() => flushSync(f)) as { finished?: Promise<unknown> } | undefined;
-  t?.finished?.finally(() => delete html.dataset.vtSens);
+  const t = doc.startViewTransition(() => flushSync(f)) as { finished?: Promise<unknown>; ready?: Promise<unknown> } | undefined;
+  // Une transition AVORTEE (onglet masque, seconde transition) rejette `ready` :
+  // le changement d'etat a bien eu lieu, seule l'animation saute. Sans ce
+  // `catch`, la console affichait « Uncaught (in promise) InvalidStateError ».
+  t?.ready?.catch(() => undefined);
+  t?.finished?.catch(() => undefined).finally(() => delete html.dataset.vtSens);
 }
 
-export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, palier, deconnexion, children }: Props) {
+export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, palier, deconnexion, versVp, children }: Props) {
   const { theme, basculer } = useTheme();
   const reflet = useReflet();
   const [retractee, setRetractee] = useState(false);
@@ -198,6 +204,14 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
           </button>
         ))}
         <span className="sep" aria-hidden="true" />
+        {/* GRID/VP : discret, a cote des outils et non parmi les rubriques — c'est
+            un autre espace, pas un ecran de plus de celui-ci. */}
+        {versVp && (
+          <button type="button" className="icon-btn bouton-vp" onClick={versVp} title="Ventes privées — GRID/VP" aria-label="Ouvrir les ventes privées">
+            <Icone nom="etiquette" petite />
+            <span>VP</span>
+          </button>
+        )}
         <PastilleSante {...sante} />
         <button type="button" className="icon-btn" onClick={() => setPaletteOuverte(true)} title="Rechercher (Ctrl K)" aria-label="Rechercher">
           <Icone nom="recherche" />
@@ -271,6 +285,11 @@ export function Coquille({ rubriques, active, aller, recherche = [], nomCompte, 
                     <Icone nom={r.icone} /> {r.libelle}
                   </button>
                 ))}
+                {versVp && (
+                  <button type="button" className="btn" style={{ justifyContent: 'flex-start', height: 44 }} onClick={() => { setPlusOuvert(false); versVp(); }}>
+                    <Icone nom="etiquette" /> Ventes privées
+                  </button>
+                )}
                 <button type="button" className="btn" style={{ justifyContent: 'flex-start', height: 44 }} onClick={() => { setPlusOuvert(false); setPaletteOuverte(true); }}>
                   <Icone nom="recherche" /> Rechercher
                 </button>

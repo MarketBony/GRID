@@ -31,6 +31,13 @@ const TRACES = {
   horloge: <path d="M12 4a8 8 0 100 16 8 8 0 000-16zM12 8v4l3 2" />,
   corbeille: <path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13" />,
   crayon: <path d="M4 20l4-1 11-11-3-3L5 16l-1 4z" />,
+  // GRID/VP : une etiquette de prix, la vente privee.
+  etiquette: <><path d="M3.5 12.3V5a1.5 1.5 0 0 1 1.5-1.5h7.3a1.5 1.5 0 0 1 1.06.44l7.2 7.2a1.5 1.5 0 0 1 0 2.12l-7.3 7.3a1.5 1.5 0 0 1-2.12 0l-7.2-7.2a1.5 1.5 0 0 1-.44-1.06z" /><circle cx="8.5" cy="8.5" r="1.6" /></>,
+  agenda: <><rect x="3" y="4" width="18" height="17" rx="3" /><path d="M3 9h18M8 2.5v3M16 2.5v3M7.5 13h3M13.5 13h3M7.5 17h3" /></>,
+  accueil: <><path d="M4 10.5L12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z" /><path d="M9.5 20.5v-6h5v6" /></>,
+  projection: <><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M12 16v4M8 20.5h8" /></>,
+  imprime: <><path d="M7 9V3.5h10V9" /><rect x="3.5" y="9" width="17" height="8" rx="2" /><path d="M7 14.5h10v6H7z" /></>,
+  pilotage: <><path d="M3 20h18" /><path d="M5 16l4.5-5 3.5 3 6-7" /><path d="M15 7h4v4" /></>,
   oeil: <><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="3" /></>,
   oeilBarre: <><path d="M3 3l18 18" /><path d="M10.6 5.6A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3 3.8M6.3 6.4A16.8 16.8 0 0 0 2.5 12S6 18.5 12 18.5a9 9 0 0 0 4-.9" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></>,
 } as const;

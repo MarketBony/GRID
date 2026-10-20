@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Rempart } from './components/Rempart';
-import { Coquille, type Rubrique } from './components/coquille/Coquille';
+import { Coquille, avecTransition, type Rubrique } from './components/coquille/Coquille';
+import { FournisseurCampagne } from './contexts/CampagneContext';
 import { useSession } from './contexts/SessionContext';
 import { Connexion } from './pages/Connexion';
 import { IntroGrid, consommerIntro } from './components/connexion/IntroGrid';
@@ -17,6 +18,20 @@ const Tables = lazy(() => import('./pages/Tables').then((m) => ({ default: m.Tab
 const Vendeurs = lazy(() => import('./pages/Vendeurs').then((m) => ({ default: m.Vendeurs })));
 const Campagne = lazy(() => import('./pages/Campagne').then((m) => ({ default: m.Campagne })));
 const Reglages = lazy(() => import('./pages/Reglages').then((m) => ({ default: m.Reglages })));
+// GRID/VP (20/10/2026) : un espace a part, charge seulement quand on y entre.
+const GridVp = lazy(() => import('./pages/vp/GridVp').then((m) => ({ default: m.GridVp })));
+
+/// L'espace ouvert — GRID classique ou GRID/VP — survit a un rechargement de
+/// l'onglet (`sessionStorage`, comme la campagne courante), pas au-dela.
+type Espace = 'classique' | 'vp';
+const CLE_ESPACE = 'grid.espace';
+function lireEspace(): Espace {
+  try {
+    return window.sessionStorage.getItem(CLE_ESPACE) === 'vp' ? 'vp' : 'classique';
+  } catch {
+    return 'classique';
+  }
+}
 
 /// Ce qui s'affiche le temps d'aller chercher une rubrique : un squelette, pas
 /// un ecran vide qui se lirait comme une panne.
@@ -61,6 +76,16 @@ const TOUTES: Record<Id, Rubrique> = {
 export default function App() {
   const { session, chargement, deconnexion } = useSession();
   const [active, setActive] = useState<Id>('saisie');
+  const [espace, setEspace] = useState<Espace>(lireEspace);
+  const changerEspace = (e: Espace) =>
+    avecTransition(() => {
+      setEspace(e);
+      try {
+        window.sessionStorage.setItem(CLE_ESPACE, e);
+      } catch {
+        // sans memoire, l'espace vaut pour la session React
+      }
+    }, e === 'vp' ? 1 : -1);
   // L'entree animee : seulement apres une connexion reussie, une seule fois.
   const [intro, setIntro] = useState(false);
   useEffect(() => {
@@ -105,6 +130,25 @@ export default function App() {
 
   const palier = droits.admin ? 'admin' : droits.direction ? 'direction' : droits.lecteur ? 'lecteur' : 'encadrant';
 
+  // GRID/VP s'ouvre a qui peut saisir : un admin la parametre, un encadrant y
+  // saisit et y suit les RDV de SES sites — c'est la RLS qui le decide, pas ce
+  // test, qui ne fait qu'afficher le bouton (interdit n.5).
+  const accesVp = !(droits.lecteur && !droits.administre);
+  if (espace === 'vp' && accesVp) {
+    return (
+      <>
+        {intro && <IntroGrid onFin={() => setIntro(false)} />}
+        <FournisseurCampagne nature="vente_privee">
+          <Rempart nom="GRID/VP">
+            <Suspense fallback={<div className="v2"><Attente /></div>}>
+              <GridVp retour={() => changerEspace('classique')} nomCompte={utilisateur.nom} palier={palier} deconnexion={deconnexion} />
+            </Suspense>
+          </Rempart>
+        </FournisseurCampagne>
+      </>
+    );
+  }
+
   return (
     <>
     {intro && <IntroGrid onFin={() => setIntro(false)} />}
@@ -115,6 +159,7 @@ export default function App() {
       nomCompte={utilisateur.nom}
       palier={palier}
       deconnexion={deconnexion}
+      versVp={accesVp ? () => changerEspace('vp') : undefined}
     >
       {/* Une frontiere PAR RUBRIQUE : un ecran qui casse n'emporte pas la
           navigation avec lui. La cle force le remontage au changement. */}

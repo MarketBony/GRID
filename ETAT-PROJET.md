@@ -1817,6 +1817,19 @@ sache les exclure (`BUGS-CONNUS.md`).
 `test:garde-fous` 34/39, **les cinq échecs connus** (juin clôturée, voir
 `BUGS-CONNUS.md`), aucun nouveau.
 
+**L'interface GRID/VP est écrite** (même jour, `pages/vp/`, `services/vp.ts`,
+`backend/src/utils/vp.ts` + `test:vp` 36/36). On y entre par un bouton discret « VP »
+dans l'Île (et « Ventes privées » dans « Plus » au téléphone), réservé à qui peut
+saisir. GRID classique n'affiche plus les VP (`chargerCampagnes`). `tsc` front et
+backend propres, build conforme (`dist` inchangé). **Éprouvée au navigateur sans VP
+seulement** — aucune n'existe en base, et le front de développement attaque la
+production. Les écrans avec données restent à éprouver sur la VP de Massagettes.
+
+Correction non demandée, déclarée : `avecTransition` (`Coquille.tsx`) laissait une
+promesse rejetée quand une transition de page est avortée (onglet masqué) —
+« Uncaught (in promise) InvalidStateError » dans la console. Le changement d'écran avait
+bien lieu ; le rejet est désormais absorbé.
+
 Décidé le même jour : **pas d'API SPARK tant que SPARK n'est pas fini**. Le premier pont
 sera le référentiel vendeurs. Avant de le brancher, il faudra régler un point :
 **les totaux par site se rangent selon le site ACTUEL du vendeur** (`agregats.ts`).

@@ -88,7 +88,7 @@ type Origine = 'table' | 'equipe' | 'tout';
 export function Saisie() {
   const [campagnes, setCampagnes] = useState<CampagneResume[]>([]);
   // Partagee avec les autres ecrans — voir `contexts/CampagneContext.tsx`.
-  const { campagneId, choisir: setCampagneId } = useCampagneCourante();
+  const { campagneId, choisir: setCampagneId, nature } = useCampagneCourante();
   const [donnees, setDonnees] = useState<PerimetreSaisie | null>(null);
   const [vendeurId, setVendeurId] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -141,7 +141,7 @@ export function Saisie() {
   }, []);
 
   useEffect(() => {
-    chargerCampagnes()
+    chargerCampagnes(nature)
       .then((cs) => {
         setCampagnes(cs);
         // On ouvre sur une campagne ou l'utilisateur a QUELQUE CHOSE A FAIRE, pas

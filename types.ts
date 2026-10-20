@@ -35,6 +35,10 @@ export interface Droits {
   /// regle.
   administre: boolean;
   gereUtilisateurs: boolean;
+  /// Parametrer une vente privee (GRID/VP) : `admin` seul. Calcule depuis
+  /// `ROLES_GESTION_VP`, la liste que `test:invariants` compare a
+  /// `relance.peut_gerer_vp()`.
+  gereVp: boolean;
   lecteur: boolean;
   /// Sites encadres, toutes campagnes confondues.
   sitesEncadres: string[];

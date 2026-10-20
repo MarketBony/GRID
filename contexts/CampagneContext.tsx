@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import type { NatureCampagne } from '../backend/src/auth/roles';
 
 // ============================================================================
 // LA CAMPAGNE COURANTE — partagee par tous les ecrans.
@@ -40,22 +41,30 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 
 const CLE = 'grid.campagneCourante';
 
+// ---------------------------------------------------------------------------
+// DEUX ESPACES, DEUX CAMPAGNES COURANTES (GRID/VP, 20/10/2026)
+// ---------------------------------------------------------------------------
+// GRID classique et GRID/VP montent chacun leur fournisseur : la NATURE dit aux
+// ecrans partages (saisie, Suivi) quelles campagnes lister, et la CLE de memoire
+// est distincte. Sans cela, ouvrir une VP puis revenir a GRID classique y ferait
+// atterrir sur la VP — que la liste de GRID classique ne contient pas.
+
 /// Lecture defensive. `sessionStorage` peut lever — navigation privee, stockage
 /// desactive par une politique d'entreprise — et une exception ici empecherait
 /// l'application de monter. Elle ne vaut pas ce risque : sans elle, on repart
 /// simplement sur le defaut de chaque ecran.
-function lireMemoire(): string | null {
+function lireMemoire(cle: string): string | null {
   try {
-    return window.sessionStorage.getItem(CLE);
+    return window.sessionStorage.getItem(cle);
   } catch {
     return null;
   }
 }
 
-function ecrireMemoire(id: string | null): void {
+function ecrireMemoire(cle: string, id: string | null): void {
   try {
-    if (id === null) window.sessionStorage.removeItem(CLE);
-    else window.sessionStorage.setItem(CLE, id);
+    if (id === null) window.sessionStorage.removeItem(cle);
+    else window.sessionStorage.setItem(cle, id);
   } catch {
     // Sans memoire, le contexte reste valable pour la duree de la session React :
     // le defaut corrige — les onglets ne se reinitialisent plus — tient quand meme.
@@ -67,19 +76,32 @@ interface Contexte {
   /// verifie qu'il figure dans la liste que l'ecran vient de charger.
   campagneId: string | null;
   choisir: (id: string | null) => void;
+  /// Les campagnes de cet espace : `operation` pour GRID classique,
+  /// `vente_privee` pour GRID/VP.
+  nature: NatureCampagne;
 }
 
 const ContexteCampagne = createContext<Contexte | null>(null);
 
-export function FournisseurCampagne({ children }: { children: ReactNode }) {
-  const [campagneId, setId] = useState<string | null>(() => lireMemoire());
+export function FournisseurCampagne({
+  children,
+  nature = 'operation',
+}: {
+  children: ReactNode;
+  nature?: NatureCampagne;
+}) {
+  const cle = nature === 'operation' ? CLE : `${CLE}.${nature}`;
+  const [campagneId, setId] = useState<string | null>(() => lireMemoire(cle));
 
-  const choisir = useCallback((id: string | null) => {
-    setId(id);
-    ecrireMemoire(id);
-  }, []);
+  const choisir = useCallback(
+    (id: string | null) => {
+      setId(id);
+      ecrireMemoire(cle, id);
+    },
+    [cle]
+  );
 
-  const valeur = useMemo(() => ({ campagneId, choisir }), [campagneId, choisir]);
+  const valeur = useMemo(() => ({ campagneId, choisir, nature }), [campagneId, choisir, nature]);
   return <ContexteCampagne.Provider value={valeur}>{children}</ContexteCampagne.Provider>;
 }
 

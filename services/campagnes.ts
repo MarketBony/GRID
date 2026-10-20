@@ -1,4 +1,5 @@
 import { ErreurApi, supabase, txt, verifier } from './supabase';
+import type { NatureCampagne } from '../backend/src/auth/roles';
 
 // ============================================================================
 // MODULE A — les campagnes, leurs jours et leurs creneaux.
@@ -98,9 +99,19 @@ const versResume = (c: LigneCampagne, saisissables: number): CampagneResume => (
 /// source que les politiques. Zero n'est pas une anomalie : les droits sont par
 /// campagne, etre chef de table en juin n'en donne aucun en septembre — et
 /// l'ecran a besoin de le montrer pour que la situation soit comprehensible.
-export async function chargerCampagnes(): Promise<CampagneResume[]> {
+///
+/// LA NATURE (GRID/VP, 20/10/2026). Tout GRID classique passe par ici — saisie,
+/// tableau de bord, Suivi, Campagnes, et le MODELE de « Nouvelle campagne ». Le
+/// filtre par defaut sur `operation` tient donc les ventes privees hors de GRID
+/// classique en un seul point ; GRID/VP demande les siennes explicitement.
+export async function chargerCampagnes(nature: NatureCampagne = 'operation'): Promise<CampagneResume[]> {
   const [campagnes, perimetre] = await Promise.all([
-    supabase.from('campagne').select(SELECT_CAMPAGNE).is('archive_le', null).order('date_debut', { ascending: false }),
+    supabase
+      .from('campagne')
+      .select(SELECT_CAMPAGNE)
+      .eq('nature', nature)
+      .is('archive_le', null)
+      .order('date_debut', { ascending: false }),
     supabase.from('perimetre_saisie').select('campagne_id'),
   ]);
 

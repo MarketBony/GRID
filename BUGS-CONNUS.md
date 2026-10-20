@@ -7,7 +7,7 @@ verifie, pas seulement corrige de memoire.
 
 ---
 
-## [OUVERT — 20/10/2026] Le front de GRID classique ne distingue pas encore les VP
+## [CORRIGE SUR feat/grid-vp — 20/10/2026, PAS ENCORE EN LIGNE] Le front de GRID classique ne distinguait pas les VP
 
 La migration `vente_privee` est posee, l'interface VP ne l'est pas. Tant qu'elle ne
 l'est pas, **ne creer AUCUNE VP en production** : rien dans le front ne filtre
@@ -18,8 +18,11 @@ bien ses creneaux, mais **aucune session**, puisqu'une VP n'en a pas.
 
 Rien ne casse tant qu'aucune VP n'existe : toutes les campagnes en base sont des
 `operation`, et leurs perimetres sont identiques a la ligne pres (`test:rls`).
-A fermer avec le premier lot d'interface VP : exclure les VP du selecteur de GRID
-classique, et choisir le modele parmi les `operation`.
+**Corrige** : `chargerCampagnes(nature = 'operation')` — la saisie, le tableau de bord,
+le Suivi, Effectifs et Campagnes passent tous par elle, et le modele de « Nouvelle
+campagne » aussi. **Tant que la branche n'a pas atteint `master`, la regle tient
+toujours** : le front EN LIGNE ne filtre rien, aucune VP ne doit etre creee en
+production avant la mise en ligne.
 
 ## [CONNU — 20/10/2026] Purger le preneur d'un RDV reaffecte dans une VP cloturee echoue
 

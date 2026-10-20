@@ -51,7 +51,7 @@ const pourcent = (t: number | null) => (t === null ? '—' : `${(t * 100).toFixe
 
 export function Suivi() {
   const [campagnes, setCampagnes] = useState<CampagneResume[]>([]);
-  const { campagneId, choisir } = useCampagneCourante();
+  const { campagneId, choisir, nature } = useCampagneCourante();
   const [rdvs, setRdvs] = useState<RdvSuivi[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -72,7 +72,7 @@ export function Suivi() {
   useEffect(() => setLimite(TRANCHE), [vue, recherche, campagneId]);
 
   useEffect(() => {
-    chargerCampagnes()
+    chargerCampagnes(nature)
       .then((cs) => {
         setCampagnes(cs);
         const retenue = choisirDansListe(cs, campagneId, (l) => l.find((c) => !c.cloturee) ?? l[0]);

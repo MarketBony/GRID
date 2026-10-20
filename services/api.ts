@@ -1,5 +1,6 @@
 import type { Droits, Session, Utilisateur } from '../types';
 import { ErreurApi, supabase, txt, verifier } from './supabase';
+import { ROLES_GESTION_VP } from '../backend/src/auth/roles';
 
 // ============================================================================
 // SESSION ET DROITS.
@@ -41,6 +42,7 @@ const DROITS_VIDES: Droits = {
   direction: false,
   administre: false,
   gereUtilisateurs: false,
+  gereVp: false,
   lecteur: false,
   sitesEncadres: [],
   plaquesParCampagne: {},
@@ -93,6 +95,8 @@ async function chargerDroits(utilisateurId: string): Promise<Droits> {
     tablesParCampagne: {},
   };
 
+  const roles = verifier(globaux).map((r) => r.role as string);
+  droits.gereVp = ROLES_GESTION_VP.some((r) => roles.includes(r));
   for (const r of verifier(globaux)) {
     if (r.role === 'admin') droits.admin = true;
     if (r.role === 'direction') droits.direction = true;
