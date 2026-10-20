@@ -1804,6 +1804,11 @@ migration, aucun code de l'application touché.** DA et fluidité validées par
 l'utilisateur. Le modèle est proposé dans `PLAN-GRID-VP.md` : une VP est une campagne,
 avec une nature et un site, et le périmètre gagne une condition de présence.
 
+**Modèle validé et migré en LOCAL** le même jour (`20261020142152_vente_privee`) : les
+sept suites sont vertes, avec `test:rls` à 168 et `test:invariants` à 15. Détail dans
+`ETAT-BACKEND.md`. **Pas encore sur Supabase.** Aucune VP ne doit être créée en
+production avant que GRID classique sache les exclure (`BUGS-CONNUS.md`).
+
 Décidé le même jour : **pas d'API SPARK tant que SPARK n'est pas fini**. Le premier pont
 sera le référentiel vendeurs. Avant de le brancher, il faudra régler un point :
 **les totaux par site se rangent selon le site ACTUEL du vendeur** (`agregats.ts`).

@@ -89,6 +89,12 @@ export const ACTIONS_JOURNAL = [
 ] as const;
 export type ActionJournal = (typeof ACTIONS_JOURNAL)[number];
 
+/// GRID/VP (20/10/2026, PLAN-GRID-VP.md). `operation` : une campagne multi-site
+/// de GRID classique ; `vente_privee` : une operation sur UN site, deux jours de
+/// phoning puis un jour de RDV. Une VP porte son site (`campagne.site_id`).
+export const NATURES_CAMPAGNE = ['operation', 'vente_privee'] as const;
+export type NatureCampagne = (typeof NATURES_CAMPAGNE)[number];
+
 const dansLaListe = <T extends readonly string[]>(liste: T, valeur: unknown): boolean =>
   typeof valeur === 'string' && (liste as readonly string[]).includes(valeur);
 
@@ -133,3 +139,10 @@ export const ROLES_GESTION_COMPTES: readonly RoleGlobal[] = ['admin'];
 // `relance.peut_administrer()` a chaque passage. Elles ne peuvent plus diverger
 // en silence.
 export const ROLES_ADMINISTRATION_REFERENTIELS: readonly RoleGlobal[] = ['admin', 'direction'];
+
+// PARAMETRER UNE VENTE PRIVEE (creer, dates, creneaux, vendeurs, objectifs,
+// cloture) : `admin` SEUL — decision de l'utilisateur du 20/10/2026. Le marketing
+// et l'encadrant des VP sont des comptes `admin` ; `direction` n'y a pas acces,
+// alors qu'il prepare les operations de GRID classique. Comparee a
+// `relance.peut_gerer_vp()` par `test:invariants`.
+export const ROLES_GESTION_VP: readonly RoleGlobal[] = ['admin'];

@@ -59,6 +59,8 @@ import {
   ACTIONS_JOURNAL,
   ROLES_GESTION_COMPTES,
   ROLES_ADMINISTRATION_REFERENTIELS,
+  NATURES_CAMPAGNE,
+  ROLES_GESTION_VP,
 } from '../src/auth/roles';
 
 const prisma = new PrismaClient();
@@ -96,6 +98,7 @@ const CHECKS: Attendu[] = [
   { contrainte: 'rdv_source_check', liste: SOURCES_RDV, nomListe: 'SOURCES_RDV' },
   { contrainte: 'rdv_suivi_issue_check', liste: ISSUES_SUIVI, nomListe: 'ISSUES_SUIVI' },
   { contrainte: 'journal_compte_action_check', liste: ACTIONS_JOURNAL, nomListe: 'ACTIONS_JOURNAL' },
+  { contrainte: 'campagne_nature_check', liste: NATURES_CAMPAGNE, nomListe: 'NATURES_CAMPAGNE' },
 ];
 
 /// Extrait les litteraux d'une definition de contrainte.
@@ -164,6 +167,13 @@ const PALIERS: Palier[] = [
     fonction: 'peut_gerer_utilisateurs',
     liste: ROLES_GESTION_COMPTES,
     nomListe: 'ROLES_GESTION_COMPTES',
+  },
+  // GRID/VP (20/10/2026) : la troisieme frontiere — `direction` prepare les
+  // operations, jamais les ventes privees.
+  {
+    fonction: 'peut_gerer_vp',
+    liste: ROLES_GESTION_VP,
+    nomListe: 'ROLES_GESTION_VP',
   },
 ];
 

@@ -1,8 +1,59 @@
 # ETAT-BACKEND — API, base, invariants
 
-Mise a jour : 08/10/2026, perimetre du Suivi.
+Mise a jour : 20/10/2026, GRID/VP (vente privee).
 
 ---
+
+## 20/10/2026 — GRID/VP : la vente privee (`20261020142152_vente_privee`)
+
+**Une VP est une campagne** (`PLAN-GRID-VP.md`) : un site, deux jours de phoning, un
+jour de RDV. Tout ce que GRID classique sait faire s'applique tel quel ; la migration
+n'ajoute que ce qui est propre a la VP. **Appliquee en LOCAL seulement**.
+
+| Objet | Contenu |
+|---|---|
+| `campagne.nature` | `operation` (defaut) ou `vente_privee` — CHECK `campagne_nature_check` = `NATURES_CAMPAGNE` |
+| `campagne.site_id` | FK `site`, `Restrict`. CHECK : renseigne **si et seulement si** VP |
+| `campagne.phoning_du/au` | CHECK : obligatoires pour une VP, `du <= au < date_debut` ; NULL ailleurs. Le jour des RDV est l'unique `campagne_jour` |
+| `mobilisation.objectif_rdv` | objectif de RDV du vendeur, `>= 0` — une consigne, pas un agregat |
+| `rdv.pris_par_vendeur_id` | FK `vendeur`, `SetNull`. NULL = le vendeur du RDV l'a pris. Le **phoning** compte `coalesce(pris_par_vendeur_id, vendeur_id)`, la **vente** compte `vendeur_id` |
+| `rdv_suivi.arrive_le / avec_vendeur_le / sorti_le` | la tablette d'accueil. CHECK d'ordre ; CHECK « un client arrive n'est pas un no show » |
+
+**Le perimetre gagne UNE condition de presence**, `(c.site_id IS NULL OR v.site_id =
+c.site_id)`, dans `perimetre_suivi` et dans la branche « table » de `perimetre_saisie`.
+Les origines de droit ne changent pas. Une operation a `site_id` NULL : ses perimetres
+sont identiques a la ligne pres (controle « une operation garde ses 5 vendeurs »).
+
+**Palier `relance.peut_gerer_vp()` = `admin` seul** (`ROLES_GESTION_VP`, compare par
+`test:invariants`). `direction` prepare les operations, jamais les VP. La regle est
+portee par **un trigger**, `verifier_preparation_vp`, sur `campagne`, `campagne_jour`,
+`campagne_creneau`, `session_plaque`, `role_campagne` et `mobilisation` : les politiques
+de ces tables accordent l'ecriture a `peut_administrer()`, et des RPC `security definer`
+les ecrivent sans RLS. Un trigger la tient en un point, quel que soit le chemin.
+
+Deux autres garde-fous :
+- `campagne_nature_figee` : nature et site ne changent pas apres la creation ;
+- `rdv_site_vp` / `mobilisation_site_vp` : une VP ne recoit que les vendeurs de son site
+  (lu au moment de l'ecriture).
+
+**RPC** (toutes revoquees a `PUBLIC`/`anon`, accordees a `authenticated`) :
+
+| Fonction | Qui | Ce qu'elle fait |
+|---|---|---|
+| `vp_creer(libelle, site, jour, phoning_du, phoning_au, modele)` | admin | la campagne, son jour, les creneaux du modele. **Aucune session** : sans table, tout vendeur du site est mobilise par defaut |
+| `rdv_reaffecter(rdv, vendeur)` | qui peut saisir les deux vendeurs | change le vendeur, retient le preneur ; rendre au preneur efface la mention. VP seulement |
+| `rdv_accueil_avancer(rdv)` / `rdv_accueil_reculer(rdv)` | perimetre du Suivi | une etape de plus / de moins, a l'heure du serveur. Aucune liste d'etapes a dupliquer : la base sait laquelle suit |
+| `vp_noshow_absents(campagne)` | perimetre du Suivi | les RDV du phoning ni arrives ni qualifies passent en `no_show`. Refuse a qui n'a aucun vendeur de la VP |
+
+Suites, en local : `test:rls` 135 -> **168** (33 controles VP, les deux sens),
+`test:invariants` 13 -> **15** ; garde-fous 39/39, import 19/19, agregats 39/39,
+repartition 20/20, suivi 29/29 ; derive Prisma vide ; `tsc` front et backend propres.
+
+**Deux defauts attrapes par `test:rls` pendant l'ecriture**, corriges :
+`verifier_site_vp` lisait `NEW.pris_par_vendeur_id` sur `mobilisation` (PL/pgSQL n'evalue
+pas un `AND` en court-circuit) ; `vp_noshow_absents` rendait `0` a un lecteur au lieu
+de le refuser.
+
 
 ## 08/10/2026 — Le Suivi s'arrete aux vendeurs de MES SITES (`20261008090000`, `20261008090100`)
 

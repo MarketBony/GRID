@@ -1,11 +1,37 @@
 # BUGS-CONNUS
 
-Mise a jour : 03/10/2026, robustesse de seance et comptes.
+Mise a jour : 20/10/2026, GRID/VP.
 
 Defauts identifies, corriges ou non. Un defaut retire de ce fichier doit avoir ete
 verifie, pas seulement corrige de memoire.
 
 ---
+
+## [OUVERT — 20/10/2026] Le front de GRID classique ne distingue pas encore les VP
+
+La migration `vente_privee` est posee, l'interface VP ne l'est pas. Tant qu'elle ne
+l'est pas, **ne creer AUCUNE VP en production** : rien dans le front ne filtre
+`campagne.nature`. Une VP apparaitrait dans l'ecran Campagnes, le tableau de bord et le
+Suivi de GRID classique. Et, etant la campagne la plus recente, elle deviendrait le
+**modele** que propose « Nouvelle campagne » : une operation creee depuis elle aurait
+bien ses creneaux, mais **aucune session**, puisqu'une VP n'en a pas.
+
+Rien ne casse tant qu'aucune VP n'existe : toutes les campagnes en base sont des
+`operation`, et leurs perimetres sont identiques a la ligne pres (`test:rls`).
+A fermer avec le premier lot d'interface VP : exclure les VP du selecteur de GRID
+classique, et choisir le modele parmi les `operation`.
+
+## [CONNU — 20/10/2026] Purger le preneur d'un RDV reaffecte dans une VP cloturee echoue
+
+`rdv.pris_par_vendeur_id` est en `ON DELETE SET NULL`. Le `SET NULL` est un UPDATE de
+`rdv`, et `rdv_campagne_ouverte` refuse toute ecriture dans une campagne cloturee : la
+purge du vendeur s'arrete. C'est le meme mur que celui que rencontre deja la purge d'un
+vendeur qui a des RDV dans une campagne cloturee — le `DELETE` de ses RDV y est refuse
+pareillement. Cas rarissime (un vendeur cree par erreur ne prend pas de RDV), donc non
+traite.
+
+---
+
 
 ## [CORRIGE LE 03/10/2026] La charge d'une seance etait le PRODUIT des saisies par les postes
 

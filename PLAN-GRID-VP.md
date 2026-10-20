@@ -58,7 +58,7 @@ la VP (elle n'aura d'intérêt qu'une fois GRID branché à SPARK).
 - **Réaffectation** : la réponse reçue (« un par vendeur ») porte sur l'objectif. La
   règle proposée reste à confirmer (question 1 ci-dessous).
 
-## Le modèle (proposé le 20/10/2026)
+## Le modèle (validé le 20/10/2026, migration `20261020142152_vente_privee`)
 
 Le principe : **une VP est une campagne**. Elle hérite de tout ce que GRID classique sait
 déjà faire (grille, créneaux, mobilisation, Suivi, trafic naturel, no show, clôture,
@@ -91,8 +91,22 @@ changent pas.
 - `direction` ne peut ni créer ni paramétrer une VP ;
 - la réaffectation refuse un vendeur hors du site, et une campagne close.
 
-## Questions ouvertes
+## Questions tranchées (20/10/2026)
 
-1. **À qui revient un RDV réaffecté ?** Proposition : le phoning (classement, objectif)
-   reste à celui qui a pris le RDV, la vente va à celui qui reçoit le client.
-2. **Droits de `direction`** : aucun accès au paramétrage des VP. Est-ce bien ça ?
+1. **RDV réaffecté** : le phoning (classement, objectif) reste à celui qui a pris le
+   RDV, la vente va à celui qui reçoit le client.
+2. **`direction`** : aucun accès au paramétrage des VP.
+
+## Où on en est
+
+| Lot | État |
+|---|---|
+| Cadrage et maquette | **fait** — DA et fluidité validées |
+| Modèle de données | **fait en local** : migration, `auth/roles.ts`, `test:rls` 168, `test:invariants` 15. Reste à jouer sur Supabase |
+| Interface VP | à faire. **Avant la première VP créée en production**, GRID classique doit exclure les VP (voir `BUGS-CONNUS.md`) |
+| Fonctions pures `utils/vp.ts` et `test:vp` | à faire, avec l'interface |
+
+Écart avec la maquette, assumé : la maquette réaffecte vers un vendeur libre à la même
+heure. La base, elle, ne vérifie pas que l'heure est libre : GRID accepte deux RDV par
+case depuis le 03/09. L'interface proposera les vendeurs libres, et l'agenda signale les
+doublons.

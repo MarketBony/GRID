@@ -204,15 +204,15 @@ model Site {
   id BigInt @id @default(autoincrement())
 
   /// Unicite simple, meme raison que `Plaque.libelle`.
-  code      String    @unique
-  libelle   String
-  plaqueId  BigInt    @map("plaque_id")
+  code          String    @unique
+  libelle       String
+  plaqueId      BigInt    @map("plaque_id")
   /// Le site a-t-il sa ligne dans le tableau des ventes ? Faux pour Alpine
   /// (decision de l'utilisateur, 05/10/2026). Une donnee, pas une exclusion en dur.
-  tableauVentes Boolean @default(true) @map("tableau_ventes")
-  creeLe    DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
-  creePar   BigInt?   @map("cree_par")
-  archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)
+  tableauVentes Boolean   @default(true) @map("tableau_ventes")
+  creeLe        DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar       BigInt?   @map("cree_par")
+  archiveLe     DateTime? @map("archive_le") @db.Timestamptz(6)
 
   plaque        Plaque            @relation(fields: [plaqueId], references: [id])
   vendeurs      Vendeur[]
@@ -221,6 +221,7 @@ model Site {
   rolesCampagne RoleCampagne[]
 
   objectifsVente ObjectifVente[]
+  ventesPrivees  Campagne[]
 
   @@map("site")
 }
@@ -234,14 +235,14 @@ model Marque {
   id BigInt @id @default(autoincrement())
 
   /// Unique, comme `Site.code`. Reactivation plutot que recreation si archivee.
-  code      String    @unique
-  libelle   String
-  ordre     Int       @default(0)
+  code          String    @unique
+  libelle       String
+  ordre         Int       @default(0)
   /// La marque a-t-elle ses blocs dans le tableau des ventes ? Faux pour Alpine.
-  tableauVentes Boolean @default(true) @map("tableau_ventes")
-  creeLe    DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
-  creePar   BigInt?   @map("cree_par")
-  archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)
+  tableauVentes Boolean   @default(true) @map("tableau_ventes")
+  creeLe        DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar       BigInt?   @map("cree_par")
+  archiveLe     DateTime? @map("archive_le") @db.Timestamptz(6)
 
   vendeurs VendeurMarque[]
   rdvs     Rdv[]
@@ -332,7 +333,8 @@ model Vendeur {
   utilisateur   Utilisateur?    @relation(fields: [utilisateurId], references: [id])
   marques       VendeurMarque[]
   affectations  Affectation[]
-  rdvs          Rdv[]
+  rdvs          Rdv[]           @relation("RdvVendeur")
+  rdvsPris      Rdv[]           @relation("RdvPrisPar")
   mobilisations Mobilisation[]
 
   @@index([siteId])
@@ -371,10 +373,20 @@ model Campagne {
 
   /// Unique : le seed et tout script analogue resolvent une campagne par son
   /// libelle. Deux homonymes les corrompraient en silence.
-  libelle   String    @unique
-  dateDebut DateTime  @map("date_debut") @db.Date
-  dateFin   DateTime  @map("date_fin") @db.Date
-  cloturee  Boolean   @default(false)
+  libelle   String   @unique
+  dateDebut DateTime @map("date_debut") @db.Date
+  dateFin   DateTime @map("date_fin") @db.Date
+  cloturee  Boolean  @default(false)
+
+  // GRID/VP (20/10/2026, PLAN-GRID-VP.md). `nature` : 'operation' | 'vente_privee'
+  // (CHECK + NATURES_CAMPAGNE, interdit n.6). Une VP porte son site et ses deux
+  // jours de phoning ; son seul `campagne_jour` est le jour des RDV. Les CHECK
+  // de coherence vivent dans la migration `vente_privee`.
+  nature    String    @default("operation")
+  siteId    BigInt?   @map("site_id")
+  phoningDu DateTime? @map("phoning_du") @db.Date
+  phoningAu DateTime? @map("phoning_au") @db.Date
+
   creeLe    DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
   creePar   BigInt?   @map("cree_par")
   archiveLe DateTime? @map("archive_le") @db.Timestamptz(6)
@@ -388,6 +400,11 @@ model Campagne {
 
   objectifsVente ObjectifVente[]
 
+  /// `Restrict` : une VP sans site violerait son CHECK. La suppression d'un site est
+  /// de toute facon interdite par trigger (interdit n.1).
+  site Site? @relation(fields: [siteId], references: [id], onDelete: Restrict)
+
+  @@index([siteId])
   @@map("campagne")
 }
 
@@ -589,6 +606,11 @@ model Rdv {
   /// filtre est `duPhoning` dans `agregats.ts`, source unique.
   source String @default("relance")
 
+  // GRID/VP : NULL = le vendeur du RDV l'a pris lui-meme. Renseigne par
+  // `rdv_reaffecter` quand le RDV change de vendeur : le phoning (classement,
+  // objectif) reste a celui qui l'a pris, la vente va a `vendeur_id`.
+  prisParVendeurId BigInt? @map("pris_par_vendeur_id")
+
   suivi RdvSuivi?
 
   creeLe     DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
@@ -603,7 +625,10 @@ model Rdv {
   archivePar BigInt?   @map("archive_par")
 
   campagne Campagne @relation(fields: [campagneId], references: [id])
-  vendeur  Vendeur  @relation(fields: [vendeurId], references: [id])
+  vendeur  Vendeur  @relation("RdvVendeur", fields: [vendeurId], references: [id])
+  /// `SetNull` : purger le vendeur qui avait PRIS un RDV reaffecte rend ce RDV a
+  /// celui qui le recoit, sans bloquer la purge.
+  prisPar  Vendeur? @relation("RdvPrisPar", fields: [prisParVendeurId], references: [id], onDelete: SetNull)
   /// `onDelete: Restrict` explicitement, et non le `SetNull` que Prisma choisit par
   /// defaut pour une relation optionnelle : un RDV dont la marque serait annulee
   /// violerait aussitot le trigger « marque obligatoire pour un vendeur VN ». La
@@ -632,20 +657,27 @@ model Rdv {
 /// « SECHE » N'EST PAS STOCKEE : c'est une commande sans aucun des trois (D8).
 /// Aucun agregat ici (interdit n.2) : les taux se calculent a la lecture.
 model RdvSuivi {
-  rdvId       BigInt    @id @map("rdv_id")
+  rdvId       BigInt  @id @map("rdv_id")
   issue       String?
-  diac        Boolean   @default(false)
-  stock       Boolean   @default(false)
-  cs          Boolean   @default(false)
+  diac        Boolean @default(false)
+  stock       Boolean @default(false)
+  cs          Boolean @default(false)
   /// Vehicule de DEMONSTRATION vendu : un stock particulier (05/10/2026). N'existe
   /// que sur une commande STOCK d'un RDV VN — CHECK `rdv_suivi_vd_check`.
-  vd          Boolean   @default(false)
+  vd          Boolean @default(false)
   modele      String?
   commentaire String?
-  creeLe      DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
-  creePar     BigInt?   @map("cree_par")
-  modifieLe   DateTime? @map("modifie_le") @db.Timestamptz(6)
-  modifiePar  BigInt?   @map("modifie_par")
+
+  // GRID/VP, la tablette d'accueil : arrive -> avec le vendeur -> sorti. Poses
+  // par `rdv_accueil_avancer`, a l'heure du serveur. CHECK d'ordre en migration.
+  arriveLe      DateTime? @map("arrive_le") @db.Timestamptz(6)
+  avecVendeurLe DateTime? @map("avec_vendeur_le") @db.Timestamptz(6)
+  sortiLe       DateTime? @map("sorti_le") @db.Timestamptz(6)
+
+  creeLe     DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar    BigInt?   @map("cree_par")
+  modifieLe  DateTime? @map("modifie_le") @db.Timestamptz(6)
+  modifiePar BigInt?   @map("modifie_par")
 
   rdv Rdv @relation(fields: [rdvId], references: [id], onDelete: Restrict)
 
@@ -658,14 +690,17 @@ model RdvSuivi {
 /// arbitrage du 08/09). On bascule `mobilise`, on ne supprime jamais.
 /// La regle de calcul reste `mobilisation()` dans `agregats.ts`.
 model Mobilisation {
-  id         BigInt    @id @default(autoincrement())
-  campagneId BigInt    @map("campagne_id")
-  vendeurId  BigInt    @map("vendeur_id")
-  mobilise   Boolean   @default(false)
-  motif      String?
-  creeLe     DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
-  creePar    BigInt?   @map("cree_par")
-  modifieLe  DateTime? @map("modifie_le") @db.Timestamptz(6)
+  id          BigInt    @id @default(autoincrement())
+  campagneId  BigInt    @map("campagne_id")
+  vendeurId   BigInt    @map("vendeur_id")
+  mobilise    Boolean   @default(false)
+  motif       String?
+  // GRID/VP : objectif de RDV du vendeur, saisi au parametrage. Une consigne,
+  // pas un agregat (interdit n.2).
+  objectifRdv Int?      @map("objectif_rdv")
+  creeLe      DateTime  @default(now()) @map("cree_le") @db.Timestamptz(6)
+  creePar     BigInt?   @map("cree_par")
+  modifieLe   DateTime? @map("modifie_le") @db.Timestamptz(6)
 
   campagne Campagne @relation(fields: [campagneId], references: [id], onDelete: Restrict)
   vendeur  Vendeur  @relation(fields: [vendeurId], references: [id], onDelete: Restrict)

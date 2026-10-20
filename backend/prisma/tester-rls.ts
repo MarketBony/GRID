@@ -1959,6 +1959,183 @@ async function main() {
     }
   );
 
+
+  // =========================================================================
+  // GRID/VP — LA VENTE PRIVEE (20/10/2026, migration `vente_privee`)
+  //
+  // Deux VP posees en proprietaire dans la preparation, une sur chaque site du
+  // decor : « VP RLS B » sur le site de `encadrant.rls`, « VP RLS A » sur l'autre.
+  // Les deux sens a chaque fois : ce que la VP montre, et ce qu'elle cache.
+  // =========================================================================
+
+  const JOUR_VP = '2026-06-10';
+  let vpB: bigint = 0n;
+  let vpA: bigint = 0n;
+  let vendeurB2: bigint = 0n;
+  let rdvVpB1: bigint = 0n;
+  let rdvVpA2: bigint = 0n;
+  const campagneVp = (id: () => bigint) => ({ get id() { return id(); }, jours: [JOUR_VP], creneau: CRENEAU });
+  const VP_B = campagneVp(() => vpB);
+  const VP_A = campagneVp(() => vpA);
+
+  // Deux instructions et non une : `campagne_jour` et `campagne_creneau` portent
+  // un trigger BEFORE qui LIT `campagne` (voir l'en-tete du decor).
+  const poserVp = async (tx: Tx) => {
+    const lignes = await tx.$queryRawUnsafe<{ id: bigint; site_id: bigint }[]>(`
+      INSERT INTO relance.campagne (libelle, date_debut, date_fin, nature, site_id, phoning_du, phoning_au)
+      VALUES ('VP RLS B', DATE '${JOUR_VP}', DATE '${JOUR_VP}', 'vente_privee', ${decor.siteB}, DATE '2026-06-08', DATE '2026-06-09'),
+             ('VP RLS A', DATE '${JOUR_VP}', DATE '${JOUR_VP}', 'vente_privee', ${decor.siteA}, DATE '2026-06-08', DATE '2026-06-09')
+      RETURNING id, site_id`);
+    vpB = lignes.find((l) => l.site_id === decor.siteB)!.id;
+    vpA = lignes.find((l) => l.site_id === decor.siteA)!.id;
+    await tx.$executeRawUnsafe(`
+      WITH j AS (
+        INSERT INTO relance.campagne_jour (campagne_id, jour, ordre)
+        SELECT id, DATE '${JOUR_VP}', 1 FROM relance.campagne WHERE id IN (${vpA}, ${vpB})
+        RETURNING campagne_id
+      )
+      INSERT INTO relance.campagne_creneau (campagne_id, code, libelle, ordre)
+      SELECT id, '${CRENEAU}', '8h-9h', 1 FROM relance.campagne WHERE id IN (${vpA}, ${vpB})`);
+    vendeurB2 = (await tx.vendeur.findFirstOrThrow({ where: { nom: 'DECOR B2', siteId: decor.siteB }, select: { id: true } })).id;
+  };
+  const poserVpEtRdv = async (tx: Tx) => {
+    await poserVp(tx);
+    rdvVpB1 = (await tx.rdv.create({ data: rdvDecor(decor.vendeurEncadre, VP_B), select: { id: true } })).id;
+    rdvVpA2 = (await tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, VP_A), select: { id: true } })).id;
+  };
+  const perimetre = (tx: Tx, campagne: bigint) =>
+    nombre(tx, `SELECT count(*) AS n FROM relance.perimetre_saisie WHERE campagne_id = ${campagne}`);
+
+  // --- le perimetre : les vendeurs du site, et seulement eux ---
+  await doitValoir('VP  admin : la VP ne montre que les 2 vendeurs de son site', { login: ADMIN }, 2,
+    (tx) => perimetre(tx, vpB), poserVp);
+  await doitValoir('VP  encadrant du site : les 2 vendeurs de la VP', { login: ENCADRANT }, 2,
+    (tx) => perimetre(tx, vpB), poserVp);
+  await doitValoir('VP  encadrant d un autre site : 0 vendeur', { login: ENCADRANT }, 0,
+    (tx) => perimetre(tx, vpA), poserVp);
+  await doitValoir('VP  chef de table : 0 vendeur (sa table n est pas dans la VP)', { login: CHEF }, 0,
+    (tx) => perimetre(tx, vpA), poserVp);
+  await doitValoir('VP  une operation garde ses 5 vendeurs du decor (rien ne change)', { login: ADMIN }, 5,
+    (tx) => nombre(tx, `SELECT count(*) AS n FROM relance.perimetre_saisie ps JOIN relance.vendeur v ON v.id = ps.vendeur_id
+                         WHERE ps.campagne_id = ${decor.campagne1.id} AND v.site_id IN (${decor.siteA}, ${decor.siteB})`),
+    poserVp);
+
+  // --- la saisie ---
+  await doitAccepter('VP  l encadrant pose un RDV dans la VP de son site', { login: ENCADRANT },
+    (tx) => tx.rdv.create({ data: rdvDecor(decor.vendeurEncadre, VP_B) }), poserVp);
+  await doitRefuser('VP  un RDV d un vendeur hors du site est refuse, meme par un admin (trigger)', { login: ADMIN },
+    ERREUR_METIER, (tx) => tx.rdv.create({ data: rdvDecor(decor.vendeurHorsPerimetre, VP_B) }), poserVp);
+
+  // --- le parametrage : admin SEUL ---
+  const creerVp = (libelle: string) =>
+    rpc("relance.vp_creer($1, $2, DATE '2026-07-08', DATE '2026-07-06', DATE '2026-07-07', $3)", () => [
+      libelle, decor.siteB, decor.campagne1.id,
+    ]);
+  await doitRefuser('VP  anon ne cree pas de VP', 'anonyme', DROIT_INSUFFISANT, creerVp('VP RLS REFUS'));
+  await doitRefuser('VP  la direction ne cree pas de VP', { login: DIRECTION }, ERREUR_METIER, creerVp('VP RLS REFUS'));
+  await doitRefuser('VP  un encadrant ne cree pas de VP', { login: ENCADRANT }, ERREUR_METIER, creerVp('VP RLS REFUS'));
+  await doitValoir('VP  un admin cree une VP : un jour de RDV, les creneaux du modele', { login: ADMIN }, 11,
+    async (tx) => {
+      await creerVp('VP RLS NEUVE')(tx);
+      // 1 jour x 10 + 1 creneau : un seul nombre pour deux faits, et 11 ne s'obtient
+      // pas par hasard (2 jours donneraient 21, 0 creneau 10).
+      return nombre(tx, `SELECT (SELECT count(*) * 10 FROM relance.campagne_jour j JOIN relance.campagne c ON c.id = j.campagne_id
+                                   WHERE c.libelle = 'VP RLS NEUVE' AND c.nature = 'vente_privee' AND c.site_id = ${decor.siteB})
+                              + (SELECT count(*) FROM relance.campagne_creneau k JOIN relance.campagne c ON c.id = k.campagne_id
+                                   WHERE c.libelle = 'VP RLS NEUVE') AS n`);
+    });
+  await doitRefuser('VP  vp_creer refuse un phoning apres le jour de la VP', { login: ADMIN }, ERREUR_METIER,
+    rpc("relance.vp_creer('VP RLS DATES', $1, DATE '2026-07-08', DATE '2026-07-09', DATE '2026-07-10', $2)", () => [
+      decor.siteB, decor.campagne1.id,
+    ]));
+  await doitRefuser('VP  la direction ne modifie pas une VP (trigger)', { login: DIRECTION }, ERREUR_METIER,
+    (tx) => tx.$executeRawUnsafe(`UPDATE relance.campagne SET libelle = 'VP RLS RENOMMEE' WHERE id = ${vpB}`), poserVp);
+  await doitRefuser('VP  la direction ne touche pas aux creneaux d une VP (trigger)', { login: DIRECTION }, ERREUR_METIER,
+    (tx) => tx.$executeRawUnsafe(`UPDATE relance.campagne_creneau SET libelle = 'X' WHERE campagne_id = ${vpB}`), poserVp);
+  await doitRefuser('VP  la direction ne compose pas la mobilisation d une VP (trigger)', { login: DIRECTION }, ERREUR_METIER,
+    (tx) => tx.$executeRawUnsafe(`INSERT INTO relance.mobilisation (campagne_id, vendeur_id, mobilise) VALUES (${vpB}, ${decor.vendeurEncadre.id}, false)`),
+    poserVp);
+  await doitValoir('VP  un admin pose un objectif de RDV', { login: ADMIN }, 1,
+    async (tx) => {
+      await tx.$executeRawUnsafe(`INSERT INTO relance.mobilisation (campagne_id, vendeur_id, mobilise, objectif_rdv) VALUES (${vpB}, ${decor.vendeurEncadre.id}, true, 12)`);
+      return nombre(tx, `SELECT count(*) AS n FROM relance.mobilisation WHERE campagne_id = ${vpB} AND objectif_rdv = 12`);
+    }, poserVp);
+  await doitRefuser('VP  la mobilisation refuse un vendeur hors du site (trigger)', { login: ADMIN }, ERREUR_METIER,
+    (tx) => tx.$executeRawUnsafe(`INSERT INTO relance.mobilisation (campagne_id, vendeur_id, mobilise) VALUES (${vpB}, ${decor.vendeurHorsPerimetre.id}, true)`),
+    poserVp);
+  await doitRefuser('VP  un objectif negatif est refuse (CHECK)', { login: ADMIN }, '23514',
+    (tx) => tx.$executeRawUnsafe(`INSERT INTO relance.mobilisation (campagne_id, vendeur_id, mobilise, objectif_rdv) VALUES (${vpB}, ${decor.vendeurEncadre.id}, true, -1)`),
+    poserVp);
+  await doitRefuser('VP  une operation ne devient pas une VP (nature figee)', { login: ADMIN }, ERREUR_METIER,
+    (tx) => tx.$executeRawUnsafe(`UPDATE relance.campagne SET nature = 'vente_privee', site_id = ${decor.siteB},
+             phoning_du = DATE '2026-02-26', phoning_au = DATE '2026-02-27' WHERE id = ${decor.campagne1.id}`));
+
+  // --- la reaffectation : le phoning au preneur, la vente au receveur ---
+  const reaffecter = (tx: Tx, rdv: bigint, vendeur: bigint) =>
+    tx.$queryRawUnsafe('SELECT relance.rdv_reaffecter($1, $2)', rdv, vendeur);
+  await doitValoir('VP  reaffecter : le RDV passe a B2, B1 reste celui qui l a pris', { login: ADMIN }, 1,
+    async (tx) => {
+      await reaffecter(tx, rdvVpB1, vendeurB2);
+      return nombre(tx, `SELECT count(*) AS n FROM relance.rdv WHERE id = ${rdvVpB1} AND vendeur_id = ${vendeurB2} AND pris_par_vendeur_id = ${decor.vendeurEncadre.id}`);
+    }, poserVpEtRdv);
+  await doitValoir('VP  reaffecter : rendre le RDV a son preneur efface la mention', { login: ENCADRANT }, 1,
+    async (tx) => {
+      await reaffecter(tx, rdvVpB1, vendeurB2);
+      await reaffecter(tx, rdvVpB1, decor.vendeurEncadre.id);
+      return nombre(tx, `SELECT count(*) AS n FROM relance.rdv WHERE id = ${rdvVpB1} AND vendeur_id = ${decor.vendeurEncadre.id} AND pris_par_vendeur_id IS NULL`);
+    }, poserVpEtRdv);
+  await doitRefuser('VP  reaffecter refuse un vendeur hors du site', { login: ADMIN }, ERREUR_METIER,
+    (tx) => reaffecter(tx, rdvVpB1, decor.vendeurHorsPerimetre.id), poserVpEtRdv);
+  await doitRefuser('VP  reaffecter refuse un encadrant d un autre site', { login: ENCADRANT }, ERREUR_METIER,
+    (tx) => reaffecter(tx, rdvVpA2, decor.vendeurDeSaTable.id), poserVpEtRdv);
+  await doitRefuser('VP  reaffecter refuse un lecteur', { login: LECTEUR }, ERREUR_METIER,
+    (tx) => reaffecter(tx, rdvVpB1, vendeurB2), poserVpEtRdv);
+  await doitRefuser('VP  reaffecter est propre aux VP (refuse sur une operation)', { login: ADMIN }, ERREUR_METIER,
+    async (tx) => {
+      const rdv = (await tx.rdv.create({ data: rdvDecor(decor.vendeurEncadre, decor.campagne1), select: { id: true } })).id;
+      return reaffecter(tx, rdv, vendeurB2);
+    });
+
+  // --- la tablette d'accueil ---
+  const avancer = (tx: Tx, rdv: bigint) => tx.$queryRawUnsafe('SELECT relance.rdv_accueil_avancer($1)', rdv);
+  await doitValoir('VP  accueil : trois gestes, trois etapes dans l ordre', { login: ENCADRANT }, 1,
+    async (tx) => {
+      await avancer(tx, rdvVpB1); await avancer(tx, rdvVpB1); await avancer(tx, rdvVpB1);
+      return nombre(tx, `SELECT count(*) AS n FROM relance.rdv_suivi WHERE rdv_id = ${rdvVpB1}
+                           AND arrive_le IS NOT NULL AND avec_vendeur_le IS NOT NULL AND sorti_le IS NOT NULL`);
+    }, poserVpEtRdv);
+  await doitValoir('VP  accueil : reculer retire la derniere etape seulement', { login: ENCADRANT }, 1,
+    async (tx) => {
+      await avancer(tx, rdvVpB1); await avancer(tx, rdvVpB1);
+      await tx.$queryRawUnsafe('SELECT relance.rdv_accueil_reculer($1)', rdvVpB1);
+      return nombre(tx, `SELECT count(*) AS n FROM relance.rdv_suivi WHERE rdv_id = ${rdvVpB1}
+                           AND arrive_le IS NOT NULL AND avec_vendeur_le IS NULL`);
+    }, poserVpEtRdv);
+  await doitRefuser('VP  accueil refuse un RDV hors du perimetre', { login: ENCADRANT }, ERREUR_METIER,
+    (tx) => avancer(tx, rdvVpA2), poserVpEtRdv);
+  await doitRefuser('VP  accueil refuse un lecteur', { login: LECTEUR }, ERREUR_METIER,
+    (tx) => avancer(tx, rdvVpB1), poserVpEtRdv);
+  await doitRefuser('VP  accueil refuse une VP cloturee', { login: ENCADRANT }, ERREUR_METIER,
+    (tx) => avancer(tx, rdvVpB1),
+    async (tx) => {
+      await poserVpEtRdv(tx);
+      await tx.$executeRawUnsafe(`UPDATE relance.campagne SET cloturee = true WHERE id = ${vpB}`);
+    });
+  await doitRefuser('VP  un client arrive n est pas un no show (CHECK)', { login: ADMIN }, '23514',
+    (tx) => tx.$executeRawUnsafe(`INSERT INTO relance.rdv_suivi (rdv_id, issue, arrive_le) VALUES (${rdvVpB1}, 'no_show', now())`),
+    poserVpEtRdv);
+  await doitValoir('VP  clore la journee : seul l absent passe en No show', { login: ADMIN }, 1,
+    async (tx) => {
+      const second = (await tx.rdv.create({ data: { ...rdvDecor({ id: vendeurB2 }, VP_B), client: 'CLIENT VENU' }, select: { id: true } })).id;
+      await avancer(tx, second);
+      const [l] = await tx.$queryRawUnsafe<{ n: number }[]>(`SELECT relance.vp_noshow_absents(${vpB}) AS n`);
+      const absents = await nombre(tx, `SELECT count(*) AS n FROM relance.rdv_suivi WHERE rdv_id = ${rdvVpB1} AND issue = 'no_show'`);
+      const venu = await nombre(tx, `SELECT count(*) AS n FROM relance.rdv_suivi WHERE rdv_id = ${second} AND issue IS NULL`);
+      return Number(l.n) === 1 && absents === 1 && venu === 1 ? 1 : 0;
+    }, poserVpEtRdv);
+  await doitRefuser('VP  clore la journee est refuse a un lecteur', { login: LECTEUR }, ERREUR_METIER,
+    (tx) => tx.$queryRawUnsafe(`SELECT relance.vp_noshow_absents(${vpB})`), poserVpEtRdv);
+
   // ------------------------------------------------------------------ rapport
 
   const largeur = Math.max(...resultats.map((r) => r.nom.length));
