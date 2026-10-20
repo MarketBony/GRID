@@ -8,7 +8,7 @@ Mise a jour : 20/10/2026, GRID/VP (vente privee).
 
 **Une VP est une campagne** (`PLAN-GRID-VP.md`) : un site, deux jours de phoning, un
 jour de RDV. Tout ce que GRID classique sait faire s'applique tel quel ; la migration
-n'ajoute que ce qui est propre a la VP. **Appliquee en LOCAL seulement**.
+n'ajoute que ce qui est propre a la VP. **Appliquee sur les deux bases** (voir plus bas).
 
 | Objet | Contenu |
 |---|---|
@@ -53,6 +53,14 @@ repartition 20/20, suivi 29/29 ; derive Prisma vide ; `tsc` front et backend pro
 `verifier_site_vp` lisait `NEW.pris_par_vendeur_id` sur `mobilisation` (PL/pgSQL n'evalue
 pas un `AND` en court-circuit) ; `vp_noshow_absents` rendait `0` a un lecteur au lieu
 de le refuser.
+
+**Sur Supabase, le 20/10/2026** — ports 5432/6543 de nouveau fermes depuis le bureau
+(443 seul ouvert, mesure sur les trois hotes), sequence jouee en partage de connexion 5G :
+`migrate:deploy` a applique `20261020142152_vente_privee` d'un bloc ; `comparer` :
+**aucun ecart**, 34 migrations de part et d'autre ; `test:invariants` 15/15,
+`test:rls` 168/168, import 19/19, agregats 39/39, repartition 20/20, suivi 29/29 ;
+`test:garde-fous` 34/39, **les cinq echecs connus** (juin cloturee, voir
+`BUGS-CONNUS.md`), aucun nouveau.
 
 
 ## 08/10/2026 — Le Suivi s'arrete aux vendeurs de MES SITES (`20261008090000`, `20261008090100`)

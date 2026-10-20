@@ -1806,8 +1806,16 @@ avec une nature et un site, et le périmètre gagne une condition de présence.
 
 **Modèle validé et migré en LOCAL** le même jour (`20261020142152_vente_privee`) : les
 sept suites sont vertes, avec `test:rls` à 168 et `test:invariants` à 15. Détail dans
-`ETAT-BACKEND.md`. **Pas encore sur Supabase.** Aucune VP ne doit être créée en
-production avant que GRID classique sache les exclure (`BUGS-CONNUS.md`).
+`ETAT-BACKEND.md`. Aucune VP ne doit être créée en production avant que GRID classique
+sache les exclure (`BUGS-CONNUS.md`).
+
+**Sur Supabase, le 20/10/2026** — ports 5432/6543 de nouveau fermés depuis le bureau
+(443 seul ouvert, mesuré sur les trois hôtes), séquence jouée en partage de connexion 5G :
+`migrate:deploy` a appliqué `20261020142152_vente_privee` d'un bloc ; `comparer` :
+**aucun écart**, 34 migrations de part et d'autre ; `test:invariants` 15/15,
+`test:rls` 168/168, import 19/19, agrégats 39/39, répartition 20/20, suivi 29/29 ;
+`test:garde-fous` 34/39, **les cinq échecs connus** (juin clôturée, voir
+`BUGS-CONNUS.md`), aucun nouveau.
 
 Décidé le même jour : **pas d'API SPARK tant que SPARK n'est pas fini**. Le premier pont
 sera le référentiel vendeurs. Avant de le brancher, il faudra régler un point :

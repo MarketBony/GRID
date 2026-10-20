@@ -102,7 +102,7 @@ changent pas.
 | Lot | État |
 |---|---|
 | Cadrage et maquette | **fait** — DA et fluidité validées |
-| Modèle de données | **fait en local** : migration, `auth/roles.ts`, `test:rls` 168, `test:invariants` 15. Reste à jouer sur Supabase |
+| Modèle de données | **fait, sur les deux bases** (20/10/2026) : migration, `auth/roles.ts`, `test:rls` 168, `test:invariants` 15, `comparer` sans écart |
 | Interface VP | à faire. **Avant la première VP créée en production**, GRID classique doit exclure les VP (voir `BUGS-CONNUS.md`) |
 | Fonctions pures `utils/vp.ts` et `test:vp` | à faire, avec l'interface |
 
