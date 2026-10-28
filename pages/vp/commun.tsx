@@ -49,7 +49,8 @@ export const STATUTS: Record<StatutAffiche, { libelle: string; couleur: string }
   attendu: { libelle: 'Attendu', couleur: 'var(--text-3)' },
   arrive: { libelle: 'Arrivé', couleur: 'var(--info)' },
   avec_vendeur: { libelle: 'Avec le vendeur', couleur: 'var(--warn)' },
-  sorti: { libelle: 'Sorti', couleur: 'var(--text-2)' },
+  // Sorti SANS issue : il manque la qualification. Visible, pour etre corrige.
+  sorti: { libelle: 'Sorti, sans issue', couleur: 'var(--warn)' },
   no_show: { libelle: 'No show', couleur: 'var(--danger)' },
   annule: { libelle: 'Annulé', couleur: 'var(--danger)' },
   commande: { libelle: 'Commande', couleur: 'var(--ok)' },

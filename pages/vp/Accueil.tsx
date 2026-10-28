@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { mobilisation } from '../../backend/src/utils/agregats';
 import { cleTri } from '../../backend/src/utils/tri';
@@ -38,7 +38,14 @@ export function Accueil({ donnees, maintenant, recharger }: PropsEcranVp) {
   const prenom = (id: string) => nom(id).split(' ')[0];
   const ordre = useMemo(() => new Map(creneaux.map((c) => [c.code, c.ordre])), [creneaux]);
 
+  // UN GESTE A LA FOIS PAR CLIENT. L'etat `occupe` ne desactive le bouton qu'au
+  // rendu suivant : deux clics rapides partaient tous les deux, et « avancer d'une
+  // etape » deux fois faisait SORTIR un client qui venait d'etre confie au vendeur
+  // (constate le 28/10 a Massagettes). Le verrou est une ref, lue au clic meme.
+  const enVol = useRef(new Set<string>());
   const geste = async (id: string, f: () => Promise<unknown>) => {
+    if (enVol.current.has(id)) return;
+    enVol.current.add(id);
     setErreur(null);
     setOccupe(id);
     try {
@@ -47,6 +54,7 @@ export function Accueil({ donnees, maintenant, recharger }: PropsEcranVp) {
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Le geste n’a pas été enregistré.');
     } finally {
+      enVol.current.delete(id);
       setOccupe(null);
     }
   };
@@ -103,6 +111,15 @@ export function Accueil({ donnees, maintenant, recharger }: PropsEcranVp) {
           <button type="button" className="btn" disabled={desactive} style={{ '--c': 'var(--ok)' } as React.CSSProperties} onClick={() => setSortie(r)}>
             Sortie…
           </button>
+        </>
+      );
+    // Une SORTIE se corrige aussi : un client sorti par erreur revient « avec le
+    // vendeur ». Sans ce bouton, rien a l'ecran ne permettait de le rattraper.
+    if (e === 'sorti' && r.sortiLe)
+      return (
+        <>
+          {corriger}
+          <Badge statut={statutAffiche(r, e)} />
         </>
       );
     return <Badge statut={statutAffiche(r, e)} />;
@@ -177,8 +194,10 @@ export function Accueil({ donnees, maintenant, recharger }: PropsEcranVp) {
           fermer={() => setSortie(null)}
           valider={(q) =>
             geste(sortie.id, async () => {
-              await avancerAccueil(sortie.id);
+              // L'ISSUE D'ABORD : si la sortie echoue ensuite, le client reste
+              // « avec le vendeur » avec son issue, au lieu de sortir sans issue.
               await enregistrerSuivi(sortie.id, q);
+              await avancerAccueil(sortie.id);
             }).then(() => setSortie(null))
           }
         />

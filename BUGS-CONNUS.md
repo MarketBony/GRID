@@ -7,6 +7,31 @@ verifie, pas seulement corrige de memoire.
 
 ---
 
+## [CORRIGE LE 28/10/2026, ECRAN SEULEMENT] Un client confie au vendeur apparaissait « Termine »
+
+Signale par l'utilisateur le jour de la VP de Massagettes : M. Georges TOURS, en essai
+avec Virginie Cuminal, s'affichait dans « Termines » avec le badge « Sorti » et AUCUNE
+issue. Base injoignable depuis le poste ce jour-la (5432/6543 fermes, aucune session
+ouverte dans le volet) : diagnostic par l'ecran, pas par la base.
+
+**Cause.** `rdv_accueil_avancer` fait avancer d'UNE etape, quelle qu'elle soit. Deux
+chemins menent a « sorti sans issue » : un DOUBLE CLIC sur « Avec <vendeur> » (l'etat
+`occupe` ne desactivait le bouton qu'au rendu suivant), ou un ecran pas encore
+rafraichi qui propose « Avec » pour un client deja avec le vendeur. Et une ligne
+« Termines » n'offrait plus « Annuler le dernier geste » : impossible de rattraper.
+
+**Corrige a l'ecran** (`pages/vp/Accueil.tsx`) : verrou par client lu au clic (une ref,
+pas un etat) ; « Annuler le dernier geste » sur une sortie ; a la sortie, l'issue est
+enregistree AVANT l'heure de sortie ; un sorti sans issue s'affiche « Sorti, sans
+issue », en orange.
+
+**Reste ouvert, cote base** : le second chemin (ecran perime, ou deux postes) n'est
+ferme que par une garde serveur — `rdv_accueil_avancer` devrait recevoir le nombre
+d'etapes deja franchies vu par l'ecran, et refuser s'il a change. Une migration, donc
+une session en partage de connexion.
+
+---
+
 ## [CORRIGE ET EN LIGNE LE 20/10/2026] Le front de GRID classique ne distinguait pas les VP
 
 La migration `vente_privee` est posee, l'interface VP ne l'est pas. Tant qu'elle ne
