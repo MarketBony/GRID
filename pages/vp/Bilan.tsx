@@ -57,7 +57,7 @@ export function Bilan({ donnees, vps }: PropsEcranVp & { vps: VpResume[] }) {
     ['RDV pris', phoning.length],
     ['Venus', phoning.filter(estVenu).length],
     ['Offres et commandes', phoning.filter((r) => r.issue === 'commande' || r.issue === 'offre_en_cours').length],
-    ['Commandes', b.commandesPhoning],
+    ['Commandes du phoning', b.commandesPhoning],
   ];
 
   return (
@@ -71,11 +71,21 @@ export function Bilan({ donnees, vps }: PropsEcranVp & { vps: VpResume[] }) {
           </span>
         </div>
         <div className="kpis">
-          <Kpi l="Ventes par vendeur" v={decimal(b.ventesParVendeur)} d={`${b.ventes} commandes · ${b.effectif} vendeurs`} accent />
+          {/* LES VENTES D'ABORD, visiteurs compris : c'est ce que la concession a
+              vendu. Le seul « 9 » visible a Massagettes etait la derniere etape
+              du tunnel, qui ne compte que le phoning — la 10e vente etait un
+              visiteur (28/10/2026). */}
+          <Kpi
+            l="Ventes"
+            v={b.ventes}
+            d={`${b.ventes - b.commandesPhoning > 0 ? `dont ${b.ventes - b.commandesPhoning} trafic naturel · ` : ''}${b.avecDiac} avec DIAC`}
+            accent
+          />
+          <Kpi l="Ventes par vendeur" v={decimal(b.ventesParVendeur)} d={`${b.effectif} vendeur${b.effectif > 1 ? 's' : ''}`} />
           <Kpi l="RDV pris" v={b.rdvPris} d={`${decimal(b.effectif ? b.rdvPris / b.effectif : null)} par vendeur`} />
           <Kpi l="Présence" v={pct(b.presence)} d={`${b.noShows} no show`} />
-          <Kpi l="Transformation" v={pct(b.transformation)} d="commandes / venus" />
-          <Kpi l="Visiteurs" v={b.visiteurs} d={`${b.ventes - b.commandesPhoning} commande${b.ventes - b.commandesPhoning > 1 ? 's' : ''} · ${b.avecDiac} avec DIAC en tout`} />
+          <Kpi l="Transformation" v={pct(b.transformation)} d="commandes du phoning / venus" />
+          <Kpi l="Visiteurs" v={b.visiteurs} d={`${b.ventes - b.commandesPhoning} commande${b.ventes - b.commandesPhoning > 1 ? 's' : ''}`} />
         </div>
         <div className="vp-deux">
           <div className="card pad">

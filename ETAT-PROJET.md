@@ -1854,6 +1854,13 @@ ligne) :
   visiteurs à part ;
 - le Bilan écrivait le nombre de commandes avec DIAC sous « Visiteurs ».
 
+**La VP de Massagettes a eu lieu le 28/10/2026** : 15 RDV pris au phoning, 14 clients
+venus (1 no show), 2 visiteurs sans RDV, **10 commandes** (9 du phoning, 1 visiteur ; 6
+avec DIAC), 2 offres en cours. 2 vendeurs : 5 ventes par vendeur, 64 % de
+transformation du phoning. Deux lots de corrections ont suivi : la tablette le 28
+(double clic, sortie sans issue) et les comptages du trafic naturel le 29 (voir
+`BUGS-CONNUS.md`, en tête).
+
 Correction non demandée, déclarée : `avecTransition` (`Coquille.tsx`) laissait une
 promesse rejetée quand une transition de page est avortée (onglet masqué) —
 « Uncaught (in promise) InvalidStateError » dans la console. Le changement d'écran avait

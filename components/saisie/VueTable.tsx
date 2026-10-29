@@ -1,3 +1,4 @@
+import { duPhoning } from '../../backend/src/utils/agregats';
 import { useMemo, useState } from 'react';
 import type { RdvSaisie, VendeurSaisie } from '../../services/saisie';
 import { libelleJour } from '../../utils/grille';
@@ -36,7 +37,8 @@ export function VueTable({
     for (const v of vendeurs) {
       const parCreneau = new Map<string, number>();
       for (const liste of rdvsParVendeur.get(v.id)?.values() ?? []) {
-        for (const r of liste) {
+        // Le phoning seulement, comme les compteurs de la liste (28/10/2026).
+        for (const r of duPhoning(liste)) {
           if (r.jour !== jour) continue;
           parCreneau.set(r.creneauCode, (parCreneau.get(r.creneauCode) ?? 0) + 1);
         }

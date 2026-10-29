@@ -69,9 +69,15 @@ export function Projection({ donnees, maintenant }: PropsEcranVp) {
       <>
         <div className="gros">
           <div className="accent"><b>{commandes.length}</b><span>commandes</span></div>
+          {/* Les RDV du phoning venus, SUR les RDV du phoning : les visiteurs a
+              part. Il affichait 16 / 15 a Massagettes (14 venus + 2 visiteurs),
+              le defaut deja corrige sur la tablette le 20/10. */}
           <div>
-            <b>{rdvs.filter(estVenu).length}<span style={{ fontSize: '.4em', opacity: 0.6 }}> / {duPhoning(rdvs).length}</span></b>
-            <span>clients venus</span>
+            <b>{duPhoning(rdvs).filter(estVenu).length}<span style={{ fontSize: '.4em', opacity: 0.6 }}> / {duPhoning(rdvs).length}</span></b>
+            <span>
+              clients venus
+              {rdvs.length > duPhoning(rdvs).length && ` · + ${rdvs.length - duPhoning(rdvs).length} visiteur${rdvs.length - duPhoning(rdvs).length > 1 ? 's' : ''}`}
+            </span>
           </div>
           <div><b>{rdvs.filter((r) => etapeAccueil(r) === 'avec_vendeur').length}</b><span>avec un vendeur, maintenant</span></div>
         </div>

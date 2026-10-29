@@ -1688,3 +1688,8 @@ body:has(.v2)::before, body:has(.v2)::after { display: none; }
 /* Le planning imprime ne se voit qu'a l'impression. */
 .vp-impression { display: none; }
 }
+
+@layer v2 {
+/* Un visiteur sans RDV dans la grille de saisie : present, mais hors compteurs. */
+.v2 .rdv .mention-visiteur { margin-left: 6px; padding: 0 5px; border-radius: 5px; font-size: 10px; font-weight: 800; letter-spacing: .02em; color: var(--info); background: color-mix(in srgb, var(--info) 16%, transparent); }
+}

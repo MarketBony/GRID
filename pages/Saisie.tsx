@@ -6,6 +6,7 @@ import { Icone } from '../components/ui/Icone';
 import { VueTable } from '../components/saisie/VueTable';
 import { cleRdv, libelleJour } from '../utils/grille';
 import { cleTri } from '../backend/src/utils/tri';
+import { duPhoning } from '../backend/src/utils/agregats';
 import { useTempsReel } from '../hooks/useTempsReel';
 import { appliquerRdv, type Dashboard, type EvenementRdv } from '../services/dashboard';
 import {
@@ -332,8 +333,12 @@ export function Saisie() {
       // ON COMPTE LES RDV, PAS LES CASES. C'est exactement l'ecart qui faisait dire
       // 1105 au module C et 1107 au tableau de bord, sur la meme base : deux cases
       // de juin portent deux rendez-vous, et une case ne comptait que pour un.
+      // LE PHONING SEULEMENT (28/10/2026) : un RDV de trafic naturel figure dans
+      // la grille mais n'est pas un RDV pris au telephone. Il etait compte — 17
+      // RDV a Massagettes pour 15 pris et 2 visiteurs, et le meme ecart dans GRID
+      // classique depuis le 03/10. Le filtre est celui de `duPhoning`, pas un autre.
       for (const liste of cases?.values() ?? []) {
-        for (const r of liste) {
+        for (const r of duPhoning(liste)) {
           const cle = r.marqueId ?? 'sansMarque';
           parSection[cle] = (parSection[cle] ?? 0) + 1;
           total++;

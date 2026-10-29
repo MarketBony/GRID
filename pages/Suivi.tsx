@@ -13,6 +13,7 @@ import {
   type RdvSuivi,
 } from '../services/suivi';
 import { classementCommandes, estSeche, indicateurs, type RangSuivi } from '../backend/src/utils/suivi';
+import { duPhoning } from '../backend/src/utils/agregats';
 import { ISSUES_SUIVI, type IssueSuivi } from '../backend/src/auth/roles';
 import { choisirDansListe, useCampagneCourante } from '../contexts/CampagneContext';
 import { cleTri } from '../backend/src/utils/tri';
@@ -188,7 +189,17 @@ export function Suivi() {
       {erreur && <div className="bandeau-v2 erreur" role="alert">{erreur}</div>}
 
       <div className="kpis">
-        <div className="kpi enter" style={{ ['--i' as string]: 0 }}><span className="l">Planifiés</span><span className="v num">{ind.planifies}</span></div>
+        {/* PLANIFIES = les RDV pris au phoning. Un visiteur n'avait pas de
+            rendez-vous : il compte a part (28/10/2026, « 17 planifies » a
+            Massagettes pour 15 RDV et 2 visiteurs). Commandes et taux gardent
+            visiteurs compris, comme decide le 05/10. */}
+        <div className="kpi enter" style={{ ['--i' as string]: 0 }}>
+          <span className="l">Planifiés</span>
+          <span className="v num">{duPhoning(rdvs).length}</span>
+          {ind.planifies > duPhoning(rdvs).length && (
+            <span className="faint" style={{ fontSize: 12 }}>+ {ind.planifies - duPhoning(rdvs).length} trafic naturel</span>
+          )}
+        </div>
         <div className="kpi enter" style={{ ['--i' as string]: 1 }}><span className="l">À traiter</span><span className="v num">{ind.aTraiter}</span></div>
         <div className="kpi enter" style={{ ['--i' as string]: 2 }}>
           <span className="l">Commandes</span>

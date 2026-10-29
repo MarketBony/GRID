@@ -7,6 +7,26 @@ verifie, pas seulement corrige de memoire.
 
 ---
 
+## [CORRIGE LE 29/10/2026] Le trafic naturel compte comme un RDV du phoning, sur quatre ecrans
+
+Signale par l'utilisateur apres la VP de Massagettes (28/10). La base etait JUSTE :
+15 RDV du phoning, 14 venus, 2 trafics naturels, 10 commandes (9 du phoning + 1
+visiteur). Ce sont les ecrans qui comptaient mal :
+
+| Ecran | Affichait | Cause | Affiche desormais |
+|---|---|---|---|
+| Saisie (et carte du jour) | 17 | le compteur ne connaissait pas la source du RDV | 15 ; le visiteur reste dans la grille, mention « visiteur » |
+| Suivi | 17 planifies | « planifies » comptait les visiteurs | 15 planifies, « + 2 trafic naturel » |
+| Projection | 16 / 15 venus | les visiteurs au numerateur, pas au denominateur | 14 / 15, « + 2 visiteurs » |
+| Bilan | 9 commandes | seul le tunnel, phoning seul, etait visible | « Ventes 10, dont 1 trafic naturel » ; etape « Commandes du phoning » |
+
+**La Saisie de GRID CLASSIQUE avait le meme defaut** depuis l'arrivee du trafic
+naturel (03/10) : le total d'Octobre comptait ses visiteurs. Corrige du meme geste,
+par le filtre unique `duPhoning`. Verifie en rejouant les fonctions pures sur les
+donnees de Massagettes (pas au navigateur : aucune session ouverte sur le poste).
+
+---
+
 ## [CORRIGE LE 28/10/2026, ECRAN SEULEMENT] Un client confie au vendeur apparaissait « Termine »
 
 Signale par l'utilisateur le jour de la VP de Massagettes : M. Georges TOURS, en essai

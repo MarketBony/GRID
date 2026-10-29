@@ -391,9 +391,10 @@ export function GrilleUnique({
                         />
                       ) : (
                         lesRdv.map((r) => (
-                          <span className="rdv" key={r.id} title={`${r.client} — ${libelleMarque(r.marqueId)}`}>
+                          <span className="rdv" key={r.id} title={`${r.client} — ${libelleMarque(r.marqueId)}${r.source === 'showroom' ? ' — visiteur sans RDV, hors compteurs du phoning' : ''}`}>
                             {sections.length > 1 && <span className={`point-marque ${classeMarque(libelleMarque(r.marqueId))}`} aria-hidden="true" />}
                             <span className="client">{r.client}</span>
+                            {r.source === 'showroom' && <span className="mention-visiteur">visiteur</span>}
                           </span>
                         ))
                       )}

@@ -1,5 +1,6 @@
 import { ErreurApi, supabase, txt, txtOuNull, verifier } from './supabase';
 import { comparerLibelle, trierPar } from '../backend/src/utils/tri';
+import type { SourceRdv } from '../backend/src/auth/roles';
 
 // ============================================================================
 // MODULE C — LE PERIMETRE DE SAISIE. C'est le coeur du produit.
@@ -60,6 +61,10 @@ export interface RdvSaisie {
   typeVehicule: string;
   client: string;
   commentaire: string | null;
+  /// `showroom` = trafic naturel, saisi depuis le Suivi ou l'accueil d'une VP.
+  /// Il figure dans la grille, mais n'entre dans AUCUN compteur du phoning
+  /// (`duPhoning`). Absente = phoning (un RDV pose depuis la grille).
+  source?: SourceRdv;
   /// Pose a l'ecran, pas encore accepte par la base. Son `id` est alors
   /// provisoire (`attente-<cle>`) : il ne se modifie ni ne s'archive avant
   /// d'avoir recu le sien. Voir la file d'attente de `pages/Saisie.tsx`.
@@ -239,6 +244,7 @@ interface LigneRdv {
   type_vehicule: string;
   client: string;
   commentaire: string | null;
+  source?: SourceRdv | null;
 }
 
 const versRdv = (r: LigneRdv): RdvSaisie => ({
@@ -250,6 +256,7 @@ const versRdv = (r: LigneRdv): RdvSaisie => ({
   typeVehicule: r.type_vehicule,
   client: r.client,
   commentaire: r.commentaire,
+  source: r.source === 'showroom' ? 'showroom' : 'relance',
 });
 
 /// Intitule du perimetre affiche en tete de la liste.
